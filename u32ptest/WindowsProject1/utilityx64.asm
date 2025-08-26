@@ -1,0 +1,2 @@
+option casemap:none
+end
