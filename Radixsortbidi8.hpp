@@ -2031,7 +2031,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		offset = *t;// the starting point was already adjusted to the signed range
 		*t = 0;// the first offset always starts at zero
 		t -= reversesort * 2 - 1;
-		addcarryofless(b, count, offset);
+		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		unsigned j{256 / 2 - 1};
 		do{
 			size_t difference{*t};
@@ -2062,7 +2062,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 		if constexpr(isfloatingpoint && !issigned && absolute){// starts at one removed from the initial index
 			t += reversesort * 2 - 1;// step back
-			addcarryofless(b, count, offset);
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{(256 - 2) / 2};// double the number of items per loop
 			do{
 				size_t difference{*t};// even
@@ -2079,7 +2079,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 		}else{// all other modes
 			t -= reversesort * 2 - 1;
-			addcarryofless(b, count, offset);
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{256 - 2};
 			do{
 				size_t difference{*t};
@@ -8831,7 +8831,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocsingle(size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoalloc(size_t count, T const input[], T output[], T buffer[])noexcept{
 	static_cast<void>(buffer);// the single-byte version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, T>(count, input, output);
 }

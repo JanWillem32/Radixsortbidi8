@@ -378,27 +378,45 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 
 	{// simple unit tests, mostly to track template compile-time issues
-		// TODO, create a full set of proper unit tests for the library
-		//enum dummy : int32_t {a, b, c, d, e, f, g, h};
-		uint32_t inm[]{8, 0, 3, 1 << 31 | 2, 3, 1 << 31 | 18, 1 << 31 | 2};
-		uint32_t outm[_countof(inm)];
-		uint32_t bufm[_countof(inm)];
-		rsbd8::radixsortcopynoalloc(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm), reinterpret_cast<float *>(bufm));
-		__debugbreak();
+		// 2 unit tests: radixsortcopynoalloc(), single-byte enum, no indirection, (explicit template statement) descending and ascending
+		enum cert_v_binencoding64 : uint8_t{// in groups of ten
+			$0, $1, $2, $3, $4, $5, $6, $7, $8, $9,// 0
+			$a, $b, $c, $d, $e, $f, $g, $h, $i, $j,// 10
+			$k, $l, $m, $n, $o, $p, $q, $r, $s, $t,// 20
+			$u, $v, $w, $x, $y, $z, $A, $B, $C, $D,// 30
+			$E, $F, $G, $H, $I, $J, $K, $L, $M, $N,// 40
+			$O, $P, $Q, $R, $S, $T, $U, $V, $W, $X,// 50
+			$Y, $Z, $$, $_};// 60
+		// test sequence 0B_iqUE (oblique), with one item from each row; 0:0, 10:i, 20:q, 30:B, 40:E, 50:U, 60:_
+		static cert_v_binencoding64 constexpr tein[7]{$0, $B, $_, $i, $q, $U, $E};
+		cert_v_binencoding64 teout[_countof(tein)];
+		cert_v_binencoding64 tebuf[_countof(tein)];// dummy, as it's an 8-bit type
+		rsbd8::radixsortcopynoalloc<rsbd8::decendingreverseordered>(_countof(tein), tein, teout, tebuf);
+		assert(teout[0] == $_ && teout[1] == $U && teout[2] == $E && teout[3] == $B && teout[4] == $q && teout[5] == $i && teout[6] == $0);
+		rsbd8::radixsortcopynoalloc<rsbd8::ascendingforwardordered>(_countof(tein), tein, teout);
+		assert(teout[0] == $0 && teout[1] == $i && teout[2] == $q && teout[3] == $B && teout[4] == $E && teout[5] == $U && teout[6] == $_);
 
+		// 1 unit test: radixsortnoalloc(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
+		uint32_t inm[7]{8, 0, 3, 1 << 31 | 2, 3, 1 << 31 | 18, 1 << 31 | 2};
+		uint32_t outm[_countof(inm)];
+		rsbd8::radixsortnoalloc(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm), true);
+		assert(outm[0] == 1 << 31 | 18 && outm[1] == 1 << 31 | 2 && outm[2] == 1 << 31 | 2 && outm[3] == 0 && outm[4] == 3 && outm[5] == 3 && outm[6] == 8);
+
+		// 6 groups of short unit tests: radixsortcopynoalloc() (and one directly to its implementation), 8-byte with first level getter indirection, (implicit template statement) ascending
+		// Part of this test is firing up the debugger in "release mode" to see how well the inlining parallel processing fares, or just read the asm output functions directly. (This generates quite a few similar functions for the various cases though.)
 #pragma pack(push, 1)
 		class Testmeclass{
+			uint64_t wasted{};// unused, default to zero for this test class
+			char misalignoffset{};// unused, default to zero for this test class
 		public:
-			uint64_t wasted;
-			char misalignoffset;
 			uint64_t co;
 			int64_t sco;
-			__forceinline uint64_t get()const noexcept{return{co};};
-			__forceinline uint64_t getwparam(int)const noexcept{return{co};};
-			__forceinline uint64_t bget()noexcept{return{co};};
-			__forceinline int64_t sget()const noexcept{return{sco};};
-			__forceinline int64_t zget()noexcept{return{sco};};
-			__forceinline Testmeclass(uint64_t input)noexcept : co{input}, sco{static_cast<int64_t>(input) - 1} {};
+			constexpr __forceinline uint64_t get()const noexcept{return{co};};
+			constexpr __forceinline uint64_t getwparam(int)const noexcept{return{co};};
+			constexpr __forceinline uint64_t bget()noexcept{return{co};};
+			constexpr __forceinline int64_t sget()const noexcept{return{sco};};
+			constexpr __forceinline int64_t zget()noexcept{return{sco};};
+			constexpr __forceinline Testmeclass(uint64_t input)noexcept : co{input}, sco{static_cast<int64_t>(input) - 1} {};
 		};
 #pragma pack(pop)
 		constexpr size_t sizecontainer{sizeof(Testmeclass)};
@@ -414,6 +432,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		Testmeclass const *fbuf[_countof(cin)];
 
 		rsbd8::helper::radixsortcopynoallocmulti<&Testmeclass::get, false, false, false, false, false, 0, false, Testmeclass const>(_countof(fin), fin, fout, fbuf);
+
 		rsbd8::radixsortcopynoalloc<&Testmeclass::get>(_countof(fin), fin, fout, fbuf);
 		rsbd8::radixsortcopynoalloc<&Testmeclass::getwparam>(_countof(fin), fin, fout, fbuf, 8);
 		rsbd8::radixsortcopynoalloc<&Testmeclass::co>(_countof(fin), fin, fout, fbuf);
@@ -428,7 +447,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// correctly fails to compile (not const-correct):
 		//rsbd8::radixsortcopynoalloc<&Testmeclass::zget>(_countof(fin), fin, fout, fbuf);
 
-		Testmeclass *const yin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
+		Testmeclass *yin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
 		Testmeclass *yout[_countof(cin)];
 		Testmeclass *ybuf[_countof(cin)];
 
@@ -445,6 +464,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		rsbd8::radixsortcopynoalloc<&Testmeclass::bget>(_countof(yin), yin, yout, ybuf);
 		rsbd8::radixsortcopynoalloc<&Testmeclass::zget>(_countof(yin), yin, yout, ybuf);
 
+		// TODO: add more unit tests
 		__debugbreak();
 	}
 
