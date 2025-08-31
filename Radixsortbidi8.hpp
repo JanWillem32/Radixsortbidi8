@@ -895,7 +895,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= CHAR_BIT * sizeof(T) - 8 + 1;
 		}else if constexpr(issigned){
 			cura += curaq;
-			cura += curaq;
+			curb += curbq;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
