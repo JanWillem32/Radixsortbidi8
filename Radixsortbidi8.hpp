@@ -878,7 +878,7 @@ template<bool absolute = false, bool issigned = false, bool isfloatingpoint = fa
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T),
-	std::pair<T, T>> filtertopbyte(T cura, T curb)noexcept{
+	std::pair<size_t, size_t>> filtertopbyte(T cura, T curb)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		std::make_signed_t<T> curap{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(isfloatingpoint || !issigned) cura *= 2;
@@ -932,7 +932,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	T> filtershiftbyte(T cur, unsigned shift)noexcept{
+	size_t> filtershiftbyte(T cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top byte for non-absolute floating-point inputs.
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
