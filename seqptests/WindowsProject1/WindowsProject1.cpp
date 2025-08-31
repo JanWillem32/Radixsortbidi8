@@ -397,10 +397,10 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(teout[0] == $0 && teout[1] == $i && teout[2] == $q && teout[3] == $B && teout[4] == $E && teout[5] == $U && teout[6] == $_);
 
 		// 1 unit test: radixsortnoalloc(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
-		uint32_t inm[7]{8, 0, 3, 1 << 31 | 2, 3, 1 << 31 | 18, 1 << 31 | 2};
+		uint32_t inm[7]{8, 0, 3, 1u << 31 | 2, 3, 1u << 31 | 18, 1u << 31 | 2};
 		uint32_t outm[_countof(inm)];
 		rsbd8::radixsortnoalloc(_countof(inm), reinterpret_cast<float *>(inm), reinterpret_cast<float *>(outm), true);
-		assert(outm[0] == 1 << 31 | 18 && outm[1] == 1 << 31 | 2 && outm[2] == 1 << 31 | 2 && outm[3] == 0 && outm[4] == 3 && outm[5] == 3 && outm[6] == 8);
+		assert(outm[0] == (1u << 31 | 18) && outm[1] == (1u << 31 | 2) && outm[2] == (1u << 31 | 2) && outm[3] == 0 && outm[4] == 3 && outm[5] == 3 && outm[6] == 8);
 
 		// 6 groups of short unit tests: radixsortcopynoalloc() (and one directly to its implementation), 8-byte with first level getter indirection, (implicit template statement) ascending
 		// Part of this test is firing up the debugger in "release mode" to see how well the inlining parallel processing fares, or just read the asm output functions directly. (This generates quite a few similar functions for the various cases though.)
@@ -465,7 +465,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		rsbd8::radixsortcopynoalloc<&Testmeclass::zget>(_countof(yin), yin, yout, ybuf);
 
 		// TODO: add more unit tests
-		__debugbreak();
 	}
 
 	// allocate 256 MiB for the in- and outputs
