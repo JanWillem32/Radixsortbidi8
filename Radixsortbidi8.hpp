@@ -350,13 +350,11 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // The C++20 "std::endian" parts in the "bit" header currently unfortunately don't indicate more than little, big and undefined mixed endianness.
 //
 // C++17 features detection
-#if 201703L > __cplusplus
 // Microsoft C/C++-compatible compilers don't set the __cplusplus predefined macro conforming to the standard by default for some very outdated legacy code reasons.
 // /Zc:__cplusplus can correct it, but it's not part of the regular "Standards conformance" /permissive- compiler options.
 // Use its internal macro here as a temporary fix.
-#if !defined(_MSVC_LANG) || 201703L > _MSVC_LANG
+#if 201703L > __cplusplus || defined(_MSVC_LANG) && 201703L > _MSVC_LANG
 #error Compiler does not conform to C++17 to compile this library.
-#endif
 #endif
 #include <utility>
 #if CHAR_BIT & 8 - 1
