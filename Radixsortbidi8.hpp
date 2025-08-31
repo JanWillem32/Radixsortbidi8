@@ -350,13 +350,16 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // The C++20 "std::endian" parts in the "bit" header currently unfortunately don't indicate more than little, big and undefined mixed endianness.
 //
 // C++17 features detection
+#if 201703L > __cplusplus
 // Microsoft C/C++-compatible compilers don't set the __cplusplus predefined macro conforming to the standard by default for some very outdated legacy code reasons.
 // /Zc:__cplusplus can correct it, but it's not part of the regular "Standards conformance" /permissive- compiler options.
 // Use its internal macro here as a temporary fix.
-#if 201703L > __cplusplus || defined(_MSVC_LANG) && 201703L > _MSVC_LANG
+#if !defined(_MSVC_LANG) || 201703L > _MSVC_LANG
 #error Compiler does not conform to C++17 to compile this library.
 #endif
+#endif
 #include <utility>
+#include <tuple>
 #if CHAR_BIT & 8 - 1
 #error This platform has an addressable unit that isn't divisible by 8. For these kinds of platforms it's better to re-write this library and not use an 8-bit indexed radix sort method.
 #endif
@@ -451,10 +454,10 @@ namespace rsbd8{// Avoid putting any include files into this library's namespace
 // These are the only two macros defined in this file, and #undef statements are used for them at the end.
 #if defined(DEBUG) || defined(_DEBUG)// This part is debug-only. These are non-standard conforming macros, but note that the "NDEBUG" rule for detecting non-debug builds should only ever apply to runtime assert() statments in C++.
 #ifdef _MSC_VER
-#define RSBD8_FUNC_INLINE __declspec(noalias safebuffers)
+#define RSBD8_FUNC_INLINE __declspec(noalias safebuffers) inline
 #define RSBD8_FUNC_NORMAL __declspec(noalias safebuffers)
 #else
-#define RSBD8_FUNC_INLINE
+#define RSBD8_FUNC_INLINE inline
 #define RSBD8_FUNC_NORMAL
 #endif
 #else// release-only
