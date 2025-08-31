@@ -544,7 +544,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				return reinterpret_cast<V *>(reinterpret_cast<T const *>(p) + std::forward(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+				return reinterpret_cast<V *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				return p->*reinterpret_cast<T(V:: *)>(indirection1);
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
@@ -557,10 +557,10 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 				if constexpr(isindexed2){// second level extra index
 					return reinterpret_cast<std::byte const *>(p->*indirection1);
-					//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[std::forward(varparameters...)]};
+					//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
 				}else{// first level extra index
-					return reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * std::forward(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * std::forward(varparameters...))->*indirection1) + indirection2)};
+					return reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 				}
 			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
 				auto[index1, index2]{std::make_pair(varparameters...)};
@@ -602,11 +602,11 @@ RSBD8_FUNC_INLINE T indirectinput2(std::byte const *pintermediate, vararguments.
 			//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)};
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
-				return{reinterpret_cast<T const *>(pintermediate + indirection2)[std::forward(varparameters...)]};
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[std::forward(varparameters...)]};
+				return{reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)]};
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
 			}else{// first level extra index
 				return{*reinterpret_cast<T const *>(pintermediate + indirection2)};
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * std::forward(varparameters...))->*indirection1) + indirection2)};
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 			}
 		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
 			auto[index1, index2]{std::make_pair(varparameters...)};
