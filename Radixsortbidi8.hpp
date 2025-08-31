@@ -563,10 +563,9 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 				}
 			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-				auto[index1, index2]{std::make_pair(varparameters...)};
-				static_cast<void>(index2);
-				return reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * index1)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * index1)->*indirection1) + indirection2)[index2]};
+				std::pair indices{varparameters...};
+				return reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
@@ -609,10 +608,9 @@ RSBD8_FUNC_INLINE T indirectinput2(std::byte const *pintermediate, vararguments.
 				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 			}
 		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-			auto[index1, index2]{std::make_pair(varparameters...)};
-			static_cast<void>(index1);
-			return{reinterpret_cast<T const *>(pintermediate + indirection2)[index2]};
-			//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * index1)->*indirection1) + indirection2)[index2]};
+			std::pair indices{varparameters...};
+			return{reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second]};
+			//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		if constexpr(isindexed2){// second level extra index
@@ -901,32 +899,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curbq;
 		if constexpr(8 <= CHAR_BIT * sizeof(T)){
 			if constexpr(isfloatingpoint){
-				return{std::make_pair(static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu)};
+				return{static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu};
 			}else{
 				cura >>= CHAR_BIT * sizeof(T) - 8;
 				curb >>= CHAR_BIT * sizeof(T) - 8;
-				return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
+				return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 			}
-		}else return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
+		}else return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		if constexpr(8 <= CHAR_BIT * sizeof(T)){
 			cura >>= CHAR_BIT * sizeof(T) - 8 - 1;
 			curb >>= CHAR_BIT * sizeof(T) - 8 - 1;
-			return{std::make_pair(static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu)};
+			return{static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu};
 		}else if(issigned){
 			cura <<= 1;
 			curb <<= 1;
-			return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
+			return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
-			return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
+			return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 		}
 	}else if constexpr(8 <= CHAR_BIT * sizeof(T)){
 		cura >>= CHAR_BIT * sizeof(T) - 8;
 		curb >>= CHAR_BIT * sizeof(T) - 8;
-		return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
-	}else return{std::make_pair(static_cast<size_t>(cura), static_cast<size_t>(curb))};
+		return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
+	}else return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 }
 
 template<bool absolute = false, bool issigned = false, bool isfloatingpoint = false, typename T>
@@ -984,7 +982,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	cura >>= shift;
 	curb >>= shift;
-	return{std::make_pair(static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu)};
+	return{static_cast<size_t>(cura) & 0xFFu, static_cast<size_t>(curb) & 0xFFu};
 }
 
 template<bool absolute = false, bool issigned = false, bool isfloatingpoint = false, typename T>
@@ -1955,7 +1953,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*t = offset;
 		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// high half, the last offset always starts at the end
 		t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
-		if constexpr(16 < CHAR_BIT * sizeof(T) || !issigned || absolute || reversesort) t -= reversesort * 2 - 1;
+		if constexpr(16 < CHAR_BIT * sizeof(T) || !issigned || absolute || !reversesort) t -= reversesort * 2 - 1;// only the reverse sorting mode for signed 16-bit types can skip this
 		paritybool ^= b;
 		runsteps ^= b << k;
 	}while((16 == CHAR_BIT * sizeof(T) && issigned && !absolute)? false :
@@ -1997,7 +1995,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		paritybool ^= b;
 		runsteps ^= b << (CHAR_BIT * sizeof(T) / 8 - 1);
 	}
-	return{std::make_pair(runsteps, paritybool)};// paritybool will be 1 for when the swap count is odd
+	return{runsteps, paritybool};// paritybool will be 1 for when the swap count is odd
 }
 
 template<bool reversesort = false, bool absolute = false, bool issigned = false, bool isfloatingpoint = false, typename T>
@@ -2022,7 +2020,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// 0b0111'1111 +QNaN (maximum amount of ones)
 	// Determining the starting point depends of several factors here.
 	size_t *t{offsets// either aim to cache low-to-high or high-to-low
-		+ reversesort * (CHAR_BIT * sizeof(T) * 256 / 8 - 1 - (issigned && !absolute) * 256 / 2)
+		+ (issigned && !absolute) * (CHAR_BIT * sizeof(T) * 256 / 8 / 2 - reversesort)
+		+ (reversesort && (!issigned || absolute)) * (CHAR_BIT * sizeof(T) * 256 / 8 - 1)
 		- (isfloatingpoint && !issigned && absolute) * (reversesort * 2 - 1)};
 	size_t offset;
 	unsigned b;
@@ -8737,7 +8736,7 @@ RSBD8_FUNC_INLINE T *
 	}
 #endif
 	T *buffer{reinterpret_cast<T *>(mmap(pempty, allocsize, PROT_READ | PROT_WRITE, mmapflags, -1, 0))};
-	return{std::make_pair(buffer, allocsize)};
+	return{buffer, allocsize};
 #else
 	T *buffer{new(std::nothrow) T[allocsize]};
 	return{buffer};
