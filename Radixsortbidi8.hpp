@@ -359,7 +359,6 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #endif
 #endif
 #include <utility>
-#include <tuple>
 #if CHAR_BIT & 8 - 1
 #error This platform has an addressable unit that isn't divisible by 8. For these kinds of platforms it's better to re-write this library and not use an 8-bit indexed radix sort method.
 #endif
@@ -3266,30 +3265,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = pdstnext;
 				psrchi = pdstnext + count;
 			}
-			for(;;){
-				// handle the top byte for floating-point differently
-				if constexpr(!absolute && isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
+			if constexpr(!absolute && isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
+				[[unlikely]]
 #endif
-				{
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						T outlo{*psrclo++};
-						T outhi{*psrchi--};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-						size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-						size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
-						pdst[offsetlo] = outlo;
-						pdst[offsethi] = outhi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						T outlo{*psrclo};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-						size_t offsetlo{poffset[curlo]};
-						pdst[offsetlo] = outlo;
-					}
-					break;// no further processing beyond the top byte
-				}
+				goto handletopbyte;// rare, but possible
+			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					T outlo{*psrclo++};
 					T outhi{*psrchi--};
@@ -3311,23 +3292,49 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[unlikely]]
 #endif
 					break;
+				{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
+					[[maybe_unused]]
 #endif
-				unsigned index;
-				if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
-				shifter += 8;
-				poffset += 256;
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				psrchi = pdst + count;
-				pdst = pdstnext;
-				pdstnext = const_cast<T *>(psrclo);// never written past the first iteration
-				// skip a step if possible
-				if constexpr(16 < CHAR_BIT * sizeof(T)){
-					runsteps >>= index;
-					shifter += index * 8;
-					poffset += static_cast<size_t>(index) * 256;
+					unsigned index;
+					if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+					shifter += 8;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = const_cast<T *>(psrclo);// never written past the first iteration
+					// skip a step if possible
+					if constexpr(16 < CHAR_BIT * sizeof(T)){
+						runsteps >>= index;
+						shifter += index * 8;
+						poffset += static_cast<size_t>(index) * 256;
+					}
+				}
+				// handle the top byte for floating-point differently
+				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						T outlo{*psrclo++};
+						T outhi{*psrchi--};
+						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						pdst[offsetlo] = outlo;
+						pdst[offsethi] = outhi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						T outlo{*psrclo};
+						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
+						pdst[offsetlo] = outlo;
+					}
+					break;// no further processing beyond the top byte
 				}
 			}
 		}
@@ -4616,30 +4623,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			shifter *= 8;
 			T *psrchi{psrclo + count};
 			T *pdstnext{psrclo};// for the next iteration
-			for(;;){
-				// handle the top byte for floating-point differently
-				if constexpr(absolute || isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
+			if constexpr(!absolute && isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
+				[[unlikely]]
 #endif
-					{
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						T outlo{*psrclo++};
-						T outhi{*psrchi--};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-						size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-						size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
-						pdst[offsetlo] = outlo;
-						pdst[offsethi] = outhi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						T outlo{*psrclo};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-						size_t offsetlo{poffset[curlo]};
-						pdst[offsetlo] = outlo;
-					}
-					break;// no further processing beyond the top byte
-				}
+				goto handletopbyte;// rare, but possible
+			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					T outlo{*psrclo++};
 					T outhi{*psrchi--};
@@ -4661,23 +4650,49 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[unlikely]]
 #endif
 					break;
+				{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
+					[[maybe_unused]]
 #endif
-				unsigned index;
-				if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
-				shifter += 8;
-				poffset += 256;
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				psrchi = pdst + count;
-				pdst = pdstnext;
-				pdstnext = psrclo;
-				// skip a step if possible
-				if constexpr(16 < CHAR_BIT * sizeof(T)){
-					runsteps >>= index;
-					shifter += index * 8;
-					poffset += static_cast<size_t>(index) * 256;
+					unsigned index;
+					if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+					shifter += 8;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = psrclo;
+					// skip a step if possible
+					if constexpr(16 < CHAR_BIT * sizeof(T)){
+						runsteps >>= index;
+						shifter += index * 8;
+						poffset += static_cast<size_t>(index) * 256;
+					}
+				}
+				// handle the top byte for floating-point differently
+				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						T outlo{*psrclo++};
+						T outhi{*psrchi--};
+						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						pdst[offsetlo] = outlo;
+						pdst[offsethi] = outhi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						T outlo{*psrclo};
+						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
+						pdst[offsetlo] = outlo;
+					}
+					break;// no further processing beyond the top byte
 				}
 			}
 		}
@@ -5871,36 +5886,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = pdstnext;
 				psrchi = pdstnext + count;
 			}
-			for(;;){
-				// handle the top byte for floating-point differently
-				if constexpr(absolute || isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
+			if constexpr(!absolute && isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
+				[[unlikely]]
 #endif
-					{
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-						size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-						size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
-						pdst[offsetlo] = plo;
-						pdst[offsethi] = phi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						V *plo{*psrclo};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-						size_t offsetlo{poffset[curlo]};
-						pdst[offsetlo] = plo;
-					}
-					break;// no further processing beyond the top byte
-				}
+				goto handletopbyte;// rare, but possible
+			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
@@ -5928,23 +5919,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[unlikely]]
 #endif
 					break;
+				{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
+					[[maybe_unused]]
 #endif
-				unsigned index;
-				if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
-				shifter += 8;
-				poffset += 256;
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				psrchi = pdst + count;
-				pdst = pdstnext;
-				pdstnext = const_cast<V **>(psrclo);// never written past the first iteration
-				// skip a step if possible
-				if constexpr(16 < CHAR_BIT * sizeof(T)){
-					runsteps >>= index;
-					shifter += index * 8;
-					poffset += static_cast<size_t>(index) * 256;
+					unsigned index;
+					if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+					shifter += 8;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = const_cast<V **>(psrclo);// never written past the first iteration
+					// skip a step if possible
+					if constexpr(16 < CHAR_BIT * sizeof(T)){
+						runsteps >>= index;
+						shifter += index * 8;
+						poffset += static_cast<size_t>(index) * 256;
+					}
+				}
+				// handle the top byte for floating-point differently
+				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *plo{*psrclo};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
+						pdst[offsetlo] = plo;
+					}
+					break;// no further processing beyond the top byte
 				}
 			}
 		}
@@ -7215,36 +7238,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			shifter *= 8;
 			V **psrchi{psrclo + count};
 			V **pdstnext{psrclo};// for the next iteration
-			for(;;){
-				// handle the top byte for floating-point differently
-				if constexpr(absolute || isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
+			if constexpr(!absolute && isfloatingpoint) if(CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
+				[[unlikely]]
 #endif
-				{
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-						size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-						size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
-						pdst[offsetlo] = plo;
-						pdst[offsethi] = phi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						V *plo{*psrclo};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-						size_t offsetlo{poffset[curlo]};
-						pdst[offsetlo] = plo;
-					}
-					break;// no further processing beyond the top byte
-				}
+				goto handletopbyte;// rare, but possible
+			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
@@ -7272,23 +7271,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[unlikely]]
 #endif
 					break;
+				{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				unsigned index;
-				if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
-				shifter += 8;
-				poffset += 256;
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				psrchi = pdst + count;
-				pdst = pdstnext;
-				pdstnext = psrclo;
-				// skip a step if possible
-				if constexpr(16 < CHAR_BIT * sizeof(T)){
-					runsteps >>= index;
-					shifter += index * 8;
-					poffset += static_cast<size_t>(index) * 256;
+					unsigned index;
+					if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+					shifter += 8;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = psrclo;
+					// skip a step if possible
+					if constexpr(16 < CHAR_BIT * sizeof(T)){
+						runsteps >>= index;
+						shifter += index * 8;
+						poffset += static_cast<size_t>(index) * 256;
+					}
+				}
+				// handle the top byte for floating-point differently
+				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *plo{*psrclo};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
+						pdst[offsetlo] = plo;
+					}
+					break;// no further processing beyond the top byte
 				}
 			}
 		}
