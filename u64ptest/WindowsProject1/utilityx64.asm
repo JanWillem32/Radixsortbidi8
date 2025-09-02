@@ -336,7 +336,7 @@ InnerRadixSortBidi8@@32 proc
 ; no return value
 ; This function contains the radix sorting inner loop even for an even size of 64-bit unsigned elements.
 ; This function is modeled after the C++ function radixsortbidi8() in the original project.
-; This is a leaf function without internal stack modification or exception handling.
+; This is function has no exception handling.
 ; The instructions are grouped to indicate parallel execution in a modern superscalar CPU with proper register renaming and without any penalties for a full-register write-after-read or write-after-write.
 	; This function uses the stack, so this is not a leaf function. Proper prologue and epilogue code is used here, but without an exception frame.
 	; prolog part with a stack larger than a 4096-byte page
