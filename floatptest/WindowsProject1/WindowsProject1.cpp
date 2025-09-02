@@ -518,7 +518,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(double));
+		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -543,7 +543,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		// NaN issue... std::is_sorted() doesn't work well with NaN data in the array
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(double)));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(float)));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -618,7 +618,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -643,7 +643,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		// NaN issue... std::is_sorted() doesn't work well with NaN data in the array
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(double)));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(float)));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -718,7 +718,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(256 * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out), upLargePageSize);
+		rsbd8::radixsort(256 * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -743,7 +743,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		// NaN issue... std::is_sorted() doesn't work well with NaN data in the array
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(double)));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 256 * 1024 * 1024 / sizeof(float)));
 	}
 	OutputDebugStringW(L"Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.\nDiscard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.\n");
 	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to the full 256 MiB
@@ -820,7 +820,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(32 * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out), upLargePageSize);
+		rsbd8::radixsort(32 * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -858,7 +858,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + 32 * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + 2 * 32 * 1024 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + 32 * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + 2 * 32 * 1024 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -896,7 +896,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(4 * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + 2 * 32 * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(4 * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + 2 * 32 * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -934,7 +934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 2 * 4) * 1024 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 2 * 4) * 1024 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -972,7 +972,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(512 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 2 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(512 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 2 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1010,7 +1010,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 3 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 3 * 4) * 1024 * 1024 / sizeof(double) + 512 * 1024);
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 3 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 3 * 4) * 1024 * 1024 / sizeof(float) + 512 * 1024);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1048,7 +1048,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(64 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 4 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(64 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 4 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1086,7 +1086,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 5 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 5 * 4) * 1024 * 1024 / sizeof(double) + 64 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 5 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 5 * 4) * 1024 * 1024 / sizeof(float) + 64 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1124,7 +1124,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(8 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 6 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(8 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 6 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1162,7 +1162,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 7 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 7 * 4) * 1024 * 1024 / sizeof(double) + 8 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 7 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 7 * 4) * 1024 * 1024 / sizeof(float) + 8 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1200,7 +1200,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 8 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 8 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1238,7 +1238,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 9 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 9 * 4) * 1024 * 1024 / sizeof(double) + 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 9 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 9 * 4) * 1024 * 1024 / sizeof(float) + 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1276,7 +1276,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(128 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 10 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(128 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 10 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1314,7 +1314,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 11 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 11 * 4) * 1024 * 1024 / sizeof(double) + 128 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 11 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 11 * 4) * 1024 * 1024 / sizeof(float) + 128 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1352,7 +1352,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(16 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 12 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(16 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 12 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1390,7 +1390,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 13 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 13 * 4) * 1024 * 1024 / sizeof(double) + 16 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 13 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 13 * 4) * 1024 * 1024 / sizeof(float) + 16 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1428,7 +1428,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(3 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 14 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(3 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 14 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1466,7 +1466,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 15 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 15 * 4) * 1024 * 1024 / sizeof(double) + 3 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 15 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 15 * 4) * 1024 * 1024 / sizeof(float) + 3 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1504,7 +1504,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(2 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 16 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(2 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 16 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1542,7 +1542,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 17 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 17 * 4) * 1024 * 1024 / sizeof(double) + 2 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 17 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 17 * 4) * 1024 * 1024 / sizeof(float) + 2 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1580,7 +1580,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(5 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 18 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(5 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 18 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1618,7 +1618,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 19 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 19 * 4) * 1024 * 1024 / sizeof(double) + 5 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 19 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 19 * 4) * 1024 * 1024 / sizeof(float) + 5 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1656,7 +1656,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(3 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 20 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(3 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 20 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1694,7 +1694,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 21 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 21 * 4) * 1024 * 1024 / sizeof(double) + 3 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 21 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 21 * 4) * 1024 * 1024 / sizeof(float) + 3 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1732,7 +1732,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(7 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 22 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(7 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 22 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1770,7 +1770,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 23 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 23 * 4) * 1024 * 1024 / sizeof(double) + 7 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 23 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 23 * 4) * 1024 * 1024 / sizeof(float) + 7 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1808,7 +1808,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(4 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 24 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(4 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 24 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1846,7 +1846,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 25 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 25 * 4) * 1024 * 1024 / sizeof(double) + 4 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 25 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 25 * 4) * 1024 * 1024 / sizeof(float) + 4 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1884,7 +1884,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(9 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 26 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(9 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 26 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1922,7 +1922,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 27 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 27 * 4) * 1024 * 1024 / sizeof(double) + 9 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 27 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 27 * 4) * 1024 * 1024 / sizeof(float) + 9 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1960,7 +1960,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(5 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 28 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(5 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 28 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1998,7 +1998,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 29 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 29 * 4) * 1024 * 1024 / sizeof(double) + 5 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 29 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 29 * 4) * 1024 * 1024 / sizeof(float) + 5 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2036,7 +2036,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(11 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 30 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(11 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 30 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2074,7 +2074,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 31 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 31 * 4) * 1024 * 1024 / sizeof(double) + 11 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 31 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 31 * 4) * 1024 * 1024 / sizeof(float) + 11 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2112,7 +2112,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(6 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 32 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(6 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 32 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2150,7 +2150,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 33 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 33 * 4) * 1024 * 1024 / sizeof(double) + 6 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 33 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 33 * 4) * 1024 * 1024 / sizeof(float) + 6 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2188,7 +2188,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(13 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 34 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(13 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 34 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2226,7 +2226,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 35 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 35 * 4) * 1024 * 1024 / sizeof(double) + 13 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 35 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 35 * 4) * 1024 * 1024 / sizeof(float) + 13 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2264,7 +2264,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(7 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 36 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(7 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 36 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2302,7 +2302,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 37 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 37 * 4) * 1024 * 1024 / sizeof(double) + 7 * 1024 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 37 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 37 * 4) * 1024 * 1024 / sizeof(float) + 7 * 1024 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2340,7 +2340,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(15 * 512 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 38 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(15 * 512 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 38 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2378,7 +2378,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 39 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 39 * 4) * 1024 * 1024 / sizeof(double) + 15 * 512 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 39 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 39 * 4) * 1024 * 1024 / sizeof(float) + 15 * 512 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2416,7 +2416,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(4 * 128 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 40 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(4 * 128 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 40 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2454,7 +2454,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 41 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 41 * 4) * 1024 * 1024 / sizeof(double) + 4 * 128 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 41 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 41 * 4) * 1024 * 1024 / sizeof(float) + 4 * 128 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2492,7 +2492,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(5 * 128 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 42 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(5 * 128 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 42 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2530,7 +2530,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 43 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 43 * 4) * 1024 * 1024 / sizeof(double) + 5 * 128 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 43 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 43 * 4) * 1024 * 1024 / sizeof(float) + 5 * 128 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2568,7 +2568,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(6 * 128 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 44 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(6 * 128 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 44 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2606,7 +2606,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 45 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 45 * 4) * 1024 * 1024 / sizeof(double) + 6 * 128 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 45 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 45 * 4) * 1024 * 1024 / sizeof(float) + 6 * 128 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2644,7 +2644,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(7 * 128 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 46 * 4) * 1024 * 1024 / sizeof(double), upLargePageSize);
+		rsbd8::radixsort(7 * 128 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 46 * 4) * 1024 * 1024 / sizeof(float), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2682,7 +2682,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 47 * 4) * 1024 * 1024 / sizeof(double), reinterpret_cast<float *>(out) + (2 * 32 + 47 * 4) * 1024 * 1024 / sizeof(double) + 7 * 128 / sizeof(double));
+		std::stable_sort(reinterpret_cast<float *>(out) + (2 * 32 + 47 * 4) * 1024 * 1024 / sizeof(float), reinterpret_cast<float *>(out) + (2 * 32 + 47 * 4) * 1024 * 1024 / sizeof(float) + 7 * 128 / sizeof(float));
 
 		// stop measuring
 		uint64_t u64stop;
