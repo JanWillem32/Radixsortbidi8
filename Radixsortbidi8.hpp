@@ -823,12 +823,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Helper functions to implement the 8 main modes
-// There are 4 base functions, handling 1, 2, 3, 4 or 8 inputs.
-// Each of the functions have two varians that take one or two pointers per input to store each input before its first modification.
+// The filtertopbyte() and filtershiftbyte() template functions are customized for the sorting phase, and have no need for variants with pointers.
+// These also only output size_t (or a pair of them) for direct use as indices.
+// The filterinput() template functions modify their inputs and each has a variant that write their inputs to memory either once or twice.
+// There are 5 of these, handling 1, 2, 3, 4 or 8 inputs.
+// Each of these have two varians that take one or two pointers per input to store each input before modification.
 // = modes with no filtering here:
 // --- regular unsigned integer and also inside-out signed integer
 // --- regular signed integer
-// --- modes with one-pass filtering here:
+// = modes with one-pass filtering here:
 // --- absolute floating-point and also unsigned integer without using the top bit
 // --- absolute floating-point, but negative inputs will sort just below their positive counterparts
 // = modes with two-pass filtering here:
@@ -836,8 +839,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // --- inside-out floating-point
 // --- absolute signed integer
 // --- absolute signed integer, but negative inputs will sort just below their positive counterparts
-// The four starting template functions are customized for the sorting phase, and have no need for variants with pointers.
-// All other template functions modify their inputs and each has a variant that write their inputs to memory either once or twice.
 
 template<bool absolute = false, bool issigned = false, bool isfloatingpoint = false, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -863,11 +864,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else return{static_cast<size_t>(cur)};
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		if constexpr(8 <= CHAR_BIT * sizeof(T)){
-			cur >>= CHAR_BIT * sizeof(T) - 8 - 1;
-			return{static_cast<size_t>(cur & 0xFFu)};
-		}else if(issigned){
-			cur <<= 1;
-			return{static_cast<size_t>(cur)};
+			cur >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
+			return{static_cast<size_t>(cur & 0xFFu >> issigned)};
+		}else if constexpr(issigned){
+			return{static_cast<size_t>(cur & 0x7Fu)};
 		}else{
 			cur = rotateleftportable<1>(cur);
 			return{static_cast<size_t>(cur)};
@@ -914,13 +914,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		if constexpr(8 <= CHAR_BIT * sizeof(T)){
-			cura >>= CHAR_BIT * sizeof(T) - 8 - 1;
-			curb >>= CHAR_BIT * sizeof(T) - 8 - 1;
-			return{static_cast<size_t>(cura & 0xFFu), static_cast<size_t>(curb & 0xFFu)};
-		}else if(issigned){
-			cura <<= 1;
-			curb <<= 1;
-			return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
+			cura >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
+			curb >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
+			return{static_cast<size_t>(cura & 0xFFu >> issigned), static_cast<size_t>(curb & 0xFFu >> issigned)};
+		}else if constexpr(issigned){
+			return{static_cast<size_t>(cura & 0x7Fu), static_cast<size_t>(curb & 0x7Fu)};
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
@@ -951,9 +949,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curq{static_cast<T>(curp)};
 		if constexpr(!isfloatingpoint && issigned) cur += curq;
 		cur ^= curq;
-	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned) cur <<= 1;
-		else cur = rotateleftportable<1>(cur);
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		cur = rotateleftportable<1>(cur);
 	}
 	cur >>= shift;
 	return{static_cast<size_t>(cur & 0xFFu)};
@@ -983,14 +980,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curaq;
 		curb ^= curbq;
-	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned){
-			cura <<= 1;
-			curb <<= 1;
-		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
-		}
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		cura = rotateleftportable<1>(cura);
+		curb = rotateleftportable<1>(curb);
 	}
 	cura >>= shift;
 	curb >>= shift;
@@ -1013,7 +1005,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		else if constexpr(issigned) cur += curq;
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned) cur <<= 1;
+		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
 		else cur = rotateleftportable<1>(cur);
 	}
 }
@@ -1036,7 +1028,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*out = cur;
-		if(issigned) cur <<= 1;
+		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
 		else cur = rotateleftportable<1>(cur);
 	}else *out = cur;
 }
@@ -1061,7 +1053,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*out = cur;
 		*dst = cur;
-		if(issigned) cur <<= 1;
+		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
 		else cur = rotateleftportable<1>(cur);
 	}else{
 		*out = cur;
@@ -1095,9 +1087,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cura ^= curaq;
 		curb ^= curbq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned){
-			cura <<= 1;
-			curb <<= 1;
+		if constexpr(issigned){
+			cura &= ~static_cast<T>(0) >> 1;
+			curb &= ~static_cast<T>(0) >> 1;
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
@@ -1134,10 +1126,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curbq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 	}else{
 		*outa = cura;
@@ -1177,11 +1169,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		*dsta = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
 		*dstb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 	}else{
 		*outa = cura;
@@ -1224,10 +1216,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curbq;
 		curc ^= curcq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned){
-			cura <<= 1;
-			curb <<= 1;
-			curc <<= 1;
+		if constexpr(issigned){
+			cura &= ~static_cast<T>(0) >> 1;
+			curb &= ~static_cast<T>(0) >> 1;
+			curc &= ~static_cast<T>(0) >> 1;
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
@@ -1273,13 +1265,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curc ^= curcq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 	}else{
 		*outa = cura;
@@ -1329,15 +1321,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		*dsta = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
 		*dstb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
 		*dstc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 	}else{
 		*outa = cura;
@@ -1389,11 +1381,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curc ^= curcq;
 		curd ^= curdq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned){
-			cura <<= 1;
-			curb <<= 1;
-			curc <<= 1;
-			curd <<= 1;
+		if constexpr(issigned){
+			cura &= ~static_cast<T>(0) >> 1;
+			curb &= ~static_cast<T>(0) >> 1;
+			curc &= ~static_cast<T>(0) >> 1;
+			curd &= ~static_cast<T>(0) >> 1;
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
@@ -1448,16 +1440,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curd ^= curdq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 		*outd = curd;
-		if(issigned) curd <<= 1;
+		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
 		else curd = rotateleftportable<1>(curd);
 	}else{
 		*outa = cura;
@@ -1517,19 +1509,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		*dsta = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
 		*dstb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
 		*dstc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 		*outd = curd;
 		*dstd = curd;
-		if(issigned) curd <<= 1;
+		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
 		else curd = rotateleftportable<1>(curd);
 	}else{
 		*outa = cura;
@@ -1611,15 +1603,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curg ^= curgq;
 		curh ^= curhq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if(issigned){
-			cura <<= 1;
-			curb <<= 1;
-			curc <<= 1;
-			curd <<= 1;
-			cure <<= 1;
-			curf <<= 1;
-			curg <<= 1;
-			curh <<= 1;
+		if constexpr(issigned){
+			cura &= ~static_cast<T>(0) >> 1;
+			curb &= ~static_cast<T>(0) >> 1;
+			curc &= ~static_cast<T>(0) >> 1;
+			curd &= ~static_cast<T>(0) >> 1;
+			cure &= ~static_cast<T>(0) >> 1;
+			curf &= ~static_cast<T>(0) >> 1;
+			curg &= ~static_cast<T>(0) >> 1;
+			curh &= ~static_cast<T>(0) >> 1;
 		}else{
 			cura = rotateleftportable<1>(cura);
 			curb = rotateleftportable<1>(curb);
@@ -1710,28 +1702,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curh ^= curhq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 		*outd = curd;
-		if(issigned) curd <<= 1;
+		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
 		else curd = rotateleftportable<1>(curd);
 		*oute = cure;
-		if(issigned) cure <<= 1;
+		if constexpr(issigned) cure &= ~static_cast<T>(0) >> 1;
 		else cure = rotateleftportable<1>(cure);
 		*outf = curf;
-		if(issigned) curf <<= 1;
+		if constexpr(issigned) curf &= ~static_cast<T>(0) >> 1;
 		else curf = rotateleftportable<1>(curf);
 		*outg = curg;
-		if(issigned) curg <<= 1;
+		if constexpr(issigned) curg &= ~static_cast<T>(0) >> 1;
 		else curg = rotateleftportable<1>(curg);
 		*outh = curh;
-		if(issigned) curh <<= 1;
+		if constexpr(issigned) curh &= ~static_cast<T>(0) >> 1;
 		else curh = rotateleftportable<1>(curh);
 	}else{
 		*outa = cura;
@@ -1831,35 +1823,35 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		*dsta = cura;
-		if(issigned) cura <<= 1;
+		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(cura);
 		*outb = curb;
 		*dstb = curb;
-		if(issigned) curb <<= 1;
+		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
 		else curb = rotateleftportable<1>(curb);
 		*outc = curc;
 		*dstc = curc;
-		if(issigned) curc <<= 1;
+		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
 		else curc = rotateleftportable<1>(curc);
 		*outd = curd;
 		*dstd = curd;
-		if(issigned) curd <<= 1;
+		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
 		else curd = rotateleftportable<1>(curd);
 		*oute = cure;
 		*dste = cure;
-		if(issigned) cure <<= 1;
+		if constexpr(issigned) cure &= ~static_cast<T>(0) >> 1;
 		else cure = rotateleftportable<1>(cure);
 		*outf = curf;
 		*dstf = curf;
-		if(issigned) curf <<= 1;
+		if constexpr(issigned) curf &= ~static_cast<T>(0) >> 1;
 		else curf = rotateleftportable<1>(curf);
 		*outg = curg;
 		*dstg = curg;
-		if(issigned) curg <<= 1;
+		if constexpr(issigned) curg &= ~static_cast<T>(0) >> 1;
 		else curg = rotateleftportable<1>(curg);
 		*outh = curh;
 		*dsth = curh;
-		if(issigned) curh <<= 1;
+		if constexpr(issigned) curh &= ~static_cast<T>(0) >> 1;
 		else curh = rotateleftportable<1>(curh);
 	}else{
 		*outa = cura;
@@ -1904,8 +1896,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// 0b1111'1111 -QNaN (maximum amount of ones)
 	// 0b0111'1111 +QNaN (maximum amount of ones)
 	// Determining the starting point depends of several factors here.
+	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
 	size_t *t{offsets// either aim to cache low-to-high or high-to-low
-		+ reversesort * (CHAR_BIT * sizeof(T) * 256 / 8 - 1 - (issigned && !absolute) * 256 / 2)
+		+ reversesort * (offsetsstride - 1 - (issigned && !absolute) * 256 / 2)
 		- (isfloatingpoint && !issigned && absolute) * (reversesort * 2 - 1)};
 	unsigned runsteps{(1 << CHAR_BIT * sizeof(T) / 8) - 1};
 	// handle the sign bit, virtually offset the top byte by half the range here
@@ -1917,14 +1910,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 + 1] = offset - 1;// high half
+			t[offsetsstride + 1] = offset - 1;// high half
 			--t;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		size_t differencemid{t[256]};
 		t[256] = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8 + 1] = offset - 1;// high half
+		t[offsetsstride + 1] = offset - 1;// high half
 		t += 256 - 1;// offset to the end of the range
 		offset += differencemid;
 		addcarryofless(b, count, differencemid);
@@ -1932,15 +1925,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 + 1] = offset - 1;// high half
+			t[offsetsstride + 1] = offset - 1;// high half
 			--t;
 			offset -= difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		addcarryofless(b, count, *t);
 		*t = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// high half, the last offset always starts at the end
-		t[CHAR_BIT * sizeof(T) * 256 / 8 + 1] = offset - 1;// high half
+		t[offsetsstride] = count;// high half, the last offset always starts at the end
+		t[offsetsstride + 1] = offset - 1;// high half
 		t -= 256 / 2 + 1;// offset to the next byte to process
 		paritybool ^= b;
 		runsteps ^= b << (CHAR_BIT * sizeof(T) / 8 - 1);
@@ -1959,20 +1952,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};// even
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 - reversesort * 2 + 1] = offset - 1;// odd, high half
+			t[offsetsstride - reversesort * 2 + 1] = offset - 1;// odd, high half
 			offset += difference;
 			addcarryofless(b, count, difference);
 			difference = t[reversesort * -6 + 3];// odd
 			t[reversesort * -6 + 3] = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8] = offset - 1;// even, high half
+			t[offsetsstride] = offset - 1;// even, high half
 			t += reversesort * -4 + 2;// step forward twice
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		addcarryofless(b, count, *t);
 		*t = offset;// even
-		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// even, high half, the last offset always starts at the end
-		t[CHAR_BIT * sizeof(T) * 256 / 8 - reversesort * 2 + 1] = offset - 1;// odd, high half
+		t[offsetsstride] = count;// even, high half, the last offset always starts at the end
+		t[offsetsstride - reversesort * 2 + 1] = offset - 1;// odd, high half
 		t += reversesort * -4 + 2;// step forward twice
 		paritybool ^= b;
 		runsteps ^= b << k;
@@ -1986,15 +1979,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+			t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 			t -= reversesort * 2 - 1;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		addcarryofless(b, count, *t);
 		*t = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// high half, the last offset always starts at the end
-		t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+		t[offsetsstride] = count;// high half, the last offset always starts at the end
+		t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 		if constexpr(16 < CHAR_BIT * sizeof(T) || !issigned || absolute || !reversesort) t -= reversesort * 2 - 1;// only the reverse sorting mode for signed 16-bit types can skip this
 		paritybool ^= b;
 		runsteps ^= b << k;
@@ -2010,14 +2003,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 - 1] = offset - 1;// high half
+			t[offsetsstride - 1] = offset - 1;// high half
 			++t;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		size_t differencemid{t[-256]};
 		t[-256] = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8 - 1] = offset - 1;// high half
+		t[offsetsstride - 1] = offset - 1;// high half
 		t -= 256 - 1;// offset to the start of the range
 		offset += differencemid;
 		addcarryofless(b, count, differencemid);
@@ -2025,15 +2018,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 - 1] = offset - 1;// high half
+			t[offsetsstride - 1] = offset - 1;// high half
 			++t;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		addcarryofless(b, count, *t);
 		*t = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// high half, the last offset always starts at the end
-		t[CHAR_BIT * sizeof(T) * 256 / 8 - 1] = offset - 1;// high half
+		t[offsetsstride] = count;// high half, the last offset always starts at the end
+		t[offsetsstride - 1] = offset - 1;// high half
 		paritybool ^= b;
 		runsteps ^= b << (CHAR_BIT * sizeof(T) / 8 - 1);
 	}
@@ -2061,9 +2054,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// 0b1111'1111 -QNaN (maximum amount of ones)
 	// 0b0111'1111 +QNaN (maximum amount of ones)
 	// Determining the starting point depends of several factors here.
+	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
 	size_t *t{offsets// either aim to cache low-to-high or high-to-low
-		+ (issigned && !absolute) * (CHAR_BIT * sizeof(T) * 256 / 8 / 2 - reversesort)
-		+ (reversesort && (!issigned || absolute)) * (CHAR_BIT * sizeof(T) * 256 / 8 - 1)
+		+ (issigned && !absolute) * (offsetsstride / 2 - reversesort)
+		+ (reversesort && (!issigned || absolute)) * (offsetsstride - 1)
 		- (isfloatingpoint && !issigned && absolute) * (reversesort * 2 - 1)};
 	size_t offset;
 	unsigned b;
@@ -2077,14 +2071,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+			t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 			t -= reversesort * 2 - 1;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
 		size_t differencemid{t[256 * (reversesort * 2 - 1)]};
 		t[256 * (reversesort * 2 - 1)] = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+		t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 		t += (256 - 1) * (reversesort * 2 - 1);// offset to the start/end of the range
 		offset += differencemid;
 		addcarryofless(b, count, differencemid);
@@ -2092,7 +2086,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{
 			size_t difference{*t};
 			*t = offset;
-			t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+			t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 			t -= reversesort * 2 - 1;
 			offset -= difference * (reversesort * 2 - 1);
 			addcarryofless(b, count, difference);
@@ -2108,12 +2102,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				size_t difference{*t};// even
 				*t = offset;
-				t[CHAR_BIT * sizeof(T) * 256 / 8 - reversesort * 2 + 1] = offset - 1;// odd, high half
+				t[offsetsstride - reversesort * 2 + 1] = offset - 1;// odd, high half
 				offset += difference;
 				addcarryofless(b, count, difference);
 				difference = t[reversesort * -6 + 3];// odd
 				t[reversesort * -6 + 3] = offset;
-				t[CHAR_BIT * sizeof(T) * 256 / 8] = offset - 1;// even, high half
+				t[offsetsstride] = offset - 1;// even, high half
 				t += reversesort * -4 + 2;// step forward twice
 				offset += difference;
 				addcarryofless(b, count, difference);
@@ -2125,7 +2119,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				size_t difference{*t};
 				*t = offset;
-				t[CHAR_BIT * sizeof(T) * 256 / 8 + reversesort * 2 - 1] = offset - 1;// high half
+				t[offsetsstride + reversesort * 2 - 1] = offset - 1;// high half
 				t -= reversesort * 2 - 1;
 				offset += difference;
 				addcarryofless(b, count, difference);
@@ -2139,9 +2133,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	{
 		*t = offset;
-		t[CHAR_BIT * sizeof(T) * 256 / 8] = count;// high half, the last offset always starts at the end
+		t[offsetsstride] = count;// high half, the last offset always starts at the end
 		// again, adjust for the special mode
-		t[CHAR_BIT * sizeof(T) * 256 / 8 + ((isfloatingpoint && !issigned && absolute) != reversesort) * 2 - 1] = offset - 1;// high half
+		t[offsetsstride + ((isfloatingpoint && !issigned && absolute) != reversesort) * 2 - 1] = offset - 1;// high half
 		return{true};
 	}
 	return{false};
@@ -2165,7 +2159,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -2177,7 +2172,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, output + i, buffer + i,
 							curlo, output + i - 1, buffer + i - 1);
@@ -2190,7 +2185,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
 					U curhi6{curhi >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curhi);
 						buffer[i] = static_cast<T>(curhi);
 					}
@@ -2202,13 +2197,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -2217,7 +2213,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
 					U curlo6{curlo >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i - 1] = static_cast<T>(curlo);
 						buffer[i - 1] = static_cast<T>(curlo);
 					}
@@ -2229,18 +2225,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2250,7 +2247,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
 					U cur6{cur >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
@@ -2262,19 +2259,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 8-byte, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -2287,7 +2285,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
 					U curhi6{curhi >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
@@ -2296,13 +2294,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -2311,7 +2310,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
 					U curlo6{curlo >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
@@ -2320,18 +2319,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2341,7 +2341,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
 					U cur6{cur >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -2350,13 +2350,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -2366,7 +2367,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, output + i, buffer + i,
 							curlo, output + i - 1, buffer + i - 1);
@@ -2378,7 +2379,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curhi);
 						buffer[i] = static_cast<T>(curhi);
 					}
@@ -2389,12 +2390,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -2402,7 +2404,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i - 1] = static_cast<T>(curlo);
 						buffer[i - 1] = static_cast<T>(curlo);
 					}
@@ -2413,17 +2415,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2432,7 +2435,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
@@ -2443,18 +2446,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 7-byte, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -2466,7 +2470,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
@@ -2474,12 +2478,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -2487,7 +2492,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
@@ -2495,17 +2500,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2514,7 +2520,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -2522,12 +2528,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -2537,7 +2544,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, output + i, buffer + i,
 							curlo, output + i - 1, buffer + i - 1);
@@ -2548,7 +2555,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curhi);
 						buffer[i] = static_cast<T>(curhi);
 					}
@@ -2558,18 +2565,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i - 1] = static_cast<T>(curlo);
 						buffer[i - 1] = static_cast<T>(curlo);
 					}
@@ -2579,16 +2587,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2596,7 +2605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
@@ -2606,17 +2615,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 6-byte, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -2627,41 +2637,43 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -2669,18 +2681,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -2690,7 +2703,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, output + i, buffer + i,
 							curlo, output + i - 1, buffer + i - 1);
@@ -2699,7 +2712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curhi);
 						buffer[i] = static_cast<T>(curhi);
 					}
@@ -2708,7 +2721,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i - 1] = static_cast<T>(curlo);
 						buffer[i - 1] = static_cast<T>(curlo);
 					}
@@ -2717,30 +2730,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> (8 - log2ptrs)};
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
@@ -2749,16 +2764,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 5-byte, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -2767,51 +2783,54 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> (8 - log2ptrs)};
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -2821,7 +2840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{pinput[0]};
 					U curb{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, output + i, buffer + i,
 							curb, output + i - 1, buffer + i - 1);
@@ -2829,7 +2848,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
 					U cur2a{cura >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(cura);
 						buffer[i] = static_cast<T>(cura);
 					}
@@ -2837,7 +2856,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
 					U cur2b{curb >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i - 1] = static_cast<T>(curb);
 						buffer[i - 1] = static_cast<T>(curb);
 					}
@@ -2845,26 +2864,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
 					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
@@ -2872,15 +2893,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 4-byte, not in reverse order
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i,
 							curb, buffer + i - 1);
@@ -2888,43 +2910,46 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
 					U cur2a{cura >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
 					U cur2b{curb >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
 					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -2940,7 +2965,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{pinput[1]};
 					U curc{pinput[2]};
 					pinput += 3;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, output + i + 2, buffer + i + 2,
 							curb, output + i + 1, buffer + i + 1,
@@ -2948,86 +2973,92 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 2] = static_cast<T>(cura);
 						buffer[i + 2] = static_cast<T>(cura);
 					}
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 1] = static_cast<T>(curb);
 						buffer[i + 1] = static_cast<T>(curb);
 					}
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curc);
 						buffer[i] = static_cast<T>(curc);
 					}
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){
 					U cura{pinput[0]};
 					U curb{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, output + i + 2, buffer + i + 2,
 							curb, output + i + 1, buffer + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 2] = static_cast<T>(cura);
 						buffer[i + 2] = static_cast<T>(cura);
 					}
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 1] = static_cast<T>(curb);
 						buffer[i + 1] = static_cast<T>(curb);
 					}
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}else if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 2-byte, not in reverse order
 				i -= 3;
@@ -3039,7 +3070,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
 					U curc{input[i]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1,
@@ -3047,67 +3078,73 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curc);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}else if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -3124,7 +3161,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curc{pinput[2]};
 					U curd{pinput[3]};
 					pinput += 4;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, output + i + 3, buffer + i + 3,
 							curb, output + i + 2, buffer + i + 2,
@@ -3132,36 +3169,40 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curd, output + i, buffer + i);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 3] = static_cast<T>(cura);
 						buffer[i + 3] = static_cast<T>(cura);
 					}
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 2] = static_cast<T>(curb);
 						buffer[i + 2] = static_cast<T>(curb);
 					}
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 1] = static_cast<T>(curc);
 						buffer[i + 1] = static_cast<T>(curc);
 					}
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i] = static_cast<T>(curd);
 						buffer[i] = static_cast<T>(curd);
 					}
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
@@ -3169,40 +3210,43 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{pinput[0]};
 					U curb{pinput[1]};
 					pinput += 2;
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, output + i + 3, buffer + i + 3,
 							curb, output + i + 2, buffer + i + 2);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 3] = static_cast<T>(cura);
 						buffer[i + 3] = static_cast<T>(cura);
 					}
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[i + 2] = static_cast<T>(curb);
 						buffer[i + 2] = static_cast<T>(curb);
 					}
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{pinput[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, output, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						output[0] = static_cast<T>(cur);
 						buffer[0] = static_cast<T>(cur);
 					}
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}else{// 2-byte, not in reverse order
@@ -3216,7 +3260,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{input[i + 2]};
 					U curc{input[i + 1]};
 					U curd{input[i]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2,
@@ -3224,55 +3268,62 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curd, buffer + i);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curc);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curd);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curd);
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
 					U cura{input[i + 3]};
 					U curb{input[i + 2]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}
@@ -3317,7 +3368,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					T outhi{*psrchi--};
 					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-					size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = outlo;
 					pdst[offsethi] = outhi;
 				}while(psrclo < psrchi);
@@ -3365,7 +3416,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						T outhi{*psrchi--};
 						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
-						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = outlo;
 						pdst[offsethi] = outhi;
 					}while(psrclo < psrchi);
@@ -3397,7 +3448,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -3408,7 +3460,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curlo, pinputhi, pbufferhi,
 							curhi, pinputlo, pbufferlo);
@@ -3425,7 +3477,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
 					U curlo6{curlo >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = curlo;
 						*pbufferhi-- = curlo;
 					}
@@ -3437,13 +3489,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
@@ -3452,7 +3505,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
 					U curhi6{curhi >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curhi;
 						*pbufferlo++ = curhi;
 					}
@@ -3464,18 +3517,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
@@ -3485,7 +3539,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
 					U cur6{cur >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 56;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -3494,20 +3548,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 8-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -3520,7 +3575,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
 					U curhi6{curhi >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
@@ -3529,13 +3584,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -3544,7 +3600,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
 					U curlo6{curlo >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
@@ -3553,18 +3609,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -3574,7 +3631,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
 					U cur6{cur >> (48 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -3583,13 +3640,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -3599,7 +3657,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curlo, pinputhi, pbufferhi,
 							curhi, pinputlo, pbufferlo);
@@ -3615,7 +3673,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = curlo;
 						*pbufferhi-- = curlo;
 					}
@@ -3626,12 +3684,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
@@ -3639,7 +3698,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curhi;
 						*pbufferlo++ = curhi;
 					}
@@ -3650,17 +3709,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
@@ -3669,7 +3729,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 48;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -3677,19 +3737,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 7-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -3701,7 +3762,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
 					U curhi5{curhi >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
@@ -3709,12 +3770,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -3722,7 +3784,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
 					U curlo5{curlo >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
@@ -3730,17 +3792,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -3749,7 +3812,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
 					U cur5{cur >> (40 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
@@ -3757,12 +3820,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -3772,7 +3836,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curlo, pinputhi, pbufferhi,
 							curhi, pinputlo, pbufferlo);
@@ -3787,7 +3851,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = curlo;
 						*pbufferhi-- = curlo;
 					}
@@ -3797,18 +3861,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curhi;
 						*pbufferlo++ = curhi;
 					}
@@ -3818,16 +3883,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
@@ -3835,25 +3901,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 40;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 6-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -3864,41 +3931,43 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
 					U curhi4{curhi >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
 					U curlo4{curlo >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -3906,18 +3975,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
 					U cur4{cur >> (32 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -3927,7 +3997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curlo, pinputhi, pbufferhi,
 							curhi, pinputlo, pbufferlo);
@@ -3940,7 +4010,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = curlo;
 						*pbufferhi-- = curlo;
 					}
@@ -3949,7 +4019,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curhi;
 						*pbufferlo++ = curhi;
 					}
@@ -3958,46 +4028,49 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> (8 - log2ptrs)};
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 32;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 5-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -4006,51 +4079,54 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
 					U curlo2{curlo >> (16 - log2ptrs)};
 					U curlo3{curlo >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> (8 - log2ptrs)};
 					U cur2{cur >> (16 - log2ptrs)};
 					U cur3{cur >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -4060,7 +4136,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{*pinputlo};
 					U curb{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo);
@@ -4072,7 +4148,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
 					U cur2a{cura >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = cura;
 						*pbufferhi-- = cura;
 					}
@@ -4080,7 +4156,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
 					U cur2b{curb >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curb;
 						*pbufferlo++ = curb;
 					}
@@ -4088,40 +4164,43 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
 					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 24;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 4-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i,
 							curb, buffer + i - 1);
@@ -4129,43 +4208,46 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
 					U cur2a{cura >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
 					U cur2b{curb >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i - 1] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
 					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -4178,7 +4260,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{pinputhi[0]};
 					U curc{pinputlo[1]};
 					U curd{pinputhi[-1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo,
@@ -4191,21 +4273,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[0] = static_cast<T>(cura);
 						pbufferhi[0] = static_cast<T>(cura);
 					}
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[0] = static_cast<T>(curb);
 						pbufferlo[0] = static_cast<T>(curb);
 					}
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[-1] = static_cast<T>(curc);
 						pinputhi -= 2;
 						pbufferhi[-1] = static_cast<T>(curc);
@@ -4214,7 +4296,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curc >>= 16;
 					U cur0d{curd & 0xFFu};
 					U cur1d{curd >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[1] = static_cast<T>(curd);
 						pinputlo += 2;
 						pbufferlo[1] = static_cast<T>(curd);
@@ -4223,24 +4305,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curd >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
 					cur1d &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curd)];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 *256 + static_cast<size_t>(curc)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+					++offsets[2 * 256 + static_cast<size_t>(curd)];
 				}else if(2 & initialcount){// possibly initialize with 2 entries before the loop below
 					U cura{*pinputlo};
 					U curb{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo);
@@ -4251,26 +4337,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = cura;
 						*pbufferhi-- = cura;
 					}
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curb;
 						*pbufferlo++ = curb;
 					}
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(5 <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -4282,7 +4370,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curc{pinputlo[1]};
 					U curd{pinputhi[-1]};
 					// register pressure performance issue on several platforms: first do the high half here
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo,
@@ -4290,41 +4378,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[0] = static_cast<T>(cura);
 						pbufferhi[0] = static_cast<T>(cura);
 					}
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[0] = static_cast<T>(curb);
 						pbufferlo[0] = static_cast<T>(curb);
 					}
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[-1] = static_cast<T>(curc);
 						pbufferhi[-1] = static_cast<T>(curc);
 					}
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					U cure{pinputlo[2]};
 					U curf{pinputhi[-2]};
 					// register pressure performance issue on several platforms: do the low half here second
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							curd, pinputlo + 1, pbufferlo + 1,
 							cure, pinputhi - 2, pbufferhi - 2,
@@ -4336,14 +4427,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0d{curd & 0xFFu};
 					U cur1d{curd >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[1] = static_cast<T>(curd);
 						pbufferlo[1] = static_cast<T>(curd);
 					}
 					curd >>= 16;
 					U cur0e{cure & 0xFFu};
 					U cur1e{cure >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[-2] = static_cast<T>(cure);
 						pinputhi -= 3;
 						pbufferhi[-2] = static_cast<T>(cure);
@@ -4352,7 +4443,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cure >>= 16;
 					U cur0f{curf & 0xFFu};
 					U cur1f{curf >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[2] = static_cast<T>(curf);
 						pinputlo += 3;
 						pbufferlo[2] = static_cast<T>(curf);
@@ -4361,31 +4452,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curf >>= 16;
 					++offsets[cur0d];
 					cur1d &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curd)];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
 					++offsets[cur0e];
 					cur1e &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cure)];
+					if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
 					++offsets[cur0f];
 					cur1f &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curf)];
+					if constexpr(absolute && issigned && isfloatingpoint) curf &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+					++offsets[2 * 256 + static_cast<size_t>(curd)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1e);
+					++offsets[2 * 256 + static_cast<size_t>(cure)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1f);
+					++offsets[2 * 256 + static_cast<size_t>(curf)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 3-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 2};
@@ -4397,7 +4492,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
 					U curc{input[i]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1,
@@ -4405,68 +4500,74 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curc);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -4476,7 +4577,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(2 & count + 1){// possibly initialize with 2 entries before the loop below
 					U cura{*pinputlo};
 					U curb{*pinputhi};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo);
@@ -4486,20 +4587,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++pbufferlo;
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputhi-- = cura;
 						*pbufferhi-- = cura;
 					}
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						*pinputlo++ = curb;
 						*pbufferlo++ = curb;
 					}
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(3 <= count)
@@ -4511,7 +4614,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{pinputhi[0]};
 					U curc{pinputlo[1]};
 					U curd{pinputhi[-1]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, pinputhi, pbufferhi,
 							curb, pinputlo, pbufferlo,
@@ -4523,19 +4626,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo += 2;
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[0] = static_cast<T>(cura);
 						pbufferhi[0] = static_cast<T>(cura);
 					}
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[0] = static_cast<T>(curb);
 						pbufferlo[0] = static_cast<T>(curb);
 					}
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputhi[-1] = static_cast<T>(curc);
 						pinputhi -= 2;
 						pbufferhi[-1] = static_cast<T>(curc);
@@ -4543,7 +4646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint){
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
 						pinputlo[1] = static_cast<T>(curd);
 						pinputlo += 2;
 						pbufferlo[1] = static_cast<T>(curd);
@@ -4551,24 +4654,29 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, pbufferhi);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) *pbufferhi = cur;
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) *pbufferhi = cur;
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}else{// 2-byte, not in reverse order
@@ -4582,7 +4690,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{input[i + 2]};
 					U curc{input[i + 1]};
 					U curd{input[i]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2,
@@ -4590,55 +4698,62 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curd, buffer + i);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 1] = static_cast<T>(curc);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curd);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curd);
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
 					U cura{input[i + 3]};
 					U curb{input[i + 2]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					U cur{input[0]};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(!absolute && !isfloatingpoint) buffer[0] = static_cast<T>(cur);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[0] = static_cast<T>(cur);
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}
@@ -4676,7 +4791,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					T outhi{*psrchi--};
 					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-					size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = outlo;
 					pdst[offsethi] = outhi;
 				}while(psrclo < psrchi);
@@ -4724,7 +4839,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						T outhi{*psrchi--};
 						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
-						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = outlo;
 						pdst[offsethi] = outhi;
 					}while(psrclo < psrchi);
@@ -4762,7 +4877,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -4782,7 +4898,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -4801,13 +4917,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -4824,13 +4941,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -4839,7 +4957,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -4857,13 +4975,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 8-byte, not in reverse order
 				do{
@@ -4877,7 +4996,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -4896,13 +5015,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -4919,13 +5039,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -4933,7 +5054,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -4951,13 +5072,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -4975,7 +5097,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -4992,12 +5114,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -5012,12 +5135,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5026,7 +5150,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5042,12 +5166,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 7-byte, not in reverse order
 				do{
@@ -5061,7 +5186,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -5078,12 +5203,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -5098,12 +5224,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5111,7 +5238,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5127,12 +5254,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -5150,7 +5278,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -5165,11 +5293,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -5182,11 +5311,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5195,7 +5325,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5209,11 +5339,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 6-byte, not in reverse order
 				do{
@@ -5227,7 +5358,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -5242,11 +5373,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -5259,11 +5391,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5271,7 +5404,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5285,11 +5418,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -5307,7 +5441,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					U curhi0{curhi & 0xFFu};
@@ -5324,18 +5458,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5344,7 +5480,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5356,10 +5492,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 5-byte, not in reverse order
 				do{
@@ -5373,7 +5510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					U curhi0{curhi & 0xFFu};
@@ -5390,18 +5527,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5409,7 +5548,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5421,10 +5560,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -5442,7 +5582,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5456,15 +5596,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5473,7 +5615,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5483,9 +5625,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 4-byte, not in reverse order
 				do{
@@ -5499,7 +5642,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5513,15 +5656,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -5529,7 +5674,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5539,9 +5684,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -5569,7 +5715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5583,16 +5729,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){
@@ -5607,7 +5756,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5618,12 +5767,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					V *p{input[0]};
@@ -5631,7 +5782,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5639,8 +5790,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 3-byte, not in reverse order
 				i -= 2;
@@ -5661,7 +5813,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5675,16 +5827,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
@@ -5696,7 +5851,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5707,19 +5862,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -5727,8 +5884,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -5761,7 +5919,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5773,12 +5931,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0d{curd & 0xFFu};
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
@@ -5794,7 +5956,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5802,8 +5964,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
@@ -5812,12 +5976,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}else{// 2-byte, not in reverse order
@@ -5843,7 +6008,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5855,12 +6020,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0d{curd & 0xFFu};
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
@@ -5873,7 +6042,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -5881,8 +6050,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
@@ -5890,12 +6061,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}
@@ -5944,7 +6116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-					size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
@@ -5998,7 +6170,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
-						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = plo;
 						pdst[offsethi] = phi;
 					}while(psrclo < psrchi);
@@ -6037,7 +6209,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -6056,7 +6229,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -6075,13 +6248,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
@@ -6098,13 +6272,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					V *p{*pinputlo};
@@ -6112,7 +6287,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6130,13 +6305,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 8-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
@@ -6149,7 +6325,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -6168,13 +6344,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
 					curhi6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[7 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -6191,13 +6368,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
 					curlo6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[7 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -6205,7 +6383,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6223,13 +6401,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
 					cur6 &= sizeof(void *) * 0xFFu;
-					++offsets[7 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -6247,7 +6426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -6264,12 +6443,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
@@ -6284,12 +6464,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					V *p{*pinputlo};
@@ -6297,7 +6478,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6313,12 +6494,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 7-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
@@ -6331,7 +6513,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -6348,12 +6530,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
 					curhi5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[6 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -6368,12 +6551,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
 					curlo5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[6 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -6381,7 +6565,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -6397,12 +6581,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
 					cur5 &= sizeof(void *) * 0xFFu;
-					++offsets[6 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -6420,7 +6605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -6435,11 +6620,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
@@ -6452,16 +6638,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					U cur{*pinputlo};
 					// no write to input, as this is the midpoint
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6475,11 +6662,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 6-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
@@ -6492,7 +6680,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -6507,11 +6695,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
 					curhi4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[5 * 256 + static_cast<size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -6524,11 +6713,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
 					curlo4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[5 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -6536,7 +6726,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6550,11 +6740,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
 					cur4 &= sizeof(void *) * 0xFFu;
-					++offsets[5 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -6572,7 +6763,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
 					U curlo0{curlo & 0xFFu};
@@ -6589,18 +6780,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++offsets[curhi0];
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					V *p{*pinputlo};
@@ -6608,7 +6801,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6620,10 +6813,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 5-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
@@ -6636,14 +6830,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> (8 - log2ptrs)};
 					U curhi2{curhi >> (16 - log2ptrs)};
 					U curhi3{curhi >> (24 - log2ptrs)};
-					if constexpr(!absolute && !isfloatingpoint) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> (8 - log2ptrs)};
@@ -6654,18 +6848,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi1 &= sizeof(void *) * 0xFFu;
 					curhi2 &= sizeof(void *) * 0xFFu;
 					curhi3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curhi)];
+					if constexpr(absolute && issigned && isfloatingpoint) curhi &= 0x7Fu;
 					++offsets[curlo0];
 					curlo1 &= sizeof(void *) * 0xFFu;
 					curlo2 &= sizeof(void *) * 0xFFu;
 					curlo3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(curlo)];
+					if constexpr(absolute && issigned && isfloatingpoint) curlo &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[4 * 256 + static_cast<size_t>(curhi)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[4 * 256 + static_cast<size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -6673,7 +6869,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6685,10 +6881,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
 					cur3 &= sizeof(void *) * 0xFFu;
-					++offsets[4 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -6706,7 +6903,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -6720,13 +6917,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
+					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					V *p{*pinputlo};
@@ -6734,7 +6935,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6744,9 +6945,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 4-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
@@ -6759,7 +6961,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -6773,15 +6975,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
 					cur2a &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
 					cur2b &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[3 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[3 * 256 + static_cast<size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// possibly finalize 1 entry after the loop above
@@ -6789,7 +6993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6799,9 +7003,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
 					cur2 &= sizeof(void *) * 0xFFu;
-					++offsets[3 * 256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -6834,7 +7039,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -6851,20 +7056,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curd >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
 					cur1d &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curd)];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+					++offsets[2 * 256 + static_cast<size_t>(curd)];
 				}else if(2 & initialcount){// possibly initialize with 2 entries before the loop below
 					V *pa{pinputlo[0]};
 					V *pb{pinputhi[0]};
@@ -6876,7 +7085,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -6887,12 +7096,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(5 <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -6916,7 +7127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					// register pressure performance issue on several platforms: first do the high half here
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -6930,16 +7141,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					V *pe{pinputlo[2]};
 					V *pf{pinputhi[-2]};
 					pinputlo[1] = pd;
@@ -6959,7 +7173,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime)};
 					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime)};
 					// register pressure performance issue on several platforms: do the low half here second
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curd, cure, curf);
 					}
 					U cur0d{curd & 0xFFu};
@@ -6973,16 +7187,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curf >>= 16;
 					++offsets[cur0d];
 					cur1d &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curd)];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
 					++offsets[cur0e];
 					cur1e &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(cure)];
+					if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
 					++offsets[cur0f];
 					cur1f &= sizeof(void *) * 0xFFu;
-					++offsets[2 * 256 + static_cast<size_t>(curf)];
+					if constexpr(absolute && issigned && isfloatingpoint) curf &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+					++offsets[2 * 256 + static_cast<size_t>(curd)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1e);
+					++offsets[2 * 256 + static_cast<size_t>(cure)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1f);
+					++offsets[2 * 256 + static_cast<size_t>(curf)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
 					V *p{*pinputlo};
@@ -6990,7 +7207,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -6998,8 +7215,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}else{// 3-byte, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 2};
@@ -7020,7 +7238,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7034,16 +7252,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
 					cur1c &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[2 * 256 + static_cast<size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
 				if(2 & i){// possibly finalize 2 entries after the loop above
@@ -7055,7 +7276,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7066,19 +7287,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
 					cur1b &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[2 * 256 + static_cast<size_t>(cura)];
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[2 * 256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -7086,8 +7309,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= sizeof(void *) * 0xFFu;
-					++offsets[256 + static_cast<size_t>(cur)];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -7105,7 +7329,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7113,8 +7337,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(3 <= count)
@@ -7146,7 +7372,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7158,12 +7384,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0d{curd & 0xFFu};
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
@@ -7172,12 +7402,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
 					cur >>= 8;
 					++offsets[cur0];
+					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
 			}else{// 2-byte, not in reverse order
@@ -7203,7 +7434,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7215,12 +7446,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0d{curd & 0xFFu};
 					curd >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
-					++offsets[256 + static_cast<size_t>(curb)];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
 					++offsets[cur0c];
-					++offsets[256 + static_cast<size_t>(curc)];
+					if constexpr(absolute && issigned && isfloatingpoint) curc &= 0x7Fu;
 					++offsets[cur0d];
+					if constexpr(absolute && issigned && isfloatingpoint) curd &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
+					++offsets[256 + static_cast<size_t>(curb)];
+					++offsets[256 + static_cast<size_t>(curc)];
 					++offsets[256 + static_cast<size_t>(curd)];
 					i -= 4;
 				}while(0 <= i);
@@ -7233,7 +7468,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -7241,8 +7476,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0b{curb & 0xFFu};
 					curb >>= 8;
 					++offsets[cur0a];
-					++offsets[256 + static_cast<size_t>(cura)];
+					if constexpr(absolute && issigned && isfloatingpoint) cura &= 0x7Fu;
 					++offsets[cur0b];
+					if constexpr(absolute && issigned && isfloatingpoint) curb &= 0x7Fu;
+					++offsets[256 + static_cast<size_t>(cura)];
 					++offsets[256 + static_cast<size_t>(curb)];
 				}
 				if(1 & i){// possibly finalize 1 entry after the loop above
@@ -7250,7 +7487,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					if constexpr(absolute || isfloatingpoint){
+					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
 					U cur0{cur & 0xFFu};
@@ -7297,7 +7534,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-					size_t offsethi{poffset[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--};// the next item will be placed one lower
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
@@ -7351,7 +7588,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
-						size_t offsethi{offsets[curhi + CHAR_BIT * (2 * sizeof(T) - 1) * 256 / 8]--};// the next item will be placed one lower
+						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = plo;
 						pdst[offsethi] = phi;
 					}while(psrclo < psrchi);
@@ -7386,7 +7623,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -7606,11 +7844,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
 				}else{
 					offsetlo = offsets[curlo]++;// the next item will be placed one higher
-					offsethi = offsets[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
 				}
 				output[offsetlo] = outlo;
 				output[offsethi] = outhi;
@@ -7620,7 +7858,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8];
+					offsetlo = offsets[curlo + offsetsstride];
 				}else{
 					offsetlo = offsets[curlo];
 				}
@@ -7644,7 +7882,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -7948,11 +8187,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
 				}else{
 					offsetlo = offsets[curlo]++;// the next item will be placed one higher
-					offsethi = offsets[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
 				}
 				input[offsetlo] = outlo;
 				input[offsethi] = outhi;
@@ -7962,7 +8201,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8];
+					offsetlo = offsets[curlo + offsetsstride];
 				}else{
 					offsetlo = offsets[curlo];
 				}
@@ -7991,7 +8230,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{offsetsstride - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -8286,11 +8526,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
 				}else{
 					offsetlo = offsets[curlo]++;// the next item will be placed one higher
-					offsethi = offsets[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
 				}
 				output[offsetlo] = plo;
 				output[offsethi] = phi;
@@ -8302,7 +8542,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8];
+					offsetlo = offsets[curlo + offsetsstride];
 				}else{
 					offsetlo = offsets[curlo];
 				}
@@ -8331,7 +8571,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		size_t offsets[CHAR_BIT * sizeof(T) * 256 / 8 * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
@@ -8678,11 +8919,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
 				}else{
 					offsetlo = offsets[curlo]++;// the next item will be placed one higher
-					offsethi = offsets[curhi + CHAR_BIT * sizeof(T) * 256 / 8]--;// the next item will be placed one lower
+					offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
 				}
 				input[offsetlo] = plo;
 				input[offsethi] = phi;
@@ -8694,7 +8935,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
 				if constexpr(reverseorder){
-					offsetlo = offsets[curlo + CHAR_BIT * sizeof(T) * 256 / 8];
+					offsetlo = offsets[curlo + offsetsstride];
 				}else{
 					offsetlo = offsets[curlo];
 				}
