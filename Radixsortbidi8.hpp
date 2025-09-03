@@ -58,14 +58,14 @@
 // = rsdb8::deallocatearray()
 // This library only includes the common use scenarios to deal with input from first- and second-level indirection.
 // Similarly, editing the usually parallel input filter inlined template functions is an option to use custom transforms:
-// = rsdb8::helper::filtertopbyte() (2 variants, for 1 and 2 inputs)
-// = rsdb8::helper::filtershiftbyte() (2 variants, for 1 and 2 inputs)
+// = rsdb8::helper::filtertop8() (2 variants, for 1 and 2 inputs)
+// = rsdb8::helper::filtershift8() (2 variants, for 1 and 2 inputs)
 // = rsdb8::helper::filterinput() (many variants, usage is dependent on input data size and reverse ordering scenarios)
 
 // Examples of using the 4 templates with input from second-level indirection (automatically deduced template parameters are omitted here):
 // As the use case for these almost always involve multi-pass techniques, the user is advised to allocate the (reusable) buffers accordingly and avoid the use of radixsortcopy() and radixsort().
 // The rsdb8::allocatearray() and rsdb8::deallocatearray() inline function templates are provided for handling an intermediate buffer.
-// Again, no intermediate buffer is required when radixsortcopynoalloc() is used for sorting a single-byte type.
+// Again, no intermediate buffer is required when radixsortcopynoalloc() is used for sorting a single-part type.
 // These will internally first retrieve a pointer to a "T" type array "T *myarray".
 // After that it's dereferenced at the origin (first set of examples) or indexed (second set of examples) as "myarray[indirectionindex]" to retrieve the value used for sorting.
 // Again, all "addressoffset" variants as template inputs displace like on a flat "std::byte const *", so not as some sort of array indices.
@@ -170,7 +170,7 @@ enum sortingmode : unsigned char{// 5 bits as bitfields, bit 6 is used to select
 enum sortingdirection : unsigned char{// 2 bits as bitfields
 // = reversesort (default false): reverse the sorting direction
 // = reverseorder (default false): reverse the array direction when sorting items with the same value (only used when dealing with indirection)
-// Enabling reversesort costs next to nothing in terms of performance, reverseorder does initially take minor extra processing when handling multi-byte types.
+// Enabling reversesort costs next to nothing in terms of performance, reverseorder does initially take minor extra processing when handling multi-part types.
 	ascendingforwardordered = 0,
 // = reversesort = false, reverseorder = false: stable sort, low to high (default)
 	decendingreverseordered = 1 | 1 << 1,
@@ -335,8 +335,8 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // = Helper constants and functions
 // = Helper functions to implement the 8 main modes
 // = Helper functions to implement the offset transforms
-// = Function implementation templates for multi-byte types
-// = Function implementation templates for single-byte types
+// = Function implementation templates for multi-part types
+// = Function implementation templates for single-part types
 //
 // = Definition of the GetOffsetOf template
 // = Generic large array allocation and deallocation functions
@@ -823,7 +823,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Helper functions to implement the 8 main modes
-// The filtertopbyte() and filtershiftbyte() template functions are customized for the sorting phase, and have no need for variants with pointers.
+// The filtertop8() and filtershift8() template functions are customized for the sorting phase, and have no need for variants with pointers.
 // These also only output size_t (or a pair of them) for direct use as indices.
 // The filterinput() template functions modify their inputs and each has a variant that write their inputs to memory either once or twice.
 // There are 5 of these, handling 1, 2, 3, 4 or 8 inputs.
@@ -846,7 +846,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
-	size_t> filtertopbyte(U cur)noexcept{
+	size_t> filtertop8(U cur)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		if constexpr(isfloatingpoint || !issigned) cur *= 2;
@@ -884,7 +884,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
-	std::pair<size_t, size_t>> filtertopbyte(U cura, U curb)noexcept{
+	std::pair<size_t, size_t>> filtertop8(U cura, U curb)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		std::make_signed_t<T> curap{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(isfloatingpoint || !issigned) cura *= 2;
@@ -939,9 +939,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
-	unsigned> filtershiftbyte(U cur, unsigned shift)noexcept{
+	unsigned> filtershift8(U cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
-	// This should never filter the top byte for non-absolute floating-point inputs.
+	// This should never filter the top part for non-absolute floating-point inputs.
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		if constexpr(absolute && !issigned) cur *= 2;
@@ -964,7 +964,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
-	std::pair<size_t, size_t>> filtershiftbyte(U cura, U curb, unsigned shift)noexcept{
+	std::pair<size_t, size_t>> filtershift8(U cura, U curb, unsigned shift)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		std::make_signed_t<T> curap{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(absolute && !issigned) cura *= 2;
@@ -1901,7 +1901,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ reversesort * (offsetsstride - 1 - (issigned && !absolute) * 256 / 2)
 		- (isfloatingpoint && !issigned && absolute) * (reversesort * 2 - 1)};
 	unsigned runsteps{(1 << CHAR_BIT * sizeof(T) / 8) - 1};
-	// handle the sign bit, virtually offset the top byte by half the range here
+	// handle the sign bit, virtually offset the top part by half the range here
 	if constexpr(issigned && !absolute && reversesort){
 		size_t offset{*t};// the starting point was already adjusted to the signed range
 		*t-- = 0;// the first offset always starts at zero
@@ -1934,7 +1934,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*t = offset;
 		t[offsetsstride] = count;// high half, the last offset always starts at the end
 		t[offsetsstride + 1] = offset - 1;// high half
-		t -= 256 / 2 + 1;// offset to the next byte to process
+		t -= 256 / 2 + 1;// offset to the next part to process
 		paritybool ^= b;
 		runsteps ^= b << (CHAR_BIT * sizeof(T) / 8 - 1);
 	}
@@ -1993,7 +1993,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps ^= b << k;
 	}while((16 == CHAR_BIT * sizeof(T) && issigned && !absolute)? false :
 		reversesort? (0 <= --k) : (static_cast<int>(CHAR_BIT * sizeof(T) / 8 - (issigned && !absolute)) > ++k));
-	// handle the sign bit, virtually offset the top byte by half the range here
+	// handle the sign bit, virtually offset the top part by half the range here
 	if constexpr(issigned && !absolute && !reversesort){
 		size_t offset{t[256 / 2]};
 		t[256 / 2] = 0;// the first offset always starts at zero
@@ -2061,7 +2061,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isfloatingpoint && !issigned && absolute) * (reversesort * 2 - 1)};
 	size_t offset;
 	unsigned b;
-	// handle the sign bit, virtually offset the top byte by half the range here
+	// handle the sign bit, virtually offset the top part by half the range here
 	if constexpr(issigned){
 		offset = *t;// the starting point was already adjusted to the signed range
 		*t = 0;// the first offset always starts at zero
@@ -2141,9 +2141,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Function implementation templates for multi-byte types
+// Function implementation templates for multi-part types
 
-// radixsortcopynoalloc() function implementation template for multi-byte types without indirection
+// radixsortcopynoalloc() function implementation template for multi-part types without indirection
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<T> &&
@@ -2268,7 +2268,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
 					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 8-byte, not in reverse order
+			}else{// 64-bit, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
@@ -2454,7 +2454,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 7-byte, not in reverse order
+			}else{// 56-bit, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
@@ -2622,7 +2622,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 6-byte, not in reverse order
+			}else{// 48-bit, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
@@ -2770,7 +2770,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 5-byte, not in reverse order
+			}else{// 40-bit, not in reverse order
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
@@ -2898,7 +2898,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 4-byte, not in reverse order
+			}else{// 32-bit, not in reverse order
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
@@ -3060,7 +3060,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 2-byte, not in reverse order
+			}else{// 16-bit, not in reverse order
 				i -= 3;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -3249,7 +3249,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
-			}else{// 2-byte, not in reverse order
+			}else{// 16-bit, not in reverse order
 				i -= 3;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -3361,12 +3361,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 				[[unlikely]]
 #endif
-				goto handletopbyte;// rare, but possible
+				goto handletop8;// rare, but possible
 			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					T outlo{*psrclo++};
 					T outhi{*psrchi--};
-					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = outlo;
@@ -3374,7 +3374,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					T outlo{*psrclo};
-					size_t curlo{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = outlo;
 				}
@@ -3404,17 +3404,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poffset += static_cast<size_t>(index) * 256;
 					}
 				}
-				// handle the top byte for floating-point differently
+				// handle the top part for floating-point differently
 				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
 				{
-handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						T outlo{*psrclo++};
 						T outhi{*psrchi--};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = outlo;
@@ -3422,18 +3422,18 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 					}while(psrclo < psrchi);
 					if(psrclo == psrchi){// fill in the final item for odd counts
 						T outlo{*psrclo};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = outlo;
 					}
-					break;// no further processing beyond the top byte
+					break;// no further processing beyond the top part
 				}
 			}
 		}
 	}
 }
 
-// radixsortnoalloc() function implementation template for multi-byte types without indirection
+// radixsortnoalloc() function implementation template for multi-part types without indirection
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned = false, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<T> &&
@@ -3557,7 +3557,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
 					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 8-byte, not in reverse order
+			}else{// 64-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
@@ -3745,7 +3745,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 7-byte, not in reverse order
+			}else{// 56-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
@@ -3915,7 +3915,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 6-byte, not in reverse order
+			}else{// 48-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
@@ -4065,7 +4065,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 5-byte, not in reverse order
+			}else{// 40-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U curhi{input[i]};
@@ -4195,7 +4195,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 4-byte, not in reverse order
+			}else{// 32-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					U cura{input[i]};
@@ -4482,7 +4482,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 3-byte, not in reverse order
+			}else{// 24-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 2};
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -4679,7 +4679,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
-			}else{// 2-byte, not in reverse order
+			}else{// 16-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 3};
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -4784,12 +4784,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 				[[unlikely]]
 #endif
-				goto handletopbyte;// rare, but possible
+				goto handletop8;// rare, but possible
 			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					T outlo{*psrclo++};
 					T outhi{*psrchi--};
-					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = outlo;
@@ -4797,7 +4797,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					T outlo{*psrclo};
-					size_t curlo{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = outlo;
 				}
@@ -4827,17 +4827,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poffset += static_cast<size_t>(index) * 256;
 					}
 				}
-				// handle the top byte for floating-point differently
+				// handle the top part for floating-point differently
 				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
 				{
-handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						T outlo{*psrclo++};
 						T outhi{*psrchi--};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = outlo;
@@ -4845,18 +4845,18 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 					}while(psrclo < psrchi);
 					if(psrclo == psrchi){// fill in the final item for odd counts
 						T outlo{*psrclo};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = outlo;
 					}
-					break;// no further processing beyond the top byte
+					break;// no further processing beyond the top part
 				}
 			}
 		}
 	}
 }
 
-// radixsortcopynoalloc() function implementation template for multi-byte types with indirection
+// radixsortcopynoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
@@ -4984,7 +4984,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
 					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 8-byte, not in reverse order
+			}else{// 64-bit, not in reverse order
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
@@ -5174,7 +5174,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 7-byte, not in reverse order
+			}else{// 56-bit, not in reverse order
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
@@ -5346,7 +5346,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 6-byte, not in reverse order
+			}else{// 48-bit, not in reverse order
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
@@ -5498,7 +5498,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 5-byte, not in reverse order
+			}else{// 40-bit, not in reverse order
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
@@ -5630,7 +5630,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 4-byte, not in reverse order
+			}else{// 32-bit, not in reverse order
 				do{
 					V *pa{input[i]};
 					V *pb{input[i - 1]};
@@ -5794,7 +5794,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 3-byte, not in reverse order
+			}else{// 24-bit, not in reverse order
 				i -= 2;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -5985,7 +5985,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
-			}else{// 2-byte, not in reverse order
+			}else{// 16-bit, not in reverse order
 				i -= 3;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -6105,7 +6105,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 				[[unlikely]]
 #endif
-				goto handletopbyte;// rare, but possible
+				goto handletop8;// rare, but possible
 			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
@@ -6114,7 +6114,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
@@ -6124,7 +6124,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					size_t curlo{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
 				}
@@ -6154,13 +6154,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poffset += static_cast<size_t>(index) * 256;
 					}
 				}
-				// handle the top byte for floating-point differently
+				// handle the top part for floating-point differently
 				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
 				{
-handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						V *plo{*psrclo++};
 						V *phi{*psrchi--};
@@ -6168,7 +6168,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = plo;
@@ -6178,18 +6178,18 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						V *plo{*psrclo};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = plo;
 					}
-					break;// no further processing beyond the top byte
+					break;// no further processing beyond the top part
 				}
 			}
 		}
 	}
 }
 
-// radixsortnoalloc() function implementation template for multi-byte types with indirection
+// radixsortnoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
@@ -6314,7 +6314,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
 					++offsets[7 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 8-byte, not in reverse order
+			}else{// 64-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					V *phi{input[i]};
@@ -6502,7 +6502,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
 					++offsets[6 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 7-byte, not in reverse order
+			}else{// 56-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					V *phi{input[i]};
@@ -6669,7 +6669,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
 					++offsets[5 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 6-byte, not in reverse order
+			}else{// 48-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					V *phi{input[i]};
@@ -6819,7 +6819,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
 					++offsets[4 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 5-byte, not in reverse order
+			}else{// 40-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					V *phi{input[i]};
@@ -6950,7 +6950,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
 					++offsets[3 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 4-byte, not in reverse order
+			}else{// 32-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 				do{
 					V *pa{input[i]};
@@ -7219,7 +7219,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
 					++offsets[2 * 256 + static_cast<size_t>(cur)];
 				}
-			}else{// 3-byte, not in reverse order
+			}else{// 24-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 2};
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -7411,7 +7411,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(absolute && issigned && isfloatingpoint) cur &= 0x7Fu;
 					++offsets[256 + static_cast<size_t>(cur)];
 				}
-			}else{// 2-byte, not in reverse order
+			}else{// 16-bit, not in reverse order
 				ptrdiff_t i{static_cast<ptrdiff_t>(count) - 3};
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -7523,7 +7523,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 				[[unlikely]]
 #endif
-				goto handletopbyte;// rare, but possible
+				goto handletop8;// rare, but possible
 			for(;;){
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
@@ -7532,7 +7532,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					auto[curlo, curhi]{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
@@ -7542,7 +7542,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					size_t curlo{filtershiftbyte<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
 				}
@@ -7572,13 +7572,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poffset += static_cast<size_t>(index) * 256;
 					}
 				}
-				// handle the top byte for floating-point differently
+				// handle the top part for floating-point differently
 				if(!absolute && isfloatingpoint && CHAR_BIT * sizeof(T) - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
 				{
-handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
+handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr here, but that's fine
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						V *plo{*psrclo++};
 						V *phi{*psrchi--};
@@ -7586,7 +7586,7 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-						auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
 						pdst[offsetlo] = plo;
@@ -7596,20 +7596,20 @@ handletopbyte:// this prevents "!absolute && isfloatingpoint" to be made constex
 						V *plo{*psrclo};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
+						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = plo;
 					}
-					break;// no further processing beyond the top byte
+					break;// no further processing beyond the top part
 				}
 			}
 		}
 	}
 }
 
-// Function implementation templates for single-byte types
+// Function implementation templates for single-part types
 
-// radixsortcopynoalloc() function implementation template for single-byte types without indirection
+// radixsortcopynoalloc() function implementation template for single-part types without indirection
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<T> &&
@@ -7841,8 +7841,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				T outlo{*psrclo++};
 				T outhi{*psrchi--};
-				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
+				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
 					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
@@ -7855,8 +7855,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				T outlo{*psrclo};
-				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
+				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
+				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
 					offsetlo = offsets[curlo + offsetsstride];
 				}else{
@@ -7868,7 +7868,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
-// radixsortnoalloc() function implementation template for single-byte types without indirection
+// radixsortnoalloc() function implementation template for single-part types without indirection
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<T> &&
@@ -8184,8 +8184,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				T outlo{*psrclo++};
 				T outhi{*psrchi--};
-				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
+				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
 					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
@@ -8198,8 +8198,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				T outlo{*psrclo};
-				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
+				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
+				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(false){// useless when not handling indirection: reverseorder){
 					offsetlo = offsets[curlo + offsetsstride];
 				}else{
@@ -8211,9 +8211,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
-// radixsortcopynoalloc() function implementation template for single-byte types with indirection
+// radixsortcopynoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument from a multi-byte version is detected here, and do not allow active compile-time evaluation with it
+RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>> &&
@@ -8523,8 +8523,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 				T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
+				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
 					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
@@ -8539,8 +8539,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
+				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
+				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
 					offsetlo = offsets[curlo + offsetsstride];
 				}else{
@@ -8552,9 +8552,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 	}
 }
 
-// radixsortnoalloc() function implementation template for single-byte types with indirection
+// radixsortnoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argument from a multi-byte version is detected here, and do not allow active compile-time evaluation with it
+RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>> &&
@@ -8916,8 +8916,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 				T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-				auto[curlo, curhi]{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
-				size_t offsetlo, offsethi;// this is only allowed for the single-byte version, containing just one sorting pass
+				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
+				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
 					offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 					offsethi = offsets[curhi]++;// the next item will be placed one higher
@@ -8932,8 +8932,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				size_t curlo{filtertopbyte<absolute, issigned, isfloatingpoint, T>(outlo)};
-				size_t offsetlo;// this is only allowed for the single-byte version, containing just one sorting pass
+				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
+				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
 					offsetlo = offsets[curlo + offsetsstride];
 				}else{
@@ -9087,7 +9087,7 @@ RSBD8_FUNC_INLINE void deallocatearray(T *buffer
 
 // Wrapper template functions for the 4 main sorting functions in this library
 
-// Wrapper for the multi-byte radixsortcopynoalloc() function without indirection
+// Wrapper for the multi-part radixsortcopynoalloc() function without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
@@ -9108,7 +9108,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortcopynoallocmulti<reversesort, reverseorder, absolute, issigned, isfloatingpoint, U>(count, reinterpret_cast<U const *>(input), reinterpret_cast<U *>(output), reinterpret_cast<U *>(buffer));
 }
 
-// Wrapper for the multi-byte radixsortnoalloc() function without indirection
+// Wrapper for the multi-part radixsortnoalloc() function without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
@@ -9129,7 +9129,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortnoallocmulti<reversesort, reverseorder, absolute, issigned, isfloatingpoint, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer), movetobuffer);
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function without indirection
+// Wrapper for the single-part radixsortcopynoalloc() function without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
@@ -9149,16 +9149,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortcopynoallocsingle<reversesort, reverseorder, absolute, issigned, isfloatingpoint, U>(count, reinterpret_cast<U const *>(input), reinterpret_cast<U *>(output));
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function without indirection with a dummy buffer argument
+// Wrapper for the single-part radixsortcopynoalloc() function without indirection with a dummy buffer argument
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(size_t count, T const input[], T output[], T buffer[])noexcept{
-	static_cast<void>(buffer);// the single-byte version never needs an extra buffer
+	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, T>(count, input, output);
 }
 
-// Wrapper for the single-byte radixsortnoalloc() function without indirection
+// Wrapper for the single-part radixsortnoalloc() function without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
@@ -9178,7 +9178,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortnoallocsingle<reversesort, reverseorder, absolute, issigned, isfloatingpoint, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
 }
 
-// Wrapper for the single-byte radixsortnoalloc() and radixsortcopynoalloc() functions without indirection
+// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions without indirection
 // This variant does not set the default "false" for the "movetobuffer" parameter.
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -9201,7 +9201,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper to implement the radixsort() function without indirection, which only allocates some memory prior to sorting arrays without indirection
-// This requires no specialisation for handling the single-byte types.
+// This requires no specialisation for handling the single-part types.
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9240,7 +9240,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-byte radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9280,7 +9280,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-byte radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9300,12 +9300,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
-	// the single-byte version never needs an extra buffer
+	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, T>(count, input, output);
 	return{true};
 }
 
-// Wrapper for the multi-byte radixsortcopynoalloc() function with indirection
+// Wrapper for the multi-part radixsortcopynoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -9336,7 +9336,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// Wrapper for the multi-byte radixsortnoalloc() function with indirection
+// Wrapper for the multi-part radixsortnoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -9367,7 +9367,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function with indirection
+// Wrapper for the single-part radixsortcopynoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
@@ -9402,7 +9402,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	}
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function with indirection with a dummy buffer argument
+// Wrapper for the single-part radixsortcopynoalloc() function with indirection with a dummy buffer argument
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -9410,11 +9410,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
 		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
-	static_cast<void>(buffer);// the single-byte version never needs an extra buffer
+	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters);
 }
 
-// Wrapper for the single-byte radixsortnoalloc() function with indirection
+// Wrapper for the single-part radixsortnoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movetobuffer argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
@@ -9449,7 +9449,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	}
 }
 
-// Wrapper for the single-byte radixsortnoalloc() and radixsortcopynoalloc() functions with indirection
+// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with indirection
 // This variant does not set the default "false" for the "movetobuffer" parameter.
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -9489,7 +9489,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper to implement the radixsort() function with indirection, which only allocates some memory prior to sorting arrays without indirection
-// This requires no specialisation for handling the single-byte types.
+// This requires no specialisation for handling the single-part types.
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9531,7 +9531,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-byte radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9574,7 +9574,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-byte radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9597,12 +9597,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
-	// the single-byte version never needs an extra buffer
+	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 	return{true};
 }
 
-// Wrapper for the multi-byte radixsortcopynoalloc() function with type and offset pointer indirection
+// Wrapper for the multi-part radixsortcopynoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
@@ -9626,7 +9626,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortcopynoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
 }
 
-// Wrapper for the multi-byte radixsortnoalloc() function with type and offset pointer indirection
+// Wrapper for the multi-part radixsortnoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
@@ -9650,7 +9650,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortnoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function with type and offset pointer indirection
+// Wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
@@ -9678,17 +9678,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	helper::radixsortcopynoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
 
-// Wrapper for the single-byte radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
+// Wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
-	static_cast<void>(buffer);// the single-byte version never needs an extra buffer
+	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoallocsingle<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters);
 }
 
-// Wrapper for the single-byte radixsortnoalloc() function with type and offset pointer indirection
+// Wrapper for the single-part radixsortnoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movetobuffer argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
@@ -9716,7 +9716,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	helper::radixsortnoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 }
 
-// Wrapper for the single-byte radixsortnoalloc() and radixsortcopynoalloc() functions with with type and offset pointer indirection
+// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with with type and offset pointer indirection
 // This variant does not set the default "false" for the "movetobuffer" parameter.
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -9745,7 +9745,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper to implement the radixsort() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
-// This requires no specialisation for handling the single-byte types.
+// This requires no specialisation for handling the single-part types.
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9785,7 +9785,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-byte radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
+// Wrapper to implement the multi-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9826,7 +9826,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-byte radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
+// Wrapper to implement the single-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -9847,7 +9847,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
-	// the single-byte version never needs an extra buffer
+	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 	return{true};
 }
