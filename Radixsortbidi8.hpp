@@ -520,18 +520,18 @@ RSBD8_FUNC_INLINE decltype(auto) splitget(V *p, auto index2, vararguments... var
 	else return (p->*indirection1)(varparameters...);
 }
 template<auto indirection1, typename V, typename... vararguments>
-consteval RSBD8_FUNC_INLINE decltype(auto) splitget(V *p)noexcept{
+RSBD8_FUNC_INLINE decltype(auto) splitget(V *p)noexcept{
 	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
 	return nullptr;
 }
 
 // Utility templates to split off the first parameter
 template<typename... vararguments>
-consteval RSBD8_FUNC_INLINE decltype(auto) splitparameter(auto first, vararguments...)noexcept{
+RSBD8_FUNC_INLINE decltype(auto) splitparameter(auto first, vararguments...)noexcept{
 	return first;
 }
 template<typename... vararguments>
-consteval RSBD8_FUNC_INLINE decltype(auto) splitparameter()noexcept{
+RSBD8_FUNC_INLINE decltype(auto) splitparameter()noexcept{
 	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
 	return nullptr;
 }
