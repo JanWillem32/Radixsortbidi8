@@ -869,7 +869,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else if constexpr(issigned){
 			return{static_cast<size_t>(cur & 0x7Fu)};
 		}else{
-			cur = rotateleftportable<1>(cur);
+			cur = rotateleftportable<1>(static_cast<T>(cur));
 			return{static_cast<size_t>(cur)};
 		}
 	}else if constexpr(8 <= CHAR_BIT * sizeof(T)){
@@ -920,8 +920,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else if constexpr(issigned){
 			return{static_cast<size_t>(cura & 0x7Fu), static_cast<size_t>(curb & 0x7Fu)};
 		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
+			cura = rotateleftportable<1>(static_cast<T>(cura));
+			curb = rotateleftportable<1>(static_cast<T>(curb));
 			return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 		}
 	}else if constexpr(8 <= CHAR_BIT * sizeof(T)){
@@ -950,7 +950,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(!isfloatingpoint && issigned) cur += curq;
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		cur = rotateleftportable<1>(cur);
+		cur = rotateleftportable<1>(static_cast<T>(cur));
 	}
 	cur >>= shift;
 	return{static_cast<size_t>(cur & 0xFFu)};
@@ -981,8 +981,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cura ^= curaq;
 		curb ^= curbq;
 	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		cura = rotateleftportable<1>(cura);
-		curb = rotateleftportable<1>(curb);
+		cura = rotateleftportable<1>(static_cast<T>(cura));
+		curb = rotateleftportable<1>(static_cast<T>(curb));
 	}
 	cura >>= shift;
 	curb >>= shift;
@@ -1006,7 +1006,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
-		else cur = rotateleftportable<1>(cur);
+		else cur = rotateleftportable<1>(static_cast<T>(cur));
 	}
 }
 
@@ -1029,7 +1029,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*out = cur;
 		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
-		else cur = rotateleftportable<1>(cur);
+		else cur = rotateleftportable<1>(static_cast<T>(cur));
 	}else *out = cur;
 }
 
@@ -1054,7 +1054,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*out = cur;
 		*dst = cur;
 		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
-		else cur = rotateleftportable<1>(cur);
+		else cur = rotateleftportable<1>(static_cast<T>(cur));
 	}else{
 		*out = cur;
 		*dst = cur;
@@ -1091,8 +1091,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
 		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
+			cura = rotateleftportable<1>(static_cast<T>(cura));
+			curb = rotateleftportable<1>(static_cast<T>(curb));
 		}
 	}
 }
@@ -1127,10 +1127,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 	}else{
 		*outa = cura;
 		*outb = curb;
@@ -1170,11 +1170,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*outa = cura;
 		*dsta = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		*dstb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 	}else{
 		*outa = cura;
 		*dsta = cura;
@@ -1221,9 +1221,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb &= ~static_cast<T>(0) >> 1;
 			curc &= ~static_cast<T>(0) >> 1;
 		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
-			curc = rotateleftportable<1>(curc);
+			cura = rotateleftportable<1>(static_cast<T>(cura));
+			curb = rotateleftportable<1>(static_cast<T>(curb));
+			curc = rotateleftportable<1>(static_cast<T>(curc));
 		}
 	}
 }
@@ -1266,13 +1266,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 	}else{
 		*outa = cura;
 		*outb = curb;
@@ -1322,15 +1322,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*outa = cura;
 		*dsta = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		*dstb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		*dstc = curc;
 		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 	}else{
 		*outa = cura;
 		*dsta = cura;
@@ -1387,10 +1387,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curc &= ~static_cast<T>(0) >> 1;
 			curd &= ~static_cast<T>(0) >> 1;
 		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
-			curc = rotateleftportable<1>(curc);
-			curd = rotateleftportable<1>(curd);
+			cura = rotateleftportable<1>(static_cast<T>(cura));
+			curb = rotateleftportable<1>(static_cast<T>(curb));
+			curc = rotateleftportable<1>(static_cast<T>(curc));
+			curd = rotateleftportable<1>(static_cast<T>(curd));
 		}
 	}
 }
@@ -1441,16 +1441,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 		*outd = curd;
 		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
-		else curd = rotateleftportable<1>(curd);
+		else curd = rotateleftportable<1>(static_cast<T>(curd));
 	}else{
 		*outa = cura;
 		*outb = curb;
@@ -1510,19 +1510,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*outa = cura;
 		*dsta = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		*dstb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		*dstc = curc;
 		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 		*outd = curd;
 		*dstd = curd;
 		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
-		else curd = rotateleftportable<1>(curd);
+		else curd = rotateleftportable<1>(static_cast<T>(curd));
 	}else{
 		*outa = cura;
 		*dsta = cura;
@@ -1613,14 +1613,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curg &= ~static_cast<T>(0) >> 1;
 			curh &= ~static_cast<T>(0) >> 1;
 		}else{
-			cura = rotateleftportable<1>(cura);
-			curb = rotateleftportable<1>(curb);
-			curc = rotateleftportable<1>(curc);
-			curd = rotateleftportable<1>(curd);
-			cure = rotateleftportable<1>(cure);
-			curf = rotateleftportable<1>(curf);
-			curg = rotateleftportable<1>(curg);
-			curh = rotateleftportable<1>(curh);
+			cura = rotateleftportable<1>(static_cast<T>(cura));
+			curb = rotateleftportable<1>(static_cast<T>(curb));
+			curc = rotateleftportable<1>(static_cast<T>(curc));
+			curd = rotateleftportable<1>(static_cast<T>(curd));
+			cure = rotateleftportable<1>(static_cast<T>(cure));
+			curf = rotateleftportable<1>(static_cast<T>(curf));
+			curg = rotateleftportable<1>(static_cast<T>(curg));
+			curh = rotateleftportable<1>(static_cast<T>(curh));
 		}
 	}
 }
@@ -1703,28 +1703,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*outa = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 		*outd = curd;
 		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
-		else curd = rotateleftportable<1>(curd);
+		else curd = rotateleftportable<1>(static_cast<T>(curd));
 		*oute = cure;
 		if constexpr(issigned) cure &= ~static_cast<T>(0) >> 1;
-		else cure = rotateleftportable<1>(cure);
+		else cure = rotateleftportable<1>(static_cast<T>(cure));
 		*outf = curf;
 		if constexpr(issigned) curf &= ~static_cast<T>(0) >> 1;
-		else curf = rotateleftportable<1>(curf);
+		else curf = rotateleftportable<1>(static_cast<T>(curf));
 		*outg = curg;
 		if constexpr(issigned) curg &= ~static_cast<T>(0) >> 1;
-		else curg = rotateleftportable<1>(curg);
+		else curg = rotateleftportable<1>(static_cast<T>(curg));
 		*outh = curh;
 		if constexpr(issigned) curh &= ~static_cast<T>(0) >> 1;
-		else curh = rotateleftportable<1>(curh);
+		else curh = rotateleftportable<1>(static_cast<T>(curh));
 	}else{
 		*outa = cura;
 		*outb = curb;
@@ -1824,35 +1824,35 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*outa = cura;
 		*dsta = cura;
 		if constexpr(issigned) cura &= ~static_cast<T>(0) >> 1;
-		else cura = rotateleftportable<1>(cura);
+		else cura = rotateleftportable<1>(static_cast<T>(cura));
 		*outb = curb;
 		*dstb = curb;
 		if constexpr(issigned) curb &= ~static_cast<T>(0) >> 1;
-		else curb = rotateleftportable<1>(curb);
+		else curb = rotateleftportable<1>(static_cast<T>(curb));
 		*outc = curc;
 		*dstc = curc;
 		if constexpr(issigned) curc &= ~static_cast<T>(0) >> 1;
-		else curc = rotateleftportable<1>(curc);
+		else curc = rotateleftportable<1>(static_cast<T>(curc));
 		*outd = curd;
 		*dstd = curd;
 		if constexpr(issigned) curd &= ~static_cast<T>(0) >> 1;
-		else curd = rotateleftportable<1>(curd);
+		else curd = rotateleftportable<1>(static_cast<T>(curd));
 		*oute = cure;
 		*dste = cure;
 		if constexpr(issigned) cure &= ~static_cast<T>(0) >> 1;
-		else cure = rotateleftportable<1>(cure);
+		else cure = rotateleftportable<1>(static_cast<T>(cure));
 		*outf = curf;
 		*dstf = curf;
 		if constexpr(issigned) curf &= ~static_cast<T>(0) >> 1;
-		else curf = rotateleftportable<1>(curf);
+		else curf = rotateleftportable<1>(static_cast<T>(curf));
 		*outg = curg;
 		*dstg = curg;
 		if constexpr(issigned) curg &= ~static_cast<T>(0) >> 1;
-		else curg = rotateleftportable<1>(curg);
+		else curg = rotateleftportable<1>(static_cast<T>(curg));
 		*outh = curh;
 		*dsth = curh;
 		if constexpr(issigned) curh &= ~static_cast<T>(0) >> 1;
-		else curh = rotateleftportable<1>(curh);
+		else curh = rotateleftportable<1>(static_cast<T>(curh));
 	}else{
 		*outa = cura;
 		*dsta = cura;
@@ -6112,9 +6112,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, isaddressingsubdivisable? 0 : shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
@@ -6123,8 +6123,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, isaddressingsubdivisable? 0 : shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
 				}
@@ -6166,8 +6166,8 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 						V *phi{*psrchi--};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -6177,7 +6177,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 					if(psrclo == psrchi){// fill in the final item for odd counts
 						V *plo{*psrclo};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = plo;
@@ -7530,8 +7530,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -7541,7 +7541,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
@@ -7584,8 +7584,8 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 						V *phi{*psrchi--};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + CHAR_BIT * (sizeof(T) - 1) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -7595,7 +7595,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 					if(psrclo == psrchi){// fill in the final item for odd counts
 						V *plo{*psrclo};
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 						size_t offsetlo{offsets[curlo + CHAR_BIT * (sizeof(T) - 1) * 256 / 8]};
 						pdst[offsetlo] = plo;
@@ -8521,8 +8521,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				V *phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -8538,7 +8538,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -8914,8 +8914,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				V *phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				T outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
 				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -8931,7 +8931,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				T outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
 				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
