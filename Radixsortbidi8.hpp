@@ -853,7 +853,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curp >>= CHAR_BIT * sizeof(T) - 1;
 		U curq{static_cast<T>(curp)};
 		if constexpr(isfloatingpoint) cur >>= CHAR_BIT * sizeof(T) - 8 + 1;
-		else if constexpr(issigned) cur += curq;
+		else if constexpr(issigned){
+			T curo{static_cast<T>(cur)};
+			curo += static_cast<T>(curq);
+			cur = curo;
+		}
 		cur ^= curq;
 		if constexpr(8 <= CHAR_BIT * sizeof(T)){
 			if constexpr(isfloatingpoint) return{static_cast<size_t>(cur & 0xFFu)};
@@ -898,8 +902,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cura >>= CHAR_BIT * sizeof(T) - 8 + 1;
 			curb >>= CHAR_BIT * sizeof(T) - 8 + 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			cura = curao;
+			curb = curbo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -947,7 +955,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(absolute && !issigned) cur *= 2;
 		curp >>= CHAR_BIT * sizeof(T) - 1;
 		U curq{static_cast<T>(curp)};
-		if constexpr(!isfloatingpoint && issigned) cur += curq;
+		if constexpr(!isfloatingpoint && issigned){
+			T curo{static_cast<T>(cur)};
+			curo += static_cast<T>(curq);
+			cur = curo;
+		}
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
 		cur = rotateleftportable<1>(static_cast<T>(cur));
@@ -975,8 +987,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curbp >>= CHAR_BIT * sizeof(T) - 1;
 		U curbq{static_cast<T>(curbp)};
 		if constexpr(!isfloatingpoint && issigned){
-			cura += curaq;
-			curb += curbq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			cura = curao;
+			curb = curbo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1002,7 +1018,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curp >>= CHAR_BIT * sizeof(T) - 1;
 		U curq{static_cast<T>(curp)};
 		if constexpr(isfloatingpoint) cur >>= 1;
-		else if constexpr(issigned) cur += curq;
+		else if constexpr(issigned){
+			T curo{static_cast<T>(cur)};
+			curo += static_cast<T>(curq);
+			cur = curo;
+		}
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		if constexpr(issigned) cur &= ~static_cast<T>(0) >> 1;
@@ -1024,7 +1044,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curp >>= CHAR_BIT * sizeof(T) - 1;
 		U curq{static_cast<T>(curp)};
 		if constexpr(isfloatingpoint) cur >>= 1;
-		else if constexpr(issigned) cur += curq;
+		else if constexpr(issigned){
+			T curo{static_cast<T>(cur)};
+			curo += static_cast<T>(curq);
+			cur = curo;
+		}
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*out = cur;
@@ -1048,7 +1072,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curp >>= CHAR_BIT * sizeof(T) - 1;
 		U curq{static_cast<T>(curp)};
 		if constexpr(isfloatingpoint) cur >>= 1;
-		else if constexpr(issigned) cur += curq;
+		else if constexpr(issigned){
+			T curo{static_cast<T>(cur)};
+			curo += static_cast<T>(curq);
+			cur = curo;
+		}
 		cur ^= curq;
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
 		*out = cur;
@@ -1081,8 +1109,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cura >>= 1;
 			curb >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			cura = curao;
+			curb = curbo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1119,8 +1151,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cura >>= 1;
 			curb >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			cura = curao;
+			curb = curbo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1161,8 +1197,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cura >>= 1;
 			curb >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			cura = curao;
+			curb = curbo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1208,9 +1248,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= 1;
 			curc >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1256,9 +1302,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= 1;
 			curc >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1311,9 +1363,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= 1;
 			curc >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1371,10 +1429,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curc >>= 1;
 			curd >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1429,10 +1495,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curc >>= 1;
 			curd >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1497,10 +1571,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curc >>= 1;
 			curd >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1585,14 +1667,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curg >>= 1;
 			curh >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
-			cure += cureq;
-			curf += curfq;
-			curg += curgq;
-			curh += curhq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			T cureo{static_cast<T>(cure)};
+			T curfo{static_cast<T>(curf)};
+			T curgo{static_cast<T>(curg)};
+			T curho{static_cast<T>(curh)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cureo += static_cast<T>(cureq);
+			curfo += static_cast<T>(curfq);
+			curgo += static_cast<T>(curgq);
+			curho += static_cast<T>(curhq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
+			cure = cureo;
+			curf = curfo;
+			curg = curgo;
+			curh = curho;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1683,14 +1781,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curg >>= 1;
 			curh >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
-			cure += cureq;
-			curf += curfq;
-			curg += curgq;
-			curh += curhq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			T cureo{static_cast<T>(cure)};
+			T curfo{static_cast<T>(curf)};
+			T curgo{static_cast<T>(curg)};
+			T curho{static_cast<T>(curh)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cureo += static_cast<T>(cureq);
+			curfo += static_cast<T>(curfq);
+			curgo += static_cast<T>(curgq);
+			curho += static_cast<T>(curhq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
+			cure = cureo;
+			curf = curfo;
+			curg = curgo;
+			curh = curho;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
@@ -1803,14 +1917,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curg >>= 1;
 			curh >>= 1;
 		}else if constexpr(issigned){
-			cura += curaq;
-			curb += curbq;
-			curc += curcq;
-			curd += curdq;
-			cure += cureq;
-			curf += curfq;
-			curg += curgq;
-			curh += curhq;
+			T curao{static_cast<T>(cura)};
+			T curbo{static_cast<T>(curb)};
+			T curco{static_cast<T>(curc)};
+			T curdo{static_cast<T>(curd)};
+			T cureo{static_cast<T>(cure)};
+			T curfo{static_cast<T>(curf)};
+			T curgo{static_cast<T>(curg)};
+			T curho{static_cast<T>(curh)};
+			curao += static_cast<T>(curaq);
+			curbo += static_cast<T>(curbq);
+			curco += static_cast<T>(curcq);
+			curdo += static_cast<T>(curdq);
+			cureo += static_cast<T>(cureq);
+			curfo += static_cast<T>(curfq);
+			curgo += static_cast<T>(curgq);
+			curho += static_cast<T>(curhq);
+			cura = curao;
+			curb = curbo;
+			curc = curco;
+			curd = curdo;
+			cure = cureo;
+			curf = curfo;
+			curg = curgo;
+			curh = curho;
 		}
 		cura ^= curaq;
 		curb ^= curbq;
