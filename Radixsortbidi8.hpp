@@ -763,7 +763,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			60, 11,
 			10,
 			9};
-		return{MultiplyDeBruijnBitPosition[static_cast<std::make_unsigned_t<T>>(input & -static_cast<std::make_signed_t<T>>(input)) * 0x37E84A99DAE458Full >> 58]};
+		return{MultiplyDeBruijnBitPosition[static_cast<std::make_unsigned_t<T>>(input & -static_cast<std::make_signed_t<T>>(input)) * 0x37E84A99DAE458Fu >> 58]};
 	}
 #endif
 }
@@ -9126,7 +9126,7 @@ template <
 struct OffsetHelper
 {
 	using M = ClassMemberTraits<decltype(MemberPtr)>::MemberType;
-	
+
 	constexpr static PaddedUnion<B, M, Mid> dummy{};
 	constexpr static std::size_t GetOffsetOf()
 	{
