@@ -369,6 +369,10 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #include <bit>// (C++20)
 // Library feature-test macros (C++20)
 //
+// std::byte (C++17)
+#ifndef __cpp_lib_byte
+#error Compiler does not meet requirements for __cpp_lib_byte for this library.
+#endif
 // std::is_nothrow_invocable_v (C++17)
 // std::invoke_result_t (C++17)
 #ifndef __cpp_lib_is_invocable
