@@ -2885,7 +2885,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				do{
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
@@ -3080,7 +3080,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				do{
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
@@ -3257,7 +3257,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				do{
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
@@ -3416,7 +3416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				do{
 					U curhi{pinput[0]};
 					U curlo{pinput[1]};
@@ -3553,7 +3553,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				do{
 					U cura{pinput[0]};
 					U curb{pinput[1]};
@@ -3672,7 +3672,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				i -= 2;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -3867,7 +3867,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U const *pinput{input};
+				T const *pinput{input};
 				i -= 3;
 				if(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -4173,8 +4173,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
@@ -4370,8 +4370,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
@@ -4549,8 +4549,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
@@ -4710,8 +4710,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				do{
 					U curlo{*pinputlo};
 					U curhi{*pinputhi};
@@ -4849,8 +4849,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				do{
 					U cura{*pinputlo};
 					U curb{*pinputhi};
@@ -4970,8 +4970,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				size_t initialcount{(count + 1) % 6};
 				if(4 & initialcount){// possibly initialize with 4 entries before the loop below
 					U cura{pinputlo[0]};
@@ -5290,8 +5290,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: reverseorder){// also reverse the array at the same time
-				U *pinputlo{input}, *pinputhi{input + count};
-				U *pbufferlo{buffer}, *pbufferhi{buffer + count};
+				T *pinputlo{input}, *pinputhi{input + count};
+				T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 				if(2 & count + 1){// possibly initialize with 2 entries before the loop below
 					U cura{*pinputlo};
 					U curb{*pinputhi};
