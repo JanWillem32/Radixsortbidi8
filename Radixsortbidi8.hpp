@@ -208,10 +208,8 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // Floating-point NaN positive values (implies not machine-generated) are sorted after positive infinity (0x7FF0'0000'0000'0001 and onward on an IEEE double).
 // Floating-point SNaN (signalling) values do not trigger signals inside these functions. (Several functions in namespace std can do that.)
 //
-// TODO, add support for types larger than 64 bits
-// = TODO, currently all functions here are either guarded with an upper limit of 8-bit or just 64-bit (using std::enable_if sections). Future functionality will either require lifting the 64-bit limit on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
-// = TODO, long double (can be checked by LDBL_MANT_DIG if it's defined as the 64-, 80- or 128-bit type)
-// = TODO, 128-bit integers (several compilers have unsigned __int128, __int128, uint128_t, int128_t and more already)
+// TODO, add support for types larger than 128 bits
+// = TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
 //
 // TODO, document computer system architecture-dependent code parts and add more options
 // = TODO, the current mode for pipelining (ILP - instruction level processing) is set to not need more than 15 integer registers, of which are 8 to 10 "hot" for parallel processing. This isn't a universally ideal option. To name two prominent systems, 32-bit x86 only has 7 available general-purpose registers, while ARM AArch64 (ARM64) has 31.
@@ -220,7 +218,7 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // = TODO, similarly, 16-bit systems still exist (but these often do include a capable 32-bit capable data path line, see the history of x86 in this regard for example). If this library can be optimised for use in a reasonably current 16-bit microcontroller, document and later on optimise for it.
 // = TODO, add more platform-dependent, optimised code sequences here similar to the current collections in the rsbd8::helper namespace.
 // = TODO, possibly have a go at multi-threading by using a primary sorting phase, and a merging phase using a linear comparison-based method to finalise the sorted data array.
-// = TOOD, test and debug this library on more machines, platforms and such. Functionality and performance should both be guaranteed.
+// = TODO, test and debug this library on more machines, platforms and such. Functionality and performance should both be guaranteed.
 //
 // TODO, this is a C++17 minimum library, but more modern features are welcome
 // = TODO, bumping up the library to C++20 minimum isn't advised (yet), but could be in the near future.
@@ -511,7 +509,7 @@ unsigned char constexpr log2ptrs{
 // A dirty method that heavily relies on proper inlining and compiler optimisation of that, but it at least can detect the floating-point mixed endianness cases if used properly
 template<typename T>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
 		std::enable_if<true, T>>::type>,
@@ -520,7 +518,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 template<typename T>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	std::is_floating_point_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
 		std::enable_if<true, T>>::type>,
@@ -11093,7 +11091,7 @@ RSBD8_FUNC_INLINE void deallocatearray(T *buffer
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(size_t count, T const input[], T output[], T buffer[])noexcept{
 	static bool constexpr reversesort{static_cast<bool>(1 & direction)};
@@ -11115,7 +11113,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	static bool constexpr reversesort{static_cast<bool>(1 & direction)};
@@ -11216,7 +11214,7 @@ template<sortingdirection direction = ascendingforwardordered, sortingmode mode 
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T),
+	128 >= CHAR_BIT * sizeof(T),
 	bool> radixsort(size_t count, T input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, size_t largepagesize = 0
@@ -11256,7 +11254,7 @@ template<sortingdirection direction = ascendingforwardordered, sortingmode mode 
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	bool> radixsortcopy(size_t count, T const input[], T output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -11321,7 +11319,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(size_t count, T const *const input[], T const *output[], T const *buffer[], vararguments... varparameters)noexcept{
 	static bool constexpr reversesort{static_cast<bool>(1 & direction)};
@@ -11344,7 +11342,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(size_t count, T const *input[], T const *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
 	static bool constexpr reversesort{static_cast<bool>(1 & direction)};
@@ -11449,7 +11447,7 @@ template<sortingdirection direction = ascendingforwardordered, sortingmode mode 
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T),
+	128 >= CHAR_BIT * sizeof(T),
 	bool> radixsort(size_t count, T input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, size_t largepagesize = 0
@@ -11489,7 +11487,7 @@ template<sortingdirection direction = ascendingforwardordered, sortingmode mode 
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
-	64 >= CHAR_BIT * sizeof(T) &&
+	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	bool> radixsortcopy(size_t count, T const *const input[], T const *output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -11553,7 +11551,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
@@ -11584,7 +11582,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
@@ -11740,7 +11738,7 @@ template<auto indirection1, sortingdirection direction = ascendingforwardordered
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
+	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	bool> radixsort(size_t count, V *input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, size_t largepagesize = 0
@@ -11782,7 +11780,7 @@ template<auto indirection1, sortingdirection direction = ascendingforwardordered
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	bool> radixsortcopy(size_t count, V *const input[], V output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -11850,7 +11848,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
-	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
 	using W = helper::stripenum<std::remove_pointer_t<T>>;
@@ -11874,7 +11872,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
-	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
 	using W = helper::stripenum<std::remove_pointer_t<T>>;
@@ -11996,7 +11994,7 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
-	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	bool> radixsort(size_t count, V *input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, size_t largepagesize = 0
@@ -12036,7 +12034,7 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
-	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	bool> radixsortcopy(size_t count, V *const input[], V output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
