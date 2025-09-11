@@ -527,6 +527,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Utility templates to create an immediate member object pointer for the type and offset indirection wrapper functions
+#pragma pack(push, 1)
 template<typename T, ptrdiff_t indirection1> struct memberobjectgenerator;
 template<typename T>
 struct memberobjectgenerator<T, 0>{
@@ -537,6 +538,7 @@ struct memberobjectgenerator{
 	std::byte padding[static_cast<size_t>(indirection1)];// this will work, but array counts are just required to be positive
 	T object;// some amount of padding is used
 };
+#pragma pack(pop)
 
 // Utility templates to call the getter function while splitting off the second-level indirection index parameter
 template<auto indirection1, typename V, typename... vararguments>
