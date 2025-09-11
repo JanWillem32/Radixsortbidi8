@@ -5112,6 +5112,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 }
 
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types without indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<long double, T> &&
