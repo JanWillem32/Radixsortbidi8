@@ -361,8 +361,12 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #endif
 #endif
 #include <utility>
+#include <cfloat>
 #if CHAR_BIT & 8 - 1
 #error This platform has an addressable unit that isn't divisible by 8. For these kinds of platforms it's better to re-write this library and not use an 8-bit indexed radix sort method.
+#endif
+#ifndef UINTPTR_MAX
+#error This platform has no uintptr_t type, which should be near impossible. This library can be edited to get around that, however it might be more advantageous to edit the compiler.
 #endif
 #include <cassert>
 #if 202002L <= __cplusplus || defined(_MSVC_LANG) && 202002L <= _MSVC_LANG
@@ -1190,6 +1194,305 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	size_t> filterbelowtop8(uint_least64_t curm, U cure)noexcept{
+	// Filtering is simplified if possible.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(absolute && !issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			__builtin_addcl(curm, curm, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			__builtin_addcl(curmhi, curmhi, 0, &carry);
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+#else
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curo += curo;
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+		curp >>= 16 - 1;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		uint_least64_t curq{static_cast<uint_least64_t>(curp)};
+#else
+		uint_least32_t curq{static_cast<uint_least32_t>(curp)};
+#endif
+		if constexpr(!isfloatingpoint && issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			__builtin_addcl(curm, curq, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			__builtin_addcl(curmhi, curq, 0, &carry);
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, nullptr), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curq, nullptr), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+#else
+			uint_least64_t curmtmp{curm};
+			curm += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curm < curmtmp || curm < curq;
+#endif
+			cure = curo;
+		}
+		cure ^= static_cast<U>(curq);
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		__builtin_addcl(curm, curm, 0, &carry);
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		__builtin_addcl(curmhi, curmhi, 0, &carry);
+#endif
+		unsigned short checkcarry;
+		curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
+		static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+		static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+		uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+		static_cast<void>(checkcarry);
+#else
+		uint_least64_t curmtmp{curm};
+		curm += curm;
+		curo += curo;
+		curo += curm < curmtmp;
+#endif
+		cure = curo;
+	}
+	return{static_cast<size_t>(cure & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	std::pair<size_t, size_t>> filterbelowtop8(uint_least64_t curma, U curea, uint_least64_t curmb, U cureb)noexcept{
+	// Filtering is simplified if possible.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curpa{static_cast<int_least16_t>(curea)};
+		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
+		if constexpr(absolute && !issigned){
+			uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carrya, carryb;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			__builtin_addcl(curma, curma, 0, &carrya);
+			__builtin_addcl(curmb, curmb, 0, &carryb);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			__builtin_addcl(curmhia, curmhia, 0, &carrya);
+			__builtin_addcl(curmhib, curmhib, 0, &carryb);
+#endif
+			unsigned short checkcarrya, checkcarryb;
+			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_IX86)
+			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#else
+			uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
+			curma += curma;
+			curoa += curoa;
+			curoa += curma < curmtmpa;
+			curmb += curmb;
+			curob += curob;
+			curob += curmb < curmtmpb;
+#endif
+			curea = curoa;
+			cureb = curob;
+		}
+		curpa >>= 16 - 1;
+		curpb >>= 16 - 1;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};
+		uint_least64_t curqb{static_cast<uint_least64_t>(curpb)};
+#else
+		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};
+		uint_least32_t curqb{static_cast<uint_least32_t>(curpb)};
+#endif
+		if constexpr(!isfloatingpoint && issigned){
+			uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carrya, carryb;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			__builtin_addcl(curma, curqa, 0, &carrya);
+			__builtin_addcl(curmb, curqb, 0, &carryb);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			__builtin_addcl(curmhia, curqa, 0, &carrya);
+			__builtin_addcl(curmhib, curqb, 0, &carryb);
+#endif
+			unsigned short checkcarrya, checkcarryb;
+			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
+			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_IX86)
+			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
+			curma += curqa;
+			curoa += static_cast<uint_least16_t>(curqa);
+			curoa += curma < curmtmpa || curma < curqa;
+			curmb += curqb;
+			curob += static_cast<uint_least16_t>(curqb);
+			curob += curmb < curmtmpb || curmb < curqb;
+#else
+			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			uint_least32_t curmlotmpa{curmloa}, curmhitmpa{curmhia};
+			uint_least32_t curmlotmpb{curmlob}, curmhitmpb{curmhib};
+			curmloa += curqa;
+			curmhia += curqa;
+			curoa += static_cast<uint_least16_t>(curqa);
+			curoa += curmhia < curmhitmpa || curmhia < curqa;
+			curmhia += curmloa < curmlotmpa || curmloa < curqa;// required when chaining multiple carries
+			curmlob += curqb;
+			curmhib += curqb;
+			curob += static_cast<uint_least16_t>(curqb);
+			curob += curmhib < curmhitmpb || curmhib < curqb;
+			curmhib += curmlob < curmlotmpb || curmlob < curqb;// required when chaining multiple carries
+			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#endif
+			curea = curoa;
+			cureb = curob;
+		}
+		curea ^= static_cast<U>(curqa);
+		cureb ^= static_cast<U>(curqb);
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+		uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned long carrya, carryb;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		__builtin_addcl(curma, curma, 0, &carrya);
+		__builtin_addcl(curmb, curmb, 0, &carryb);
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		__builtin_addcl(curmhia, curmhia, 0, &carrya);
+		__builtin_addcl(curmhib, curmhib, 0, &carryb);
+#endif
+		unsigned short checkcarrya, checkcarryb;
+		curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+		curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
+		static_cast<void>(checkcarrya);
+		static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+		static_cast<void>(checkcarrya);
+		static_cast<void>(checkcarryb);
+#elif defined(_M_IX86)
+		uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+		static_cast<void>(checkcarrya);
+		static_cast<void>(checkcarryb);
+#else
+		uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
+		curma += curma;
+		curoa += curoa;
+		curoa += curma < curmtmpa;
+		curmb += curmb;
+		curob += curob;
+		curob += curmb < curmtmpb;
+#endif
+		curea = curoa;
+		cureb = curob;
+	}
+	return{static_cast<size_t>(curea & 0xFFu), static_cast<size_t>(cureb & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T) &&
@@ -1220,6 +1523,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	cur >>= shift;
 	return{static_cast<size_t>(cur & 0xFFu)};
 }
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<unsigned char, T> &&
@@ -1245,6 +1549,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	return{static_cast<size_t>(cur)};
 }
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
@@ -1269,6 +1574,58 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static_assert(false, "impossible combination");
 	}
 	return{static_cast<size_t>(cur)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	size_t> filtershift8(uint_least64_t curm, U cure, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top 16 bits.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(absolute && !issigned) curm += curm;
+		curp >>= 16 - 1;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		uint_least64_t curq{static_cast<uint_least64_t>(curp)};
+#else
+		uint_least32_t curq{static_cast<uint_least32_t>(curp)};
+#endif
+		if constexpr(!isfloatingpoint && issigned){
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			curm += curq;
+#else
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			uint_least32_t curmlotmp{curmlo};
+			curmlo += curq;
+			curmhi += curq;
+			curmhi += curmlo < curmlotmp || curmlo < curq;
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+		}
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		curm ^= curq;
+#else
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		curmlo ^= curq;
+		curmhi ^= curq;
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curo{static_cast<uint_least16_t>(cure)}, curotmp{curo};
+		curo += curo;
+		curm += curm;
+		curm += curo < curotmp;
+	}
+	curm >>= shift;
+	return{static_cast<size_t>(curm & 0xFFu)};
 }
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
@@ -1315,13 +1672,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	curb >>= shift;
 	return{static_cast<size_t>(cura & 0xFFu), static_cast<size_t>(curb & 0xFFu)};
 }
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<unsigned char, T> &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
-	std::pair<size_t, size_t>> filtershift8(T cura, T curb, unsigned)noexcept{
+	std::pair<size_t, size_t>> filtershift8(U cura, U curb, unsigned)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		signed char curap{static_cast<signed char>(cura)};
 		if constexpr(absolute && !issigned) static_assert(false, "impossible combination");
@@ -1345,6 +1703,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 }
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
@@ -1377,6 +1736,607 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static_assert(false, "impossible combination");
 	}
 	return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	std::pair<size_t, size_t>> filtershift8(uint_least64_t curma, U curea, uint_least64_t curmb, U cureb, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top 16 bits.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curpa{static_cast<int_least16_t>(curea)};
+		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
+		if constexpr(absolute && !issigned){
+			curma += curma;
+			curmb += curmb;
+		}
+		curpa >>= 16 - 1;
+		curpb >>= 16 - 1;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};
+		uint_least64_t curqb{static_cast<uint_least64_t>(curpb)};
+#else
+		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};
+		uint_least32_t curqb{static_cast<uint_least32_t>(curpb)};
+#endif
+		if constexpr(!isfloatingpoint && issigned){
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			curma += curqa;
+			curmb += curqb;
+#else
+			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			uint_least32_t curmlotmpa{curmloa}, curmlotmpb{curmlob};
+			curmloa += curqa;
+			curmhia += curqa;
+			curmhia += curmloa < curmlotmpa || curmloa < curqa;
+			curmlob += curqb;
+			curmhib += curqb;
+			curmhib += curmlob < curmlotmpb || curmlob < curqb;
+			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#endif
+		}
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		curma ^= curqa;
+		curmb ^= curqb;
+#else
+		uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+		uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		curmloa ^= curqa;
+		curmhia ^= curqa;
+		curmlob ^= curqb;
+		curmhib ^= curqb;
+		alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+		curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+		alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+		curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#endif
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curoa{static_cast<uint_least16_t>(curea)}, curotmpa{curoa};
+		uint_least16_t curob{static_cast<uint_least16_t>(cureb)}, curotmpb{curob};
+		curoa += curoa;
+		curma += curma;
+		curma += curoa < curotmpa;
+		curob += curob;
+		curmb += curmb;
+		curmb += curob < curotmpb;
+	}
+	curma >>= shift;
+	curmb >>= shift;
+	return{static_cast<size_t>(curma & 0xFFu), static_cast<size_t>(curmb & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	64 >= CHAR_BIT * sizeof(T) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U),
+	void> filterinput(uint_least64_t &curm, U &cure)noexcept{
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(isfloatingpoint){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+			curo += curo;
+			cure = curo;
+		}else if constexpr(!issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curo += static_cast<uint_least16_t>(curo);
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+		curp >>= 16 - 1;
+		U curq{static_cast<uint_least16_t>(curp)};
+		if constexpr(isfloatingpoint) cure >>= 1;
+		else if constexpr(issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curq, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, &curm), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			uint_least64_t curmtmp{curm};
+			curm += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curm < curmtmp || curm < curq;
+#else
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			uint_least32_t curmlotmp{curmlo}, curmhitmp{curmhi};
+			curmlo += curq;
+			curmhi += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curmhi < curmhitmp || curmhi < curq;
+			curmhi += curmlo < curmlotmp || curmlo < curq;// required when chaining multiple carries
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			cure = curo;
+		}
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		curm ^= curq;
+#else
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		curmlo ^= curq;
+		curmhi ^= curq;
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+		cure ^= static_cast<U>(curq);
+	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
+		if constexpr(issigned) cure &= ~static_cast<uint_least16_t>(0) >> 1;
+		else{
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned short carrysign;
+			curo = __builtin_addcs(curo, curo, 0, &carrysign);
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(_addcarry_u16(0, curo, curo, &curo), curm, curm, &curm), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curo, curo, &curo), curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least16_t curotmp{curo};
+			curo += curo;
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curm += curo < curotmp;
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+	}
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	64 >= CHAR_BIT * sizeof(T) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U),
+	void> filterinput(uint_least64_t &curm, U &cure, T *out)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(isfloatingpoint){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+			curo += curo;
+			cure = curo;
+		}else if constexpr(!issigned){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curo += static_cast<uint_least16_t>(curo);
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+		curp >>= 16 - 1;
+		U curq{static_cast<uint_least16_t>(curp)};
+		if constexpr(isfloatingpoint){
+			cure >>= 1;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+		}else if constexpr(issigned){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curq, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, &curm), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			uint_least64_t curmtmp{curm};
+			curm += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curm < curmtmp || curm < curq;
+#else
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			uint_least32_t curmlotmp{curmlo}, curmhitmp{curmhi};
+			curmlo += curq;
+			curmhi += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curmhi < curmhitmp || curmhi < curq;
+			curmhi += curmlo < curmlotmp || curmlo < curq;// required when chaining multiple carries
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			cure = curo;
+		}
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		curm ^= curq;
+#else
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		curmlo ^= curq;
+		curmhi ^= curq;
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+		cure ^= static_cast<U>(curq);
+	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
+		*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+		if constexpr(issigned){
+			cure &= ~static_cast<uint_least16_t>(0) >> 1;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+		}else{
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned short carrysign;
+			curo = __builtin_addcs(curo, curo, 0, &carrysign);
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char carrysign{_addcarry_u16(0, curo, curo, &curo)};
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(carrysign, curm, curm, &curm), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char carrysign{_addcarry_u16(0, curo, curo, &curo)};
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysign, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least16_t curotmp{curo};
+			curo += curo;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curm += curo < curotmp;
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+	}
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	64 >= CHAR_BIT * sizeof(T) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U),
+	void> filterinput(uint_least64_t &curm, U &cure, T *out, T *dst)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(isfloatingpoint){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(dst) + 1) = cure;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+			curo += curo;
+			cure = curo;
+		}else if constexpr(!issigned){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(dst) + 1) = cure;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curo += static_cast<uint_least16_t>(curo);
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+		curp >>= 16 - 1;
+		U curq{static_cast<uint_least16_t>(curp)};
+		if constexpr(isfloatingpoint){
+			cure >>= 1;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+		}else if constexpr(issigned){
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+			*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(dst) + 1) = cure;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curq, 0, &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, &curm), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<uint_least16_t>(curq), &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			uint_least64_t curmtmp{curm};
+			curm += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curm < curmtmp || curm < curq;
+#else
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			uint_least32_t curmlotmp{curmlo}, curmhitmp{curmhi};
+			curmlo += curq;
+			curmhi += curq;
+			curo += static_cast<uint_least16_t>(curq);
+			curo += curmhi < curmhitmp || curmhi < curq;
+			curmhi += curmlo < curmlotmp || curmlo < curq;// required when chaining multiple carries
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			cure = curo;
+		}
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		curm ^= curq;
+#else
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		curmlo ^= curq;
+		curmhi ^= curq;
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+		cure ^= static_cast<U>(curq);
+	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
+		*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(out) + 1) = cure;
+		*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(dst) + 1) = cure;
+		if constexpr(issigned){
+			cure &= ~static_cast<uint_least16_t>(0) >> 1;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+		}else{
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+			unsigned short carrysign;
+			curo = __builtin_addcs(curo, curo, 0, &carrysign);
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			unsigned long carry;
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#else
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned long carrymid;
+			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+			unsigned short checkcarry;
+			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char carrysign{_addcarry_u16(0, curo, curo, &curo)};
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(carrysign, curm, curm, &curm), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char carrysign{_addcarry_u16(0, curo, curo, &curo)};
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysign, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+			uint_least16_t curotmp{curo};
+			curo += curo;
+			*reinterpret_cast<uint_least64_t *>(out) = curm;
+			*reinterpret_cast<uint_least64_t *>(dst) = curm;
+			uint_least64_t curmtmp{curm};
+			curm += curm;
+			curm += curo < curotmp;
+			curo += curm < curmtmp;
+#endif
+			cure = curo;
+		}
+	}
 }
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
@@ -4145,6 +5105,300 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, T, U>(outlo)};
 						size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
 						pdst[offsetlo] = outlo;
+					}
+					break;// no further processing beyond the top part
+				}
+			}
+		}
+	}
+}
+
+// radixsortcopynoalloc() function implementation template for 80-bit-based long double types without indirection
+template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double),
+	void> radixsortcopynoallocmulti(size_t count, T const input[], T output[], T buffer[])noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using U = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+		static size_t constexpr offsetsstride{80 * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
+
+		// count the 256 configurations, all in one go
+		long double *poutput{output};
+		if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(long double)){// also reverse the array at the same time
+			// reverse ordering is applied here because the padding bytes could matter, hence the check above
+			long double const *pinput{input + count};
+			long double *pbuffer{buffer};
+			do{
+				U cure{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinput) + 1)};
+				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinput)};
+				--pinput;
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, long double>(curm, cure, poutput, pbuffer);
+					++poutput;
+					++pbuffer;
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
+					*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(poutput) + 1) = cure;
+					*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(pbuffer) + 1) = cure;
+				}
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
+					*reinterpret_cast<uint_least64_t *>(poutput) = curm;
+					++poutput;
+					*reinterpret_cast<uint_least64_t *>(pbuffer) = curm;
+					++pbuffer;
+				}
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}while(input < pinput);
+		}else{// not in reverse order
+			long double const *pinput{input};
+			ptrdiff_t i{static_cast<ptrdiff_t>(count)};
+			do{
+				U cure{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinput) + 1)};
+				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinput)};
+				++pinput;
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, long double>(curm, cure, poutput);
+					++poutput;
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
+					*reinterpret_cast<W *>(reinterpret_cast<uint_least64_t *>(poutput) + 1) = cure;
+				}
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
+					*reinterpret_cast<uint_least64_t *>(poutput) = curm;
+					++poutput;
+				}
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}while(0 <= --i);
+		}
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, long double>(count, offsets)};
+
+		// perform the bidirectional 8-bit sorting sequence
+		if(runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{
+			long double *pdst{buffer}, *pdstnext{output};// for the next iteration
+			unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			long double const *psrclo, *psrchi;
+			if constexpr(!reverseorder || 80 == CHAR_BIT * sizeof(long double)){
+				// no reverse ordering applied
+				psrclo = input;
+				psrchi = input + count;
+			}
+			if(paritybool){// swap if the count of sorting actions to do is odd
+				pdst = output;
+				pdstnext = buffer;
+			}
+			// skip a step if possible
+			runsteps >>= shifter;
+			size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+			if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(long double)){
+				// reverse ordering is applied here because the padding bytes could matter, hence the check above
+				psrclo = pdstnext;
+				psrchi = pdstnext + count;
+			}
+			if(80 / 8 - 2 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+				goto handletop16;// rare, but possible
+			if(80 / 8 - 2 < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+				goto handletop8;// rare, but possible
+			shifter *= 8;
+			for(;;){
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+					uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+					++psrclo;
+					U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
+					uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
+					--psrchi;
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie, shifter)};
+					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+					long double *pwlo = pdst + offsetlo;
+					long double *pwhi = pdst + offsethi;
+					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
+					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
+					*reinterpret_cast<uint_least64_t *>(pwhi) = outhim;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+					uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, shifter)};
+					size_t offsetlo{poffset[curlo]};
+					long double *pwlo = pdst + offsetlo;
+					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
+				}
+				runsteps >>= 1;
+				if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					break;
+				{
+					unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+					shifter += 8;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = const_cast<T *>(psrclo);// never written past the first iteration
+					// skip a step if possible
+					runsteps >>= index;
+					shifter += index * 8;
+					poffset += static_cast<size_t>(index) * 256;
+				}
+				// handle the top two parts differently
+				if(80 - 16 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+					if(80 - 16 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+					{
+handletop16:
+						do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+							U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+							uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+							++psrclo;
+							U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
+							uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
+							--psrchi;
+							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+							long double *pwlo = pdst + offsetlo;
+							long double *pwhi = pdst + offsethi;
+							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
+							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
+							*reinterpret_cast<uint_least64_t *>(pwhi) = outhim;
+						}while(psrclo < psrchi);
+						if(psrclo == psrchi){// fill in the final item for odd counts
+							U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+							uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]};
+							long double *pwlo = pdst + offsetlo;
+							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
+						}
+						runsteps >>= 1;
+						if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+							[[unlikely]]
+#endif
+							break;
+						// swap the pointers for the next round, data is moved on each iteration
+						psrclo = pdst;
+						psrchi = pdst + count;
+						pdst = pdstnext;
+						// unused: pdstnext = const_cast<T *>(psrclo);// never written past the first iteration
+					}
+handletop8:
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+						uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+						++psrclo;
+						U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
+						uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
+						--psrchi;
+						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe, outhie)};
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						long double *pwlo = pdst + offsetlo;
+						long double *pwhi = pdst + offsethi;
+						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
+						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
+						*reinterpret_cast<uint_least64_t *>(pwhi) = outhim;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
+						uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
+						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe)};
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]};
+						long double *pwlo = pdst + offsetlo;
+						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
+						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 					}
 					break;// no further processing beyond the top part
 				}
