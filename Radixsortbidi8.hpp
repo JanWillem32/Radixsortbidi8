@@ -1209,12 +1209,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			__builtin_addcll(curm, curm, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			__builtin_addcl(curm, curm, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
 			__builtin_addcl(curmhi, curmhi, 0, &carry);
 #endif
@@ -1246,12 +1253,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			__builtin_addcll(curm, curq, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			__builtin_addcl(curm, curq, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
 			__builtin_addcl(curmhi, curq, 0, &carry);
 #endif
@@ -1278,12 +1292,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-		unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carry;
+		__builtin_addcll(curm, curm, 0, &carry);
+#else
 		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carry;
 		__builtin_addcl(curm, curm, 0, &carry);
+#endif
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carry;
 		uint_least32_t curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
 		__builtin_addcl(curmhi, curmhi, 0, &carry);
 #endif
@@ -1328,34 +1349,52 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya, carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			__builtin_addcll(curma, curma, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			__builtin_addcl(curma, curma, 0, &carrya);
-			__builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			__builtin_addcl(curmhia, curmhia, 0, &carrya);
+#endif
+			unsigned short checkcarrya;
+			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+			static_cast<void>(checkcarrya);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			__builtin_addcll(curmb, curmb, 0, &carryb);
+#else
+			unsigned long carryb;
+			__builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
+#else
+			unsigned long carryb;
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			__builtin_addcl(curmhib, curmhib, 0, &carryb);
 #endif
-			unsigned short checkcarrya, checkcarryb;
-			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
-			static_cast<void>(checkcarrya);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
 			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
 			static_cast<void>(checkcarrya);
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #else
 			uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
@@ -1383,34 +1422,52 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya, carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			__builtin_addcll(curma, curqa, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			__builtin_addcl(curma, curqa, 0, &carrya);
-			__builtin_addcl(curmb, curqb, 0, &carryb);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			__builtin_addcl(curmhia, curqa, 0, &carrya);
+#endif
+			unsigned short checkcarrya;
+			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
+			static_cast<void>(checkcarrya);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			__builtin_addcll(curmb, curqb, 0, &carryb);
+#else
+			unsigned long carryb;
+			__builtin_addcl(curmb, curqb, 0, &carryb);
+#endif
+#else
+			unsigned long carryb;
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			__builtin_addcl(curmhib, curqb, 0, &carryb);
 #endif
-			unsigned short checkcarrya, checkcarryb;
-			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
+			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
-			static_cast<void>(checkcarrya);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<uint_least16_t>(curqa), &curoa)};
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<uint_least16_t>(curqa), &curoa)};
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarrya);
+			uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
@@ -1450,34 +1507,55 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-		unsigned long carrya, carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrya;
+		__builtin_addcll(curma, curma, 0, &carrya);
+#else
 		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrya;
 		__builtin_addcl(curma, curma, 0, &carrya);
-		__builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrya;
 		uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 		__builtin_addcl(curmhia, curmhia, 0, &carrya);
+#endif
+		unsigned short checkcarrya;
+		curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+		static_cast<void>(checkcarrya);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carryb;
+		__builtin_addcll(curmb, curmb, 0, &carryb);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carryb;
+		__builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carryb;
+		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 		__builtin_addcl(curmhib, curmhib, 0, &carryb);
 #endif
-		unsigned short checkcarrya, checkcarryb;
-		curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
+		unsigned short checkcarryb;
 		curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
-		static_cast<void>(checkcarrya);
 		static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
 		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
 		static_cast<void>(checkcarrya);
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 		uint_least32_t curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
 		static_cast<void>(checkcarrya);
+		uint_least32_t curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #else
 		uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
@@ -1604,6 +1682,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(!isfloatingpoint && issigned){
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl)
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &checkcarry);
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#elif defined(_M_IX86)
+			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+			unsigned char checkcarry{_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi)};
+			static_cast<void>(checkcarry);
+			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+			curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
 #else
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
 			uint_least32_t curmlotmp{curmlo};
@@ -1624,10 +1717,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
 #endif
 	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		uint_least16_t curo{static_cast<uint_least16_t>(cure)}, curotmp{curo};
+		uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carrysign;
+		curo = __builtin_addcs(curo, curo, 0, &carrysign);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long checkcarry;
+		curm = __builtin_addcll(curm, curm, static_cast<unsigned long long>(carrysign), &checkcarry);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long checkcarry;
+		curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &checkcarry);
+#endif
+		static_cast<void>(checkcarry);
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid, checkcarry;
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
+		curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &checkcarry);
+		static_cast<void>(checkcarry);
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#endif
+#elif defined(_M_X64)
+		unsigned char checkcarry{_addcarry_u64(_addcarry_u16(0, curo, curo, &curo), curm, curm, &curm)};
+		static_cast<void>(checkcarry);
+#elif defined(_M_IX86)
+		uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
+		unsigned char checkcarry{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curo, curo, &curo), curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi)};
+		static_cast<void>(checkcarry);
+		alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
+		curm = *reinterpret_cast<uint_least64_t *>(acurm);// recompose
+#else
+		uint_least16_t curotmp{curo};
 		curo += curo;
 		curm += curm;
 		curm += curo < curotmp;
+#endif
 	}
 	curm >>= shift;
 	return{static_cast<size_t>(curm & 0xFFu)};
@@ -1776,6 +1906,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curmb += curqb;
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl)
+			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
+			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
+			static_cast<void>(checkcarrya);
+			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+			unsigned long carrymidb, checkcarryb;
+			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
+			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
+			static_cast<void>(checkcarryb);
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#elif defined(_M_IX86)
+			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
+			static_cast<void>(checkcarrya);
+			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
+			static_cast<void>(checkcarryb);
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #else
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
@@ -1808,14 +1965,78 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
 	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		uint_least16_t curoa{static_cast<uint_least16_t>(curea)}, curotmpa{curoa};
-		uint_least16_t curob{static_cast<uint_least16_t>(cureb)}, curotmpb{curob};
+		uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+		uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carrysigna;
+		curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long checkcarrya;
+		curma = __builtin_addcll(curma, curma, static_cast<unsigned long long>(carrysigna), &checkcarrya);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long checkcarrya;
+		curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &checkcarrya);
+#endif
+		static_cast<void>(checkcarrya);
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymida, checkcarrya;
+		uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
+		curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
+		static_cast<void>(checkcarrya);
+		alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+		curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+#endif
+		unsigned short carrysignb;
+		curob = __builtin_addcs(curob, curob, 0, &carrysignb);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		unsigned long long checkcarryb;
+		curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &checkcarryb);
+#else
+		unsigned long checkcarryb;
+		curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &checkcarryb);
+#endif
+		static_cast<void>(checkcarryb);
+#else
+		unsigned long carrymidb, checkcarryb;
+		uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
+		curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
+		static_cast<void>(checkcarryb);
+		alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+		curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#endif
+#elif defined(_M_X64)
+		unsigned char checkcarrya{_addcarry_u64(_addcarry_u16(0, curoa, curoa, &curoa), curma, curma, &curma)};
+		static_cast<void>(checkcarrya);
+		unsigned char checkcarryb{_addcarry_u64(_addcarry_u16(0, curob, curob, &curob), curmb, curmb, &curmb)};
+		static_cast<void>(checkcarryb);
+#elif defined(_M_IX86)
+		uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
+		unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curoa, curoa, &curoa), curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
+		static_cast<void>(checkcarrya);
+		alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
+		curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
+		uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
+		unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curob, curob, &curob), curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
+		static_cast<void>(checkcarryb);
+		alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
+		curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
+#else
+		uint_least16_t curotmpa{curoa}, curotmpb{curob};
 		curoa += curoa;
 		curma += curma;
 		curma += curoa < curotmpa;
 		curob += curob;
 		curmb += curmb;
 		curmb += curob < curotmpb;
+#endif
 	}
 	curma >>= shift;
 	curmb >>= shift;
@@ -1842,14 +2063,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -1882,14 +2109,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curq, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curq, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -1943,14 +2176,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysign;
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, static_cast<unsigned long long>(carrysign), &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2007,14 +2246,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2051,14 +2296,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curq, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curq, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2116,14 +2367,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned short carrysign;
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
 			*reinterpret_cast<uint_least64_t *>(out) = curm;
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, static_cast<unsigned long long>(carrysign), &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2188,14 +2445,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2235,14 +2498,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curq, 0, &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curq, 0, &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2303,14 +2572,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
 			*reinterpret_cast<uint_least64_t *>(out) = curm;
 			*reinterpret_cast<uint_least64_t *>(dst) = curm;
-			unsigned long carry;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carry;
+			curm = __builtin_addcll(curm, curm, static_cast<unsigned long long>(carrysign), &carry);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carry;
 			curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &carry);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, carry;
 			uint_least32_t curmlo{static_cast<uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<uint_least32_t>(curm >> 32)};// decompose
-			unsigned long carrymid;
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
 			alignas(8) uint_least32_t acurm[2]{curmlo, curmhi};
@@ -2377,14 +2652,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curma, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2395,12 +2676,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_cast<void>(checkcarrya);
 			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curmhib, carrymid, &carryb);
+			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
@@ -2448,14 +2735,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curqa, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curqa, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2463,10 +2756,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curqb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -2517,7 +2816,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib += curmlob < curmlotmpb || curmlob < curqb;
 			curob += static_cast<uint_least16_t>(curqb);
 			curob += curmhib < curmhitmpb || curmhib < curqb;
-			alignas(8) uint_least32_t acurm[2]{curmlob, curmhib};
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
 			curea = curoa;
@@ -2551,14 +2850,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysigna;
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, static_cast<unsigned long long>(carrysigna), &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2569,12 +2874,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_cast<void>(checkcarrya);
 			unsigned short carrysignb;
 			curob = __builtin_addcs(curob, curob, 0, &carrysignb);
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -2657,14 +2967,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curma, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2673,14 +2989,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curmhib, carrymid, &carryb);
+			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
@@ -2734,25 +3055,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curqa, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curqa, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
 #endif
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curqb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -2796,7 +3128,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa += curmhia < curmhitmpa || curmhia < curqa;
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
-
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			uint_least32_t curmlotmpb{curmlob}, curmhitmpb{curmhib};
 			curmlob += curqb;
@@ -2804,7 +3135,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib += curmlob < curmlotmpb || curmlob < curqb;
 			curob += static_cast<uint_least16_t>(curqb);
 			curob += curmhib < curmhitmpb || curmhib < curqb;
-			alignas(8) uint_least32_t acurm[2]{curmlob, curmhib};
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
 			curea = curoa;
@@ -2843,14 +3174,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned short carrysigna;
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
 			*reinterpret_cast<uint_least64_t *>(outa) = curma;
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, static_cast<unsigned long long>(carrysigna), &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2859,16 +3196,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, 0, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
-
 			unsigned short carrysignb;
 			curob = __builtin_addcs(curob, curob, 0, &carrysignb);
 			*reinterpret_cast<uint_least64_t *>(outb) = curmb;
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -2963,14 +3304,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, 0, &carrya);
+#else
+			unsigned long carrya;
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			curma = __builtin_addcl(curma, curma, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -2979,14 +3326,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curmhib, carrymid, &carryb);
+			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
@@ -3046,25 +3398,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curqa, 0, &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curqa, 0, &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
 #endif
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curqb, 0, &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curqb, 0, &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -3108,7 +3471,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa += curmhia < curmhitmpa || curmhia < curqa;
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
-
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			uint_least32_t curmlotmpb{curmlob}, curmhitmpb{curmhib};
 			curmlob += curqb;
@@ -3116,7 +3478,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib += curmlob < curmlotmpb || curmlob < curqb;
 			curob += static_cast<uint_least16_t>(curqb);
 			curob += curmhib < curmhitmpb || curmhib < curqb;
-			alignas(8) uint_least32_t acurm[2]{curmlob, curmhib};
+			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<uint_least64_t *>(acurmb);// recompose
 #endif
 			curea = curoa;
@@ -3160,14 +3522,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
 			*reinterpret_cast<uint_least64_t *>(outa) = curma;
 			*reinterpret_cast<uint_least64_t *>(dsta) = curma;
-			unsigned long carrya;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrya;
+			curma = __builtin_addcll(curma, curma, static_cast<unsigned long long>(carrysigna), &carrya);
+#else
 			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrya;
 			curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &carrya);
+#endif
 #else
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, carrya;
 			uint_least32_t curmloa{static_cast<uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<uint_least32_t>(curma >> 32)};// decompose
-			unsigned long carrymida;
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
@@ -3180,12 +3548,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, curob, 0, &carrysignb);
 			*reinterpret_cast<uint_least64_t *>(outb) = curmb;
 			*reinterpret_cast<uint_least64_t *>(dstb) = curmb;
-			unsigned long carryb;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			unsigned long long carryb;
+			curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &carryb);
 #else
+			unsigned long carryb;
+			curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &carryb);
+#endif
+#else
+			unsigned long carrymidb, carryb;
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
-			unsigned long carrymidb;
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
 			alignas(8) uint_least32_t acurmb[2]{curmlob, curmhib};
@@ -3214,7 +3587,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_cast<void>(checkcarrya);
 			alignas(8) uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<uint_least64_t *>(acurma);// recompose
-
 			uint_least32_t curmlob{static_cast<uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(0, curob, curob, &curob)};
 			*reinterpret_cast<uint_least64_t *>(outb) = curmb;
