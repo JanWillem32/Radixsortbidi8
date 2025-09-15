@@ -1,20 +1,19 @@
-// stdafx.h : include file for standard system include files, or project specific include files that are used frequently, but are changed infrequently
+﻿#pragma once
+// pch.h: This is a precompiled header file.
+// Files listed below are compiled only once, improving build performance for future builds.
+// This also affects IntelliSense performance, including code completion and many code browsing features.
+// However, files listed here are ALL re-compiled if any one of them is updated between builds.
+// Do not add files here that you will be updating frequently as this negates the performance advantage.
 
-#pragma once
-
-// Exclude rarely-used stuff from Windows headers.
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef VC_EXTRALEAN
-#define VC_EXTRALEAN
-#endif
+// // Including SDKDDKVer.h defines the highest available Windows platform.
+// If you wish to build your application for a previous Windows platform, include WinSDKVer.h and
+// set the _WIN32_WINNT macro to the platform you wish to support before including SDKDDKVer.h.
+#include <SDKDDKVer.h>
 
 // The system's thread and process environment blocks can be read using the fs (32-bit x86) or gs (64-bit x86) pointers for retrieving a lot of the common environment data. (The operating system does te exact same thing for the system calls listed in these inline functions.)
 // These are thread-safe items (mostly applies to InlineDerefTEBLastError()), do not generate any calls and have no further dependencies.
 // There are quite a few more items that can be read from the TEB and PEB than the items listed here, these can be added here when needed. Please keep the functions sorted by class (TEB, PEB and then RTL_USER_PROCESS_PARAMETERS) and by internal structure order.
 // Note: NtCurrentProcess()/ZwCurrentProcess(), NtCurrentThread()/ZwCurrentThread() and NtCurrentSession()/ZwCurrentSession() resolve to macros defined to HANDLE (void *) values of (sign-extended) -1, -2 and -3 respectively in Wdm.h. Due to being hard-coded in user- and kernel-mode drivers like this, these values are pretty certain to never change on this platform.
-#include "targetver.h"
 
 #ifdef _DEBUG
 #define _CRTDBG_MAP_ALLOC// include Microsoft memory leak detection procedures
@@ -23,6 +22,7 @@
 #include <windows.h>
 #include <Winternl.h>// This header contains a tiny bit of data regarding the system's thread and process environment blocks, along with their associated definitions, types, enumerations and structures.
 #include <cassert>
+#include "resource.h"
 #include "FeatureBitsCPUId.h"
 #include "PerfCounter100ns.h"
 

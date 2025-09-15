@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "pch.h"
 
 extern __declspec(noalias safebuffers noinline) uint64_t ConvertPerfCounterTo100ns(uint64_t timerunits){
 	// compute timerunits * 10000000
