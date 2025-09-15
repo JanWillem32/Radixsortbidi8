@@ -4624,8 +4624,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool reversesort, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
-	8 >= CHAR_BIT * sizeof(T) &&
-	!std::is_same_v<bool, T>,
+	8 >= CHAR_BIT * sizeof(T),
 	bool> generateoffsetssingle(size_t count, size_t offsets[])noexcept{
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	// reversesort is frequently optimised away in this part, e.g.: reversesort * 2 - 1 generates 1 or -1
@@ -8112,8 +8111,7 @@ template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, 
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<bool, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
@@ -9455,8 +9453,7 @@ template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, 
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<bool, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)
@@ -11495,8 +11492,7 @@ template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, 
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<bool, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoallocsingle(size_t count, V *const input[], V *output[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
@@ -11836,8 +11832,7 @@ template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, 
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	(std::is_member_function_pointer_v<decltype(indirection1)> ||
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<bool, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoallocsingle(size_t count, V *input[], V *buffer[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
