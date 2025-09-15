@@ -13138,8 +13138,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && std::is_floating_point_v<W>) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	using U = helper::tounifunsigned<W>;
-	helper::radixsortcopynoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
+	using U = helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, helper::tounifunsigned<W> const *, helper::tounifunsigned<W>>, indirection1>;
+	// Allow the V type items to gain const by a const_cast.
+	helper::radixsortcopynoallocmulti<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const *const *>(const_cast<V const *const *>(input)), reinterpret_cast<U const **>(const_cast<V const **>(output)), reinterpret_cast<U const **>(const_cast<V const **>(buffer)), varparameters...);
 }
 
 // Wrapper for the multi-part radixsortnoalloc() function with type and offset pointer indirection
@@ -13162,8 +13163,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && std::is_floating_point_v<W>) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	using U = helper::tounifunsigned<W>;
-	helper::radixsortnoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
+	using U = helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, helper::tounifunsigned<W> const *, helper::tounifunsigned<W>>, indirection1>;
+	// Allow the V type items to gain const by a const_cast.
+	helper::radixsortnoallocmulti<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const **>(const_cast<V const **>(input)), reinterpret_cast<U const **>(const_cast<V const **>(buffer)), movetobuffer, varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection
@@ -13190,8 +13192,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && std::is_floating_point_v<W>) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	using U = helper::tounifunsigned<W>;
-	helper::radixsortcopynoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, varparameters...);
+	using U = helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, helper::tounifunsigned<W> const *, helper::tounifunsigned<W>>, indirection1>;
+	// Allow the V type items to gain const by a const_cast.
+	helper::radixsortcopynoallocsingle<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const *const *>(const_cast<V const *const *>(input)), reinterpret_cast<U const **>(const_cast<V const **>(output)), varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
@@ -13228,8 +13231,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && std::is_floating_point_v<W>) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	using U = helper::tounifunsigned<W>;
-	helper::radixsortnoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
+	using U = helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, helper::tounifunsigned<W> const *, helper::tounifunsigned<W>>, indirection1>;
+	// Allow the V type items to gain const by a const_cast.
+	helper::radixsortnoallocsingle<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const **>(const_cast<V const **>(input)), reinterpret_cast<U const **>(const_cast<V const **>(buffer)), varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with with type and offset pointer indirection
@@ -13252,11 +13256,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && std::is_floating_point_v<W>) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	using U = helper::tounifunsigned<W>;
+	using U = helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, helper::tounifunsigned<W> const *, helper::tounifunsigned<W>>, indirection1>;
+	// Allow the V type items to gain const by a const_cast.
 	if(!movetobuffer){
-		helper::radixsortnoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
+		helper::radixsortnoallocsingle<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const **>(const_cast<V const **>(input)), reinterpret_cast<U const **>(const_cast<V const **>(buffer)), varparameters...);
 	}else{
-		helper::radixsortcopynoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<T>, U const *(V:: *), U(V:: *)>>(&helper::memberobjectgenerator<U, indirection1>::object), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
+		helper::radixsortcopynoallocsingle<&U::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, U const>(count, reinterpret_cast<U const **>(const_cast<V const **>(input)), reinterpret_cast<U const **>(const_cast<V const **>(buffer)), varparameters...);
 	}
 }
 
