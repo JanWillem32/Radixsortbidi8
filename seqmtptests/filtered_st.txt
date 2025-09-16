@@ -1,0 +1,122 @@
+﻿00000001	0.00000000	[11880]          84912253108 w
+00000002	0.68837881	[11880] warming up caches, ignore this benchmark
+00000003	0.68864751	[11880]             81164210
+00000004	4.75333118	[11880] float std::stable_sort() test
+00000005	4.75344467	[11880]          14242186586
+00000006	4.78227901	[11880] warming up caches, ignore this benchmark
+00000007	4.78247595	[11880]             81545078
+00000008	5.13502216	[11880] float rsbd8::radixsort() test
+00000009	5.13508654	[11880]           1235522998
+00000010	5.16411448	[11880] warming up caches, ignore this benchmark
+00000011	5.16417360	[11880]             82124560
+00000012	5.54244280	[11880] float rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000013	5.54249668	[11880]           1324960934
+00000014	5.57441521	[11880] warming up caches, ignore this benchmark
+00000015	5.57447100	[11880]             91596428
+00000016	8.09524441	[11880] double std::stable_sort() test
+00000017	8.09530354	[11880]           8832521172
+00000018	8.12408447	[11880] warming up caches, ignore this benchmark
+00000019	8.12413216	[11880]             81442612
+00000020	8.59820080	[11880] double rsbd8::radixsort() test
+00000021	8.59825325	[11880]           1660642306
+00000022	8.62899494	[11880] warming up caches, ignore this benchmark
+00000023	8.62905121	[11880]             87785364
+00000024	9.11365795	[11880] double rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000025	9.11371326	[11880]           1697590968
+00000026	9.14292431	[11880] warming up caches, ignore this benchmark
+00000027	9.14297771	[11880]             81953758
+00000028	11.61964226	[11880] uint64_t std::stable_sort() test
+00000029	11.61975956	[11880]           8677502050
+00000030	11.64864635	[11880] warming up caches, ignore this benchmark
+00000031	11.64869308	[11880]             81454116
+00000032	12.12717152	[11880] uint64_t rsbd8::radixsort() test
+00000033	12.12722683	[11880]           1676064216
+00000034	12.15630150	[11880] warming up caches, ignore this benchmark
+00000035	12.15635490	[11880]             81415810
+00000036	12.63356209	[11880] uint64_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000037	12.63362026	[11880]           1671645892
+00000038	12.66265106	[11880] warming up caches, ignore this benchmark
+00000039	12.66270638	[11880]             81526978
+00000040	15.09289455	[11880] int64_t std::stable_sort() test
+00000041	15.09301090	[11880]           8514654570
+00000042	15.12220955	[11880] warming up caches, ignore this benchmark
+00000043	15.12226391	[11880]             81762402
+00000044	15.60170841	[11880] int64_t rsbd8::radixsort() test
+00000045	15.60176182	[11880]           1679473150
+00000046	15.63103867	[11880] warming up caches, ignore this benchmark
+00000047	15.63108444	[11880]             82516364
+00000048	16.11000061	[11880] int64_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000049	16.11005402	[11880]           1677599478
+00000050	16.13897324	[11880] warming up caches, ignore this benchmark
+00000051	16.13901520	[11880]             81702072
+00000052	21.14863586	[11880] uint32_t std::stable_sort() test
+00000053	21.14869881	[11880]          17552747002
+00000054	21.17765045	[11880] warming up caches, ignore this benchmark
+00000055	21.17769623	[11880]             81276522
+00000056	21.53148842	[11880] uint32_t rsbd8::radixsort() test
+00000057	21.53154182	[11880]           1239172492
+00000058	21.56084442	[11880] warming up caches, ignore this benchmark
+00000059	21.56089401	[11880]             82333130
+00000060	21.91371918	[11880] uint32_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000061	21.91378593	[11880]           1235962844
+00000062	21.94276619	[11880] warming up caches, ignore this benchmark
+00000063	21.94281387	[11880]             81375858
+00000064	26.84424973	[11880] int32_t std::stable_sort() test
+00000065	26.84435844	[11880]          17173834306
+00000066	26.87329292	[11880] warming up caches, ignore this benchmark
+00000067	26.87334442	[11880]             81407654
+00000068	27.22691154	[11880] int32_t rsbd8::radixsort() test
+00000069	27.22696686	[11880]           1238424492
+00000070	27.25628853	[11880] warming up caches, ignore this benchmark
+00000071	27.25635147	[11880]             82985428
+00000072	27.63079071	[11880] int32_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000073	27.63085747	[11880]           1311742532
+00000074	27.66009521	[11880] warming up caches, ignore this benchmark
+00000075	27.66016006	[11880]             82534072
+00000076	35.28944016	[11880] uint16_t std::stable_sort() test
+00000077	35.28949356	[11880]          26732497306
+00000078	35.31842804	[11880] warming up caches, ignore this benchmark
+00000079	35.31847763	[11880]             81375030
+00000080	35.64480972	[11880] uint16_t rsbd8::radixsort() test
+00000081	35.64487076	[11880]           1143177630
+00000082	35.67453384	[11880] warming up caches, ignore this benchmark
+00000083	35.67459488	[11880]             84356276
+00000084	35.99951935	[11880] uint16_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000085	35.99957275	[11880]           1138077744
+00000086	36.02874756	[11880] warming up caches, ignore this benchmark
+00000087	36.02879333	[11880]             82595886
+00000088	43.61077881	[11880] int16_t std::stable_sort() test
+00000089	43.61083221	[11880]          26566692448
+00000090	43.64080811	[11880] warming up caches, ignore this benchmark
+00000091	43.64084625	[11880]             85089454
+00000092	43.96531677	[11880] int16_t rsbd8::radixsort() test
+00000093	43.96537018	[11880]           1136471900
+00000094	43.99494553	[11880] warming up caches, ignore this benchmark
+00000095	43.99500275	[11880]             83788664
+00000096	44.34005356	[11880] int16_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000097	44.34010696	[11880]           1208543198
+00000098	44.36901093	[11880] warming up caches, ignore this benchmark
+00000099	44.36906052	[11880]             81366712
+00000100	55.37940598	[11880] uint8_t std::stable_sort() test
+00000101	55.37945557	[11880]          38579669630
+00000102	55.40848541	[11880] warming up caches, ignore this benchmark
+00000103	55.40853119	[11880]             81403204
+00000104	55.71160507	[11880] uint8_t rsbd8::radixsort() test
+00000105	55.71166229	[11880]           1061487078
+00000106	55.74065399	[11880] warming up caches, ignore this benchmark
+00000107	55.74070358	[11880]             81728624
+00000108	56.01636505	[11880] uint8_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000109	56.01642990	[11880]            965586112
+00000110	56.04550552	[11880] warming up caches, ignore this benchmark
+00000111	56.04554749	[11880]             81817062
+00000112	66.54311371	[11880] int8_t std::stable_sort() test
+00000113	66.54316711	[11880]          36782920182
+00000114	66.57199860	[11880] warming up caches, ignore this benchmark
+00000115	66.57205200	[11880]             81334354
+00000116	66.87390137	[11880] int8_t rsbd8::radixsort() test
+00000117	66.87395477	[11880]           1057206388
+00000118	66.90286255	[11880] warming up caches, ignore this benchmark
+00000119	66.90290833	[11880]             81257402
+00000120	67.22056580	[11880] int8_t rsbd8::radixsortcopy<rsbd8::decendingreverseordered, rsbd8::nativetieredabsmode>() test
+00000121	67.22061920	[11880]           1112590926
+00000122	67.22064209	[11880]          85584460207 b
