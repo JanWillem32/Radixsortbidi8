@@ -4926,7 +4926,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*t = offset;// even
 		t[offsetsstride] = count;// even, high half, the last offset always starts at the end
 		t[offsetsstride - reversesort * 2 + 1] = offset - 1;// odd, high half
-		t += reversesort * -4 + 2;// step forward twice
+		t += reversesort * -6 + 3;// step forward thrice
 		paritybool ^= b;
 		runsteps ^= b << k;
 	}while(reversesort? (0 <= --k) : (static_cast<int>(CHAR_BIT * sizeof(T) / 8) > ++k));
