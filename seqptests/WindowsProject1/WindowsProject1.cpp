@@ -474,18 +474,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// TODO: add more unit tests
 	}
 
-	// allocate 256 MiB for the in- and outputs
+	// allocate 1 GiB for the in- and outputs
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
 	upLargePageSize = !upLargePageSize? 1 : upLargePageSize;// just set it to 1 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	size_t upLargePageSizem1{upLargePageSize - 1};
-	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(268435456)) + 268435456};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824)) + 1073741824};// round up to the nearest multiple of upLargePageSize
 	void *in{VirtualAlloc(nullptr, upSizeIn, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
 	if(!in){
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(268435456 + 2048)) + (268435456 + 2048)};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + 2048)) + (1073741824 + 2048)};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -533,7 +533,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
 		uint64_t *pFIin{reinterpret_cast<uint64_t *>(in)};
-		uint32_t j{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t j{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			*pFIin++ = static_cast<uint64_t>(static_cast<unsigned>(rand())) << 60
 				| static_cast<uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<uint64_t>(static_cast<unsigned>(rand())) << 30
@@ -548,7 +548,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -569,7 +569,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -614,7 +614,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 67108864);// in 67108864 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -638,7 +638,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 67108864));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -647,7 +647,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -668,7 +668,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -713,7 +713,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(67108864, reinterpret_cast<float *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsort(268435456, reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -737,7 +737,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 67108864));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -746,7 +746,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -767,7 +767,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -812,7 +812,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(67108864, reinterpret_cast<float *>(in), reinterpret_cast<float *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<float *>(in), reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -836,7 +836,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 67108864));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -845,7 +845,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -866,7 +866,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -911,7 +911,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 33554432);// in 33554432 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -935,7 +935,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 33554432));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -944,7 +944,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -965,7 +965,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1010,7 +1010,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(33554432, reinterpret_cast<double *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsort(134217728, reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1034,7 +1034,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 33554432));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1043,7 +1043,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1064,7 +1064,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1109,7 +1109,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(33554432, reinterpret_cast<double *>(in), reinterpret_cast<double *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<double *>(in), reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1133,7 +1133,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 33554432));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1142,7 +1142,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1163,7 +1163,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1208,7 +1208,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 33554432);// in 33554432 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1232,7 +1232,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1241,7 +1241,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1262,7 +1262,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1307,7 +1307,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(33554432, reinterpret_cast<uint64_t *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsort(134217728, reinterpret_cast<uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1331,7 +1331,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1340,7 +1340,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1361,7 +1361,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1406,7 +1406,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(33554432, reinterpret_cast<uint64_t *>(in), reinterpret_cast<uint64_t *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<uint64_t *>(in), reinterpret_cast<uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1430,7 +1430,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1439,7 +1439,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1460,7 +1460,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1505,7 +1505,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 33554432);// in 33554432 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1529,7 +1529,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1538,7 +1538,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1559,7 +1559,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1604,7 +1604,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(33554432, reinterpret_cast<int64_t *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsort(134217728, reinterpret_cast<int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1628,7 +1628,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1637,7 +1637,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1658,7 +1658,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1703,7 +1703,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(33554432, reinterpret_cast<int64_t *>(in), reinterpret_cast<int64_t *>(out), upLargePageSize);// in 33554432 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<int64_t *>(in), reinterpret_cast<int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1727,7 +1727,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 33554432));
+		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1736,7 +1736,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1757,7 +1757,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1802,7 +1802,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 67108864);// in 67108864 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1826,7 +1826,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1835,7 +1835,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1856,7 +1856,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1901,7 +1901,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(67108864, reinterpret_cast<uint32_t *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsort(268435456, reinterpret_cast<uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -1925,7 +1925,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1934,7 +1934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1955,7 +1955,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2000,7 +2000,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(67108864, reinterpret_cast<uint32_t *>(in), reinterpret_cast<uint32_t *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<uint32_t *>(in), reinterpret_cast<uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2024,7 +2024,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2033,7 +2033,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2054,7 +2054,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2099,7 +2099,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 67108864);// in 67108864 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2123,7 +2123,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2132,7 +2132,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2153,7 +2153,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2198,7 +2198,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(67108864, reinterpret_cast<int32_t *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsort(268435456, reinterpret_cast<int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2222,7 +2222,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2231,7 +2231,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2252,7 +2252,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2297,7 +2297,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(67108864, reinterpret_cast<int32_t *>(in), reinterpret_cast<int32_t *>(out), upLargePageSize);// in 67108864 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<int32_t *>(in), reinterpret_cast<int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2321,7 +2321,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 67108864));
+		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2330,7 +2330,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2351,7 +2351,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2396,7 +2396,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 134217728);// in 134217728 batches of 2 bytes
+		std::stable_sort(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2420,7 +2420,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2429,7 +2429,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2450,7 +2450,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2495,7 +2495,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(134217728, reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 134217728 batches of 2 bytes
+		rsbd8::radixsort(536870912, reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2519,7 +2519,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2528,7 +2528,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2549,7 +2549,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2594,7 +2594,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<uint16_t *>(in), reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 134217728 batches of 2 bytes
+		rsbd8::radixsortcopy(536870912, reinterpret_cast<uint16_t *>(in), reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2618,7 +2618,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2627,7 +2627,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2648,7 +2648,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2693,7 +2693,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 134217728);// in 134217728 batches of 2 bytes
+		std::stable_sort(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2717,7 +2717,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2726,7 +2726,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2747,7 +2747,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2792,7 +2792,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(134217728, reinterpret_cast<int16_t *>(out), upLargePageSize);// in 134217728 batches of 2 bytes
+		rsbd8::radixsort(536870912, reinterpret_cast<int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2816,7 +2816,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2825,7 +2825,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2846,7 +2846,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2891,7 +2891,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<int16_t *>(in), reinterpret_cast<int16_t *>(out), upLargePageSize);// in 134217728 batches of 2 bytes
+		rsbd8::radixsortcopy(536870912, reinterpret_cast<int16_t *>(in), reinterpret_cast<int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2915,7 +2915,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2924,7 +2924,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2945,7 +2945,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -2990,7 +2990,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 268435456);// in 268435456 batches of 1 byte
+		std::stable_sort(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3014,7 +3014,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3023,7 +3023,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3044,7 +3044,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3089,7 +3089,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(268435456, reinterpret_cast<uint8_t *>(out), upLargePageSize);// in 268435456 batches of 1 byte
+		rsbd8::radixsort(1073741824, reinterpret_cast<uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3113,7 +3113,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3122,7 +3122,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3143,7 +3143,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3188,7 +3188,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<uint8_t *>(in), reinterpret_cast<uint8_t *>(out), upLargePageSize);// in 268435456 batches of 1 byte
+		rsbd8::radixsortcopy(1073741824, reinterpret_cast<uint8_t *>(in), reinterpret_cast<uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3212,7 +3212,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"uint8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3221,7 +3221,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3242,7 +3242,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3287,7 +3287,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		std::stable_sort(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 268435456);// in 268435456 batches of 1 byte
+		std::stable_sort(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3311,7 +3311,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3320,7 +3320,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3341,7 +3341,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3386,7 +3386,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(268435456, reinterpret_cast<int8_t *>(out), upLargePageSize);// in 268435456 batches of 1 byte
+		rsbd8::radixsort(1073741824, reinterpret_cast<int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3410,7 +3410,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3419,7 +3419,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3440,7 +3440,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3485,7 +3485,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<int8_t *>(in), reinterpret_cast<int8_t *>(out), upLargePageSize);// in 268435456 batches of 1 byte
+		rsbd8::radixsortcopy(1073741824, reinterpret_cast<int8_t *>(in), reinterpret_cast<int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3509,7 +3509,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"int8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824));
 	}
 
 	// benchmark finished time

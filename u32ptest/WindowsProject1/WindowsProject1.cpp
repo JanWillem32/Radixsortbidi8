@@ -1082,18 +1082,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 	}
 
-	// allocate 256 MiB for the in- and outputs
+	// allocate 1 GiB for the in- and outputs
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
 	upLargePageSize = !upLargePageSize? 1 : upLargePageSize;// just set it to 1 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	size_t upLargePageSizem1{upLargePageSize - 1};
-	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(268435456)) + 268435456};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824)) + 1073741824};// round up to the nearest multiple of upLargePageSize
 	void *in{VirtualAlloc(nullptr, upSizeIn, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
 	if(!in){
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(268435456 + 2048)) + (268435456 + 2048)};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + 2048)) + (1073741824 + 2048)};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -1141,7 +1141,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
 		uint64_t *pFIin{reinterpret_cast<uint64_t *>(in)};
-		uint32_t j{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t j{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			*pFIin++ = static_cast<uint64_t>(static_cast<unsigned int>(rand())) << 60
 				| static_cast<uint64_t>(static_cast<unsigned int>(rand())) << 45 | static_cast<uint64_t>(static_cast<unsigned int>(rand())) << 30
@@ -1156,7 +1156,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1177,7 +1177,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1255,7 +1255,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1276,7 +1276,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1354,7 +1354,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1375,7 +1375,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1453,7 +1453,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1474,7 +1474,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1552,7 +1552,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1573,7 +1573,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1645,7 +1645,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 256 * 1024 * 1024 / sizeof(uint32_t)));
 	}
 	OutputDebugStringW(L"Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.\nDiscard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.\n");
-	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to the full 256 MiB
+	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to 256 MiB here
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1653,7 +1653,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1674,7 +1674,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -1740,7 +1740,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 32 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 32 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1778,7 +1778,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 32 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 32 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1816,7 +1816,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 4 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 4 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1854,7 +1854,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1892,7 +1892,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 512 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 512 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1930,7 +1930,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 512 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 512 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -1968,7 +1968,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 64 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 64 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2006,7 +2006,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 64 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 64 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2044,7 +2044,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 8 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 8 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2082,7 +2082,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 8 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 8 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2120,7 +2120,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 1 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 1 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2158,7 +2158,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 1 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 1 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2196,7 +2196,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 128 B instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 128 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2234,7 +2234,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 128 B instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 128 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2272,7 +2272,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 16 B instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 16 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2310,7 +2310,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 16 B instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 16 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2348,7 +2348,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 1.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 1.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2386,7 +2386,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 1.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 1.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2424,7 +2424,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 2 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 2 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2462,7 +2462,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 2 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 2 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2500,7 +2500,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 2.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 2.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2538,7 +2538,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 2.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 2.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2576,7 +2576,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 3 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 3 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2614,7 +2614,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 3 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 3 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2652,7 +2652,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 3.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 3.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2690,7 +2690,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 3.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 3.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2728,7 +2728,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 4 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 4 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2766,7 +2766,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2804,7 +2804,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 4.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 4.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2842,7 +2842,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2880,7 +2880,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2918,7 +2918,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2956,7 +2956,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 5.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 5.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -2994,7 +2994,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 5.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 5.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3032,7 +3032,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 6 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 6 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3070,7 +3070,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 6 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 6 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3108,7 +3108,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 6.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 6.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3146,7 +3146,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 6.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 6.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3184,7 +3184,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 7 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 7 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3222,7 +3222,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 7 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 7 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3260,7 +3260,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of 7.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of 7.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3298,7 +3298,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 7.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 7.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3336,7 +3336,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of .5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of .5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3374,7 +3374,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3412,7 +3412,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of .625 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of .625 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3450,7 +3450,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .625 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .625 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3488,7 +3488,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of .75 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of .75 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3526,7 +3526,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .75 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .75 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3564,7 +3564,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"radixsortbidi8() test of .875 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"radixsortbidi8() test of .875 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3602,7 +3602,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .875 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .875 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	// run an empty loop to warm up the caches first
@@ -3612,7 +3612,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3633,7 +3633,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3705,7 +3705,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 256 * 1024 * 1024 / sizeof(uint32_t)));
 	}
 	OutputDebugStringW(L"Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.\nDiscard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.\n");
-	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to the full 256 MiB
+	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to 256 MiB here
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3713,7 +3713,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		uint32_t j{16777216ui32};// in 16777216 batches of 16 bytes
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3734,7 +3734,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
 		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{33554432ui32};// in 33554432 batches of 8 bytes
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 		do{
 			uint32_t arx{pSource[0]}, ary{pSource[1]};
 			pSource += 2;
@@ -3800,7 +3800,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 32 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 32 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3838,7 +3838,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 32 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 32 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3876,7 +3876,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 4 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 4 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3914,7 +3914,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4 MiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4 MiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3952,7 +3952,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 512 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 512 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -3990,7 +3990,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 512 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 512 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4028,7 +4028,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 64 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 64 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4066,7 +4066,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 64 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 64 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4104,7 +4104,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 8 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 8 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4142,7 +4142,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 8 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 8 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4180,7 +4180,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 1 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 1 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4218,7 +4218,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 1 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 1 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4256,7 +4256,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 128 B instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 128 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4294,7 +4294,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 128 B instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 128 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4332,7 +4332,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 16 B instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 16 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4370,7 +4370,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 16 B instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 16 B instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4408,7 +4408,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 1.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 1.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4446,7 +4446,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 1.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 1.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4484,7 +4484,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 2 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 2 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4522,7 +4522,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 2 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 2 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4560,7 +4560,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 2.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 2.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4598,7 +4598,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 2.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 2.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4636,7 +4636,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 3 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 3 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4674,7 +4674,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 3 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 3 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4712,7 +4712,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 3.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 3.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4750,7 +4750,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 3.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 3.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4788,7 +4788,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 4 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 4 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4826,7 +4826,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4864,7 +4864,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 4.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 4.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4902,7 +4902,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 4.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 4.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4940,7 +4940,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -4978,7 +4978,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5016,7 +5016,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 5.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 5.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5054,7 +5054,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 5.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 5.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5092,7 +5092,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 6 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 6 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5130,7 +5130,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 6 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 6 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5168,7 +5168,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 6.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 6.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5206,7 +5206,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 6.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 6.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5244,7 +5244,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 7 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 7 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5282,7 +5282,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 7 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 7 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5320,7 +5320,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of 7.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of 7.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5358,7 +5358,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of 7.5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of 7.5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5396,7 +5396,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of .5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of .5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5434,7 +5434,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .5 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .5 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5472,7 +5472,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of .625 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of .625 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5510,7 +5510,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .625 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .625 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5548,7 +5548,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of .75 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of .75 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5586,7 +5586,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .75 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .75 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5624,7 +5624,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"rsbd8::radixsort() test of .875 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"rsbd8::radixsort() test of .875 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
@@ -5662,7 +5662,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::stable_sort() test of .875 KiB instead of 256 MiB\n");
+		OutputDebugStringW(L"std::stable_sort() test of .875 KiB instead of 1 GiB\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
 
