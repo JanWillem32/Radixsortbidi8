@@ -376,6 +376,10 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #include <bit>// (C++20)
 // Library feature-test macros (C++20)
 //
+// Structured binding declaration (C++17)
+#ifndef __cpp_structured_bindings
+#error Compiler does not meet requirements for __cpp_structured_bindings for this library.
+#endif
 // std::byte (C++17)
 #ifndef __cpp_lib_byte
 #error Compiler does not meet requirements for __cpp_lib_byte for this library.
@@ -547,11 +551,17 @@ struct memberobjectgenerator{
 };
 #pragma pack(pop)
 
+// Utility structs to generate tests for the often padded 80-bit long double types
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+struct alignas(16) longdoubletest128{uint_least64_t mantissa; uint_least16_t signexponent; uint_least16_t padding[3];};
+struct longdoubletest96{uint_least32_t mantissa[2]; uint_least16_t signexponent; uint_least16_t padding;};
+struct longdoubletest80{uint_least16_t mantissa[4]; uint_least16_t signexponent;};
+
 // Utility templates to call the getter function while splitting off the second-level indirection index parameter
 template<auto indirection1, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) splitget(V *p, auto index2, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<decltype(indirection1), V *, vararguments...>>){
+RSBD8_FUNC_INLINE decltype(auto) splitget(V *p, auto index2, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<decltype(indirection1), V *, vararguments...>>){
 	static_cast<void>(index2);
 	// The top option is a dummy, but it does allow the non-function indirection1 version of this to exist.
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>) return p->*indirection1;
@@ -576,17 +586,35 @@ RSBD8_FUNC_INLINE decltype(auto) splitparameter()noexcept{
 
 // Utility template to retrieve the first-level source for full outputs
 template<auto indirection1, bool isindexed2, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)	noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
 		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(p + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}else{
+					return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
-				return p->*reinterpret_cast<T(V:: *)>(indirection1);
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					return std::pair<uint_least64_t, W>{
+						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}else{
+					return p->*reinterpret_cast<T(V:: *)>(indirection1);
+				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
@@ -612,12 +640,19 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
-#ifdef __cpp_lib_bit_cast
-			return std::bit_cast<T>((p->*indirection1)(varparameters...));
-#else
 			U val{(p->*indirection1)(varparameters...)};
-			return reinterpret_cast<T &>(val);
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t *>(&val),
+					reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
+				};
+			}else{
+#ifdef __cpp_lib_bit_cast
+				return std::bit_cast<T>(val);
+#else
+				return *reinterpret_cast<T *>(&val);
 #endif
+			}
 		}else{// indirection to second level pointer
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
@@ -634,31 +669,81 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 
 // Utility templates to either retrieve the second-level source or pass though results for full outputs
 template<auto indirection1, ptrdiff_t indirection2, bool isindexed2, typename T, typename... vararguments>
-RSBD8_FUNC_INLINE T indirectinput2(std::byte const *pintermediate, vararguments... varparameters)noexcept{
+RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, vararguments... varparameters)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
 		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
-			return{*reinterpret_cast<T const *>(pintermediate + indirection2)};
-			//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)};
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pintermediate + indirection2),
+					*reinterpret_cast<W const *>(pintermediate + indirection2 + sizeof(uint_least64_t))
+				};
+			}else{
+				return *reinterpret_cast<T const *>(pintermediate + indirection2);
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)};
+			}
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
-				return{reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)]};
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					std::byte const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+					//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+				}
 			}else{// first level extra index
-				return{*reinterpret_cast<T const *>(pintermediate + indirection2)};
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					std::byte const *pfinal{pintermediate + indirection2};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return *reinterpret_cast<T const *>(pintermediate + indirection2);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+				}
 			}
 		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
 			std::pair indices{varparameters...};
-			return{reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second]};
-			//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				std::byte const *pfinal{pintermediate + indirection2 + sizeof(T) * indices.second};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}else{
+				return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+			}
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		if constexpr(isindexed2){// second level extra index
-			return{reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)]};
-			//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				std::byte const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}else{
+				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+			}
 		}else{// second level without an index
-			return{*reinterpret_cast<T const *>(pintermediate + indirection2)};
-			//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...)) + indirection2)};
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				std::byte const *pfinal{pintermediate + indirection2};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}else{
+				return *reinterpret_cast<T const *>(pintermediate + indirection2);
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...)) + indirection2)};
+			}
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
@@ -671,9 +756,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<T>,
 // Utility template to retrieve the first-level source for partial 8-bit outputs
 // Gave shifter the upgrade to a size_t, as it's all pointer logic in here.
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T> ||
+		std::is_same_v<long double, T> &&
+		64 == LDBL_MANT_DIG &&
+		16384 == LDBL_MAX_EXP &&
+		128 >= CHAR_BIT * sizeof(long double) &&
+		64 < CHAR_BIT * sizeof(long double))? sizeof(longdoubletest80) - 1 : sizeof(T) - 1};
 	static T constexpr highbit{generatehighbit<T>()};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
@@ -692,28 +789,48 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return std::pair{reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + shifter + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
-							reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + (sizeof(T) - 1) *
+						std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
+						return std::pair<unsigned char, unsigned char>{
+							reinterpret_cast<V const *>(pfinal + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(pfinal + highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							+ sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1)};
+							)->*reinterpret_cast<unsigned char(V:: *)>(indirection1)
+						};
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + shifter + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
 					}
 				}else{
-					return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+					if constexpr(64 < CHAR_BIT * sizeof(T)){
+						std::byte const *pfinal{reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...))};
+						return std::pair<uint_least64_t, W>{
+							reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						};
+					}else{
+						return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+					}
 				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return std::pair{reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
-							reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + (sizeof(T) - 1) *
+						return std::pair<unsigned char, unsigned char>{
+							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							)->*reinterpret_cast<unsigned char(V:: *)>(indirection1)};
+							)->*reinterpret_cast<unsigned char(V:: *)>(indirection1)
+						};
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
 					}
 				}else{
-					return p->*reinterpret_cast<T(V:: *)>(indirection1);
+					if constexpr(64 < CHAR_BIT * sizeof(T)){
+						return std::pair<uint_least64_t, W>{
+							p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						};
+					}else{
+						return p->*reinterpret_cast<T(V:: *)>(indirection1);
+					}
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
@@ -727,25 +844,32 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 					return reinterpret_cast<unsigned char const *>(p->*indirection1);
 					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
 				}else{// first level extra index
-					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 				}
 			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
 				std::pair indices{varparameters...};
-				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * indices.first)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
-#ifdef __cpp_lib_bit_cast
-			return std::bit_cast<T>((p->*indirection1)(varparameters...));
-#else
 			U val{(p->*indirection1)(varparameters...)};
-			return reinterpret_cast<T &>(val);
+			if constexpr(64 < CHAR_BIT * sizeof(T)){
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t *>(&val),
+					reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
+				};
+			}else{
+#ifdef __cpp_lib_bit_cast
+				return std::bit_cast<T>(val);
+#else
+				return *reinterpret_cast<T *>(&val);
 #endif
+			}
 		}else{// indirection to second level pointer
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
@@ -764,6 +888,18 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 // Gave shifter the upgrade to a size_t, as it's all pointer logic in here.
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermediate, size_t shifter, vararguments... varparameters)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T> ||
+		std::is_same_v<long double, T> &&
+		64 == LDBL_MANT_DIG &&
+		16384 == LDBL_MAX_EXP &&
+		128 >= CHAR_BIT * sizeof(long double) &&
+		64 < CHAR_BIT * sizeof(long double))? sizeof(longdoubletest80) - 1 : sizeof(T) - 1};
 	static T constexpr highbit{generatehighbit<T>()};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
@@ -779,91 +915,157 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return std::pair{*(pintermediate + indirection2 + shifter),
-						*(pintermediate + indirection2 + (sizeof(T) - 1) *
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<unsigned char, unsigned char>{
+						pfinal[shifter],
+						pfinal[highbyteoffset *
 						(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-						)};
+						]
+					};
 				}else{
 					return *(pintermediate + indirection2 + shifter);
 				}
 			}else{
-				return *reinterpret_cast<T const *>(pintermediate + indirection2);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return *reinterpret_cast<T const *>(pintermediate + indirection2);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
+				}
 			}
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return std::pair{*(pintermediate + indirection2 + shifter + sizeof(T) * splitparameter(varparameters...)),
-							*(pintermediate + indirection2 + (sizeof(T) - 1) *
+						unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+						return std::pair<unsigned char, unsigned char>{
+							pfinal[shifter],
+							pfinal[highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							+ sizeof(T) * splitparameter(varparameters...))};
+							]
+						};
 					}else{
 						return *(pintermediate + indirection2 + shifter + sizeof(T) * splitparameter(varparameters...));
 					}
 				}else{
-					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+					if constexpr(64 < CHAR_BIT * sizeof(T)){
+						unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+						return std::pair<uint_least64_t, W>{
+							*reinterpret_cast<uint_least64_t const *>(pfinal),
+							*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+						};
+					}else{
+						return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+						//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+					}
 				}
 			}else{// first level extra index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return std::pair{*(pintermediate + indirection2 + shifter),
-							*(pintermediate + indirection2 + (sizeof(T) - 1) *
+						unsigned char const *pfinal{pintermediate + indirection2};
+						return std::pair<unsigned char, unsigned char>{
+							pfinal[shifter],
+							pfinal[highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							)};
+							]
+						};
 					}else{
 						return *(pintermediate + indirection2 + shifter);
 					}
 				}else{
-					return *reinterpret_cast<T const *>(pintermediate + indirection2);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+					if constexpr(64 < CHAR_BIT * sizeof(T)){
+						unsigned char const *pfinal{pintermediate + indirection2};
+						return std::pair<uint_least64_t, W>{
+							*reinterpret_cast<uint_least64_t const *>(pfinal),
+							*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+						};
+					}else{
+						return *reinterpret_cast<T const *>(pintermediate + indirection2);
+						//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+					}
 				}
 			}
 		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
 			std::pair indices{varparameters...};
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return std::pair{*(pintermediate + indirection2 + shifter + sizeof(T) * indices.second),
-						*(pintermediate + indirection2 + (sizeof(T) - 1) *
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * indices.second};
+					return std::pair<unsigned char, unsigned char>{
+						pfinal[shifter],
+						pfinal[highbyteoffset *
 						(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-						+ sizeof(T) * indices.second)};
+						]
+					};
 				}else{
 					return *(pintermediate + indirection2 + shifter + sizeof(T) * indices.second);
 				}
 			}else{
-				return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<unsigned char const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * indices.second};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
+					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+				}
 			}
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		if constexpr(isindexed2){// second level extra index
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return std::pair{*(pintermediate + indirection2 + shifter + sizeof(T) * splitparameter(varparameters...)),
-						*(pintermediate + indirection2 + (sizeof(T) - 1) *
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<unsigned char, unsigned char>{
+						pfinal[shifter],
+						pfinal[highbyteoffset *
 						(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-						+ sizeof(T) * splitparameter(varparameters...))};
+						]
+					};
 				}else{
 					return *(pintermediate + indirection2 + shifter + sizeof(T) * splitparameter(varparameters...));
 				}
 			}else{
-				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				}
 			}
 		}else{// second level without an index
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return std::pair{*(pintermediate + indirection2 + shifter),
-						*(pintermediate + indirection2 + (sizeof(T) - 1) *
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<unsigned char, unsigned char>{
+						pfinal[shifter],
+						pfinal[highbyteoffset *
 						(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-						)};
+						]
+					};
 				}else{
 					return *(pintermediate + indirection2 + shifter);
 				}
 			}else{
-				return *reinterpret_cast<T const *>(pintermediate + indirection2);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
+				if constexpr(64 < CHAR_BIT * sizeof(T)){
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}else{
+					return *reinterpret_cast<T const *>(pintermediate + indirection2);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
+				}
 			}
 		}
 	}else static_assert(false, "unsupported indirection input type");
@@ -871,6 +1073,402 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
 	W> indirectinput2(W passthrough, size_t, vararguments...)noexcept{
+	return{passthrough};
+}
+
+// Utility template to retrieve the first-level source for partial 8-bit outputs
+// This variant handles the 80-bit long double types' second highest byte.
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
+		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
+			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
+			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+				if constexpr(isaddressingsubdivisable){
+					if constexpr(absolute != isfloatingpoint){
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<uint_least16_t(V:: *)>(indirection1);
+					}else{
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+					}
+				}else{
+					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}
+			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
+				if constexpr(isaddressingsubdivisable){
+					if constexpr(absolute != isfloatingpoint){
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<uint_least16_t(V:: *)>(indirection1);
+					}else{
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+					}
+				}else{
+					return std::pair<uint_least64_t, W>{
+						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}
+			}else static_assert(false, "impossible first-level indirection indexing parameter count");
+		}else{
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
+			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
+				return reinterpret_cast<unsigned char const *>(p->*indirection1);
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
+			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+				if constexpr(isindexed2){// second level extra index
+					return reinterpret_cast<unsigned char const *>(p->*indirection1);
+					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+				}else{// first level extra index
+					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+				}
+			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
+				std::pair indices{varparameters...};
+				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+		}
+	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
+		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
+			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
+			U val{(p->*indirection1)(varparameters...)};
+			return std::pair<uint_least64_t, W>{
+				*reinterpret_cast<uint_least64_t *>(&val),
+				reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
+			};
+		}else{// indirection to second level pointer
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
+			if constexpr(isindexed2){// second level extra index
+				return reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+			}else{// second level without an index
+				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
+			}
+		}
+	}else static_assert(false, "unsupported indirection input type");
+}
+
+// Utility templates to either retrieve the second-level source or pass though results for partial 8-bit outputs
+// This variant handles the 80-bit long double types' second highest byte.
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pintermediate, vararguments... varparameters)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
+		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
+			if constexpr(isaddressingsubdivisable){
+				if constexpr(absolute != isfloatingpoint){
+					return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1)	;
+				}else{
+					return *(pintermediate + indirection2 + highbyteoffset - 1);
+				}
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+			if constexpr(isindexed2){// second level extra index
+				if constexpr(isaddressingsubdivisable){
+					if constexpr(absolute != isfloatingpoint){
+						return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...));
+					}else{
+						return *(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...));
+					}
+				}else{
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}
+			}else{// first level extra index
+				if constexpr(isaddressingsubdivisable){
+					if constexpr(absolute != isfloatingpoint){
+						return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1);
+					}else{
+						return *(pintermediate + indirection2 + highbyteoffset - 1);
+					}
+				}else{
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}
+			}
+		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
+			std::pair indices{varparameters...};
+			if constexpr(isaddressingsubdivisable){
+				if constexpr(absolute != isfloatingpoint){
+					return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * indices.second);
+				}else{
+					return *(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * indices.second);
+				}
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * indices.second};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else static_assert(false, "impossible second-level indirection indexing parameter count");
+	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
+		if constexpr(isindexed2){// second level extra index
+			if constexpr(isaddressingsubdivisable){
+				if constexpr(absolute != isfloatingpoint){
+					return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...));
+				}else{
+					return *(pintermediate + indirection2 + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...));
+				}
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else{// second level without an index
+			if constexpr(isaddressingsubdivisable){
+				if constexpr(absolute != isfloatingpoint){
+					return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1);
+				}else{
+					return *(pintermediate + indirection2 + highbyteoffset - 1);
+				}
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}
+	}else static_assert(false, "unsupported indirection input type");
+}
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
+	W> indirectinputbelowtop2(W passthrough, vararguments...)noexcept{
+	return{passthrough};
+}
+
+// Utility template to retrieve the first-level source for partial 8-bit outputs
+// This variant handles the 80-bit long double types' highest byte.
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
+		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
+			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
+			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+				if constexpr(isaddressingsubdivisable){
+					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+				}else{
+					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}
+			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
+				if constexpr(isaddressingsubdivisable){
+					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+				}else{
+					return std::pair<uint_least64_t, W>{
+						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+					};
+				}
+			}else static_assert(false, "impossible first-level indirection indexing parameter count");
+		}else{
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
+			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
+				return reinterpret_cast<unsigned char const *>(p->*indirection1);
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
+			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+				if constexpr(isindexed2){// second level extra index
+					return reinterpret_cast<unsigned char const *>(p->*indirection1);
+					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
+				}else{// first level extra index
+					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
+					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
+				}
+			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
+				std::pair indices{varparameters...};
+				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
+			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+		}
+	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
+		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
+			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
+			U val{(p->*indirection1)(varparameters...)};
+			return std::pair<uint_least64_t, W>{
+				*reinterpret_cast<uint_least64_t *>(&val),
+				reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
+			};
+		}else{// indirection to second level pointer
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
+			if constexpr(isindexed2){// second level extra index
+				return reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+			}else{// second level without an index
+				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
+				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
+			}
+		}
+	}else static_assert(false, "unsupported indirection input type");
+}
+
+// Utility templates to either retrieve the second-level source or pass though results for partial 8-bit outputs
+// This variant handles the 80-bit long double types' highest byte.
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE decltype(auto) indirectinputtop2(unsigned char const *pintermediate, vararguments... varparameters)noexcept{
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
+	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
+		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
+			if constexpr(isaddressingsubdivisable){
+				return *(pintermediate + indirection2 + highbyteoffset);
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
+			if constexpr(isindexed2){// second level extra index
+				if constexpr(isaddressingsubdivisable){
+					return *(pintermediate + indirection2 + highbyteoffset + sizeof(T) * splitparameter(varparameters...));
+				}else{
+					unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}
+			}else{// first level extra index
+				if constexpr(isaddressingsubdivisable){
+					return *(pintermediate + indirection2 + highbyteoffset);
+				}else{
+					unsigned char const *pfinal{pintermediate + indirection2};
+					return std::pair<uint_least64_t, W>{
+						*reinterpret_cast<uint_least64_t const *>(pfinal),
+						*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+					};
+				}
+			}
+		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
+			std::pair indices{varparameters...};
+			if constexpr(isaddressingsubdivisable){
+				return *(pintermediate + indirection2 + highbyteoffset + sizeof(T) * indices.second);
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * indices.second};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else static_assert(false, "impossible second-level indirection indexing parameter count");
+	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
+		if constexpr(isindexed2){// second level extra index
+			if constexpr(isaddressingsubdivisable){
+				return *(pintermediate + indirection2 + highbyteoffset + sizeof(T) * splitparameter(varparameters...));
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2 + sizeof(T) * splitparameter(varparameters...)};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}else{// second level without an index
+			if constexpr(isaddressingsubdivisable){
+				return *(pintermediate + indirection2 + highbyteoffset);
+			}else{
+				unsigned char const *pfinal{pintermediate + indirection2};
+				return std::pair<uint_least64_t, W>{
+					*reinterpret_cast<uint_least64_t const *>(pfinal),
+					*reinterpret_cast<W const *>(pfinal + sizeof(uint_least64_t))
+				};
+			}
+		}
+	}else static_assert(false, "unsupported indirection input type");
+}
+template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2, bool isindexed2, typename T, typename V, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
+	W> indirectinputtop2(W passthrough, vararguments...)noexcept{
 	return{passthrough};
 }
 
@@ -1088,6 +1686,8 @@ template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typenam
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T) &&
+	(!std::is_same_v<unsigned char, T> ||
+	8 < CHAR_BIT) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	size_t> filtertop8(U cur)noexcept{
@@ -1107,7 +1707,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-		if constexpr(8 <= CHAR_BIT * sizeof(T)){
+		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			if constexpr(isfloatingpoint) return{static_cast<size_t>(cur & 0xFFu)};
 			else{
 				cur >>= CHAR_BIT * sizeof(T) - 8;
@@ -1115,7 +1715,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}else return{static_cast<size_t>(cur)};
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if constexpr(8 <= CHAR_BIT * sizeof(T)){
+		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			cur >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
 			return{static_cast<size_t>(cur & 0xFFu >> issigned)};
 		}else if constexpr(issigned){
@@ -1124,7 +1724,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = rotateleftportable<1>(static_cast<T>(cur));
 			return{static_cast<size_t>(cur)};
 		}
-	}else if constexpr(8 <= CHAR_BIT * sizeof(T)){
+	}else if constexpr(8 < CHAR_BIT * sizeof(T)){
 		cur >>= CHAR_BIT * sizeof(T) - 8;
 		return{static_cast<size_t>(cur)};
 	}else return{static_cast<size_t>(cur)};
@@ -1132,8 +1732,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<unsigned char, T> &&
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U),
+	size_t> filtertop8(U cur)noexcept{
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		signed char curp{static_cast<signed char>(cur)};
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
+		curp >>= 8 - 1;
+		U curq{static_cast<unsigned char>(curp)};
+		if constexpr(isfloatingpoint) cur &= 0x7Fu;
+		else if constexpr(issigned){
+			T curo{static_cast<unsigned char>(cur)};
+			curo += static_cast<unsigned char>(curq);
+			cur = curo;
+		}
+		cur ^= curq;
+	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
+		static_assert(!issigned, "impossible combination of partwise filtering and tiered absolute mode");
+		cur &= 0x7Fu;
+	}
+	return{static_cast<size_t>(cur)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T) &&
+	(!std::is_same_v<unsigned char, T> ||
+	8 < CHAR_BIT) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	std::pair<size_t, size_t>> filtertop8(U cura, U curb)noexcept{
@@ -1167,7 +1795,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curaq;
 		curb ^= curbq;
-		if constexpr(8 <= CHAR_BIT * sizeof(T)){
+		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			if constexpr(isfloatingpoint){
 				return{static_cast<size_t>(cura & 0xFFu), static_cast<size_t>(curb & 0xFFu)};
 			}else{
@@ -1177,7 +1805,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}else return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
-		if constexpr(8 <= CHAR_BIT * sizeof(T)){
+		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			cura >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
 			curb >>= CHAR_BIT * sizeof(T) - 8 - !issigned;
 			return{static_cast<size_t>(cura & 0xFFu >> issigned), static_cast<size_t>(curb & 0xFFu >> issigned)};
@@ -1188,7 +1816,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb = rotateleftportable<1>(static_cast<T>(curb));
 			return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 		}
-	}else if constexpr(8 <= CHAR_BIT * sizeof(T)){
+	}else if constexpr(8 < CHAR_BIT * sizeof(T)){
 		cura >>= CHAR_BIT * sizeof(T) - 8;
 		curb >>= CHAR_BIT * sizeof(T) - 8;
 		return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
@@ -1197,11 +1825,50 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<unsigned char, T> &&
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U),
+	std::pair<size_t, size_t>> filtertop8(U cura, U curb)noexcept{
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		signed char curpa{static_cast<signed char>(cura)};
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
+		curpa >>= 8 - 1;
+		U curqa{static_cast<unsigned char>(curpa)};
+		signed char curpb{static_cast<signed char>(curb)};
+		curpb >>= 8 - 1;
+		U curqb{static_cast<unsigned char>(curpb)};
+		if constexpr(isfloatingpoint){
+			cura &= 0x7Fu;
+			curb &= 0x7Fu;
+		}else if constexpr(issigned){
+			T curoa{static_cast<unsigned char>(cura)};
+			curoa += static_cast<unsigned char>(curqa);
+			cura = curoa;
+			T curob{static_cast<unsigned char>(curb)};
+			curob += static_cast<unsigned char>(curqb);
+			curb = curob;
+		}
+		cura ^= curqa;
+		curb ^= curqb;
+	}else if constexpr(isfloatingpoint && absolute){// one-register filtering
+		static_assert(!issigned, "impossible combination of partwise filtering and tiered absolute mode");
+		cura &= 0x7Fu;
+		curb &= 0x7Fu;
+	}
+	return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -1249,9 +1916,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		curp >>= 16 - 1;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		uint_least64_t curq{static_cast<uint_least64_t>(curp)};
+		uint_least64_t curq{static_cast<uint_least64_t>(curp)};// sign-extend
 #else
-		uint_least32_t curq{static_cast<uint_least32_t>(curp)};
+		uint_least32_t curq{static_cast<uint_least32_t>(curp)};// sign-extend
 #endif
 		if constexpr(!isfloatingpoint && issigned){
 			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
@@ -1335,11 +2002,75 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	size_t> filterbelowtop8(U cure)noexcept{
+	// Filtering is simplified if possible.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curp{static_cast<int_least16_t>(cure)};
+		if constexpr(absolute && !issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+			curo += curo;
+			cure = curo;
+		}
+		curp >>= 16 - 1;
+		U curq{static_cast<uint_least16_t>(curp)};
+		if constexpr(!isfloatingpoint && issigned){
+			uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+			curo += static_cast<uint_least16_t>(curq);
+			cure = curo;
+		}
+		cure ^= curq;
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curo{static_cast<uint_least16_t>(cure)};
+		curo += curo;
+		cure = curo;
+	}
+	return{static_cast<size_t>(cure & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_same_v<unsigned char, W>,
+	size_t> filterbelowtop8(W cure)noexcept{
+	// Filtering is simplified if possible.
+	static_assert((!isfloatingpoint && !absolute && !issigned) ||
+		(!isfloatingpoint && !absolute && issigned) ||
+		(isfloatingpoint && absolute && issigned), "impossible combination of partwise filtering and the wrong type of filter");
+	return{static_cast<size_t>(cure)};// passthrough, but ensure zero-extension
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -1415,10 +2146,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= 16 - 1;
 		curpb >>= 16 - 1;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};
+		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};// sign-extend
 		uint_least64_t curqb{static_cast<uint_least64_t>(curpb)};
 #else
-		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};
+		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};// sign-extend
 		uint_least32_t curqb{static_cast<uint_least32_t>(curpb)};
 #endif
 		if constexpr(!isfloatingpoint && issigned){
@@ -1578,6 +2309,80 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	std::pair<size_t, size_t>> filterbelowtop8(U curea, U cureb)noexcept{
+	// Filtering is simplified if possible.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		int_least16_t curpa{static_cast<int_least16_t>(curea)};
+		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
+		if constexpr(absolute && !issigned){
+			uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+			curoa += curoa;
+			curea = curoa;
+			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+			curob += curob;
+			cureb = curob;
+		}
+		curpa >>= 16 - 1;
+		U curqa{static_cast<uint_least16_t>(curpa)};
+		curpb >>= 16 - 1;
+		U curqb{static_cast<uint_least16_t>(curpb)};
+		if constexpr(!isfloatingpoint && issigned){
+			uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+			curoa += static_cast<uint_least16_t>(curqa);
+			curea = curoa;
+			uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+			curob += static_cast<uint_least16_t>(curqb);
+			cureb = curob;
+		}
+		curea ^= curqa;
+		cureb ^= curqb;
+	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
+		uint_least16_t curoa{static_cast<uint_least16_t>(curea)};
+		curoa += curoa;
+		curea = curoa;
+		uint_least16_t curob{static_cast<uint_least16_t>(cureb)};
+		curob += curob;
+		cureb = curob;
+	}
+	return{static_cast<size_t>(curea & 0xFFu), static_cast<size_t>(cureb & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_same_v<unsigned char, W>,
+	std::pair<size_t, size_t>> filterbelowtop8(W curea, W cureb)noexcept{
+	// Filtering is simplified if possible.
+	static_assert((!isfloatingpoint && !absolute && !issigned) ||
+		(!isfloatingpoint && !absolute && issigned) ||
+		(isfloatingpoint && absolute && issigned), "impossible combination of partwise filtering and the wrong type of filter");
+	return{static_cast<size_t>(curea), static_cast<size_t>(cureb)};// passthrough, but ensure zero-extension
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T) &&
@@ -1611,63 +2416,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<unsigned char, T> &&
-	std::is_unsigned_v<U> &&
-	64 >= CHAR_BIT * sizeof(U) &&
-	8 < CHAR_BIT * sizeof(U),
-	size_t> filtershift8(U cur, unsigned)noexcept{
-	// Filtering is simplified if possible.
-	// This should never filter the top part for non-absolute floating-point inputs.
-	if constexpr(isfloatingpoint != absolute){// two-register filtering
-		signed char curp{static_cast<signed char>(cur)};
-		if constexpr(absolute && !issigned) static_assert(false, "impossible combination");
-		curp >>= 8 - 1;
-		U curq{static_cast<unsigned char>(curp)};
-		if constexpr(!isfloatingpoint && issigned){
-			unsigned char curo{static_cast<unsigned char>(cur)};
-			curo += static_cast<unsigned char>(curq);
-			cur = curo;
-		}
-		cur ^= curq;
-	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		static_assert(false, "impossible combination");
-	}
-	return{static_cast<size_t>(cur)};
-}
-
-template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<U> &&
-	64 >= CHAR_BIT * sizeof(U) &&
-	8 < CHAR_BIT * sizeof(U),
-	size_t> filtershift8(std::pair<unsigned char, unsigned char> set, unsigned)noexcept{
-	// Filtering is simplified if possible.
-	// This should never filter the top part for non-absolute floating-point inputs.
-	U cur{set.first};
-	if constexpr(isfloatingpoint != absolute){// two-register filtering
-		signed char curp{static_cast<signed char>(set.second)};
-		if constexpr(absolute && !issigned) static_assert(false, "impossible combination");
-		curp >>= 8 - 1;
-		U curq{static_cast<unsigned char>(curp)};
-		if constexpr(!isfloatingpoint && issigned){
-			unsigned char curo{static_cast<unsigned char>(cur)};
-			curo += static_cast<unsigned char>(curq);
-			cur = curo;
-		}
-		cur ^= curq;
-	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		static_assert(false, "impossible combination");
-	}
-	return{static_cast<size_t>(cur)};
-}
-
-template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<long double, T> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T> ||
+		std::is_same_v<long double, T> &&
+		64 == LDBL_MANT_DIG &&
+		16384 == LDBL_MAX_EXP &&
+		128 >= CHAR_BIT * sizeof(long double) &&
+		64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -1679,9 +2435,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(absolute && !issigned) curm += curm;
 		curp >>= 16 - 1;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		uint_least64_t curq{static_cast<uint_least64_t>(curp)};
+		uint_least64_t curq{static_cast<uint_least64_t>(curp)};// sign-extend
 #else
-		uint_least32_t curq{static_cast<uint_least32_t>(curp)};
+		uint_least32_t curq{static_cast<uint_least32_t>(curp)};// sign-extend
 #endif
 		if constexpr(!isfloatingpoint && issigned){
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -1767,6 +2523,79 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<size_t>(curm & 0xFFu)};
 }
 
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<W> &&
+	64 >= CHAR_BIT * sizeof(W) &&
+	8 < CHAR_BIT * sizeof(W),
+	size_t> filtershift8(std::pair<uint_least64_t, W> cur, unsigned shift)noexcept{
+	// Use the function above.
+	return{filtershift8<absolute, issigned, isfloatingpoint, T, U>(cur.first, cur.second, shift)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<unsigned char, T> &&
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	size_t> filtershift8(U cur, unsigned)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top part for non-absolute floating-point inputs.
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		signed char curp{static_cast<signed char>(cur)};
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
+		curp >>= 8 - 1;
+		U curq{static_cast<unsigned char>(curp)};
+		if constexpr(!isfloatingpoint && issigned){
+			unsigned char curo{static_cast<unsigned char>(cur)};
+			curo += static_cast<unsigned char>(curq);
+			cur = curo;
+		}
+		cur ^= curq;
+	}
+	static_assert(!(isfloatingpoint && absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");// one-register filtering
+	return{static_cast<size_t>(cur)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	8 == CHAR_BIT &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U),
+	size_t> filtershift8(std::pair<unsigned char, unsigned char> set, unsigned)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top part for non-absolute floating-point inputs.
+	U cur{set.first};
+	if constexpr(isfloatingpoint != absolute){// two-register filtering
+		signed char curp{static_cast<signed char>(set.second)};
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
+		curp >>= 8 - 1;
+		U curq{static_cast<unsigned char>(curp)};
+		if constexpr(!isfloatingpoint && issigned){
+			unsigned char curo{static_cast<unsigned char>(cur)};
+			curo += static_cast<unsigned char>(curq);
+			cur = curo;
+		}
+		cur ^= curq;
+	}
+	static_assert(!(isfloatingpoint && absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");// one-register filtering
+	return{static_cast<size_t>(cur)};
+}
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<T> &&
@@ -1821,7 +2650,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::pair<size_t, size_t>> filtershift8(U cura, U curb, unsigned)noexcept{
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		signed char curap{static_cast<signed char>(cura)};
-		if constexpr(absolute && !issigned) static_assert(false, "impossible combination");
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
 		curap >>= 8 - 1;
 		U curaq{static_cast<unsigned char>(curap)};
 		signed char curbp{static_cast<signed char>(curb)};
@@ -1837,14 +2666,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curaq;
 		curb ^= curbq;
-	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		static_assert(false, "impossible combination");
 	}
+	static_assert(!(isfloatingpoint && absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");// one-register filtering
 	return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 }
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	8 == CHAR_BIT &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -1855,7 +2684,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	U curb{setb.first};
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		signed char curap{static_cast<signed char>(seta.second)};
-		if constexpr(absolute && !issigned) static_assert(false, "impossible combination");
+		static_assert(!(absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");
 		curap >>= 8 - 1;
 		U curaq{static_cast<unsigned char>(curap)};
 		signed char curbp{static_cast<signed char>(setb.second)};
@@ -1871,19 +2700,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curaq;
 		curb ^= curbq;
-	}else if constexpr(isfloatingpoint && absolute && !issigned){// one-register filtering
-		static_assert(false, "impossible combination");
 	}
+	static_assert(!(isfloatingpoint && absolute && !issigned), "impossible combination of partwise filtering and tiered absolute mode");// one-register filtering
 	return{static_cast<size_t>(cura), static_cast<size_t>(curb)};
 }
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<long double, T> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T> ||
+		std::is_same_v<long double, T> &&
+		64 == LDBL_MANT_DIG &&
+		16384 == LDBL_MAX_EXP &&
+		128 >= CHAR_BIT * sizeof(long double) &&
+		64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -1900,10 +2731,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= 16 - 1;
 		curpb >>= 16 - 1;
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};
+		uint_least64_t curqa{static_cast<uint_least64_t>(curpa)};// sign-extend
 		uint_least64_t curqb{static_cast<uint_least64_t>(curpb)};
 #else
-		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};
+		uint_least32_t curqa{static_cast<uint_least32_t>(curpa)};// sign-extend
 		uint_least32_t curqb{static_cast<uint_least32_t>(curpb)};
 #endif
 		if constexpr(!isfloatingpoint && issigned){
@@ -2047,13 +2878,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<size_t>(curma & 0xFFu), static_cast<size_t>(curmb & 0xFFu)};
 }
 
-template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<W> &&
+	64 >= CHAR_BIT * sizeof(W) &&
+	8 < CHAR_BIT * sizeof(W),
+	std::pair<size_t, size_t>> filtershift8(std::pair<uint_least64_t, W> cura, std::pair<uint_least64_t, W> curb, unsigned shift)noexcept{
+	// Use the function above.
+	return{filtershift8<absolute, issigned, isfloatingpoint, T, U>(cura.first, cura.second, curb.first, curb.second, shift)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curm, U &cure)noexcept{
@@ -2226,17 +3081,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curm, U &cure, T *out)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		int_least16_t curp{static_cast<int_least16_t>(cure)};
 		if constexpr(isfloatingpoint){
@@ -2422,17 +3280,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curm, U &cure, T *out, T *dst)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		int_least16_t curp{static_cast<int_least16_t>(cure)};
 		if constexpr(isfloatingpoint){
@@ -2630,17 +3491,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curma, U &curea, uint_least64_t &curmb, U &cureb)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		int_least16_t curpa{static_cast<int_least16_t>(curea)};
 		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
@@ -2939,17 +3803,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curma, U &curea, T *outa, uint_least64_t &curmb, U &cureb, T *outb)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		int_least16_t curpa{static_cast<int_least16_t>(curea)};
 		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
@@ -3270,17 +4137,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(uint_least64_t &curma, U &curea, T *outa, T *dsta, uint_least64_t &curmb, U &cureb, T *outb, T *dstb)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
 	if constexpr(isfloatingpoint != absolute){// two-register filtering
 		int_least16_t curpa{static_cast<int_least16_t>(curea)};
 		int_least16_t curpb{static_cast<int_least16_t>(cureb)};
@@ -6400,16 +7270,19 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double),
+	64 < CHAR_BIT * sizeof(long double)),
 	void> radixsortcopynoallocmulti(size_t count, T const input[], T output[], T buffer[])noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
-	using U = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
+	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
@@ -6422,17 +7295,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
-		long double *poutput{output};
-		if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(long double)){// also reverse the array at the same time
+		T *poutput{output};
+		if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
-			long double const *pinput{input + count};
-			long double *pbuffer{buffer};
+			T const *pinput{input + count};
+			T *pbuffer{buffer};
 			do{
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinput) + 1)};
 				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinput)};
 				--pinput;
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
-					filterinput<absolute, issigned, isfloatingpoint, long double>(curm, cure, poutput, pbuffer);
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure, poutput, pbuffer);
 					++poutput;
 					++pbuffer;
 				}
@@ -6474,14 +7347,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
 			}while(input < pinput);
 		}else{// not in reverse order
-			long double const *pinput{input};
+			T const *pinput{input};
 			ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 			do{
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinput) + 1)};
 				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinput)};
 				++pinput;
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
-					filterinput<absolute, issigned, isfloatingpoint, long double>(curm, cure, poutput);
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure, poutput);
 					++poutput;
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -6521,7 +7394,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, long double>(count, offsets)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, T>(count, offsets)};
 
 		// perform the bidirectional 8-bit sorting sequence
 		if(runsteps)
@@ -6529,10 +7402,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{
-			long double *pdst{buffer}, *pdstnext{output};// for the next iteration
+			T *pdst{buffer}, *pdstnext{output};// for the next iteration
 			unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-			long double const *psrclo, *psrchi;
-			if constexpr(!reverseorder || 80 == CHAR_BIT * sizeof(long double)){
+			T const *psrclo, *psrchi;
+			if constexpr(!reverseorder || 80 == CHAR_BIT * sizeof(T)){
 				// no reverse ordering applied
 				psrclo = input;
 				psrchi = input + count;
@@ -6544,7 +7417,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// skip a step if possible
 			runsteps >>= shifter;
 			size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
-			if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(long double)){
+			if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(T)){
 				// reverse ordering is applied here because the padding bytes could matter, hence the check above
 				psrclo = pdstnext;
 				psrchi = pdstnext + count;
@@ -6568,11 +7441,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
 					uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
 					--psrchi;
-					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, outhim, outhie, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
-					long double *pwlo = pdst + offsetlo;
-					long double *pwhi = pdst + offsethi;
+					T *pwlo = pdst + offsetlo;
+					T *pwhi = pdst + offsethi;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -6581,9 +7454,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
 					uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
-					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, shifter)};
 					size_t offsetlo{poffset[curlo]};
-					long double *pwlo = pdst + offsetlo;
+					T *pwlo = pdst + offsetlo;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 				}
@@ -6626,11 +7499,11 @@ handletop16:
 							U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
 							uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
 							--psrchi;
-							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie)};
+							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, outhim, outhie)};
 							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 							size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-							long double *pwlo = pdst + offsetlo;
-							long double *pwhi = pdst + offsethi;
+							T *pwlo = pdst + offsetlo;
+							T *pwhi = pdst + offsethi;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -6639,9 +7512,9 @@ handletop16:
 						if(psrclo == psrchi){// fill in the final item for odd counts
 							U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
 							uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
-							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe)};
+							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe)};
 							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]};
-							long double *pwlo = pdst + offsetlo;
+							T *pwlo = pdst + offsetlo;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 						}
@@ -6668,8 +7541,8 @@ handletop8:
 						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe, outhie)};
 						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-						long double *pwlo = pdst + offsetlo;
-						long double *pwhi = pdst + offsethi;
+						T *pwlo = pdst + offsetlo;
+						T *pwhi = pdst + offsethi;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -6680,7 +7553,7 @@ handletop8:
 						uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe)};
 						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]};
-						long double *pwlo = pdst + offsetlo;
+						T *pwlo = pdst + offsetlo;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 					}
@@ -8118,16 +8991,19 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
 	std::is_same_v<long double, T> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double),
+	64 < CHAR_BIT * sizeof(long double)),
 	void> radixsortnoallocmulti(size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	using W = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t,
-		std::conditional_t<96 == CHAR_BIT * sizeof(long double), uint_least32_t,
-		std::conditional_t<80 == CHAR_BIT * sizeof(long double), uint_least16_t, void>>>;
-	using U = std::conditional_t<128 == CHAR_BIT * sizeof(long double), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
+	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
@@ -8139,17 +9015,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
 
 		// count the 256 configurations, all in one go
-		if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(long double)){// also reverse the array at the same time
+		if constexpr(reverseorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
-			long double const *pinputlo{input}, *pinputhi{input + count};
-			long double *pbufferlo{buffer}, *pbufferhi{buffer + count};
+			T const *pinputlo{input}, *pinputhi{input + count};
+			T *pbufferlo{buffer}, *pbufferhi{buffer + count};
 			do{
 				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinputlo) + 1)};
 				uint_least64_t curmlo{*reinterpret_cast<uint_least64_t const *>(pinputlo)};
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinputhi) + 1)};
 				uint_least64_t curmhi{*reinterpret_cast<uint_least64_t const *>(pinputhi)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
-					filterinput<absolute, issigned, isfloatingpoint, long double>(
+					filterinput<absolute, issigned, isfloatingpoint, T>(
 						curelo, curmlo, pinputhi, pbufferhi,
 						curehi, curmhi, pinputlo, pbufferlo);
 					--pinputhi;
@@ -8237,7 +9113,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinputlo)};
 				// no write to input, as this is the midpoint
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
-					filterinput<absolute, issigned, isfloatingpoint, long double>(cure, curm, pbufferhi);
+					filterinput<absolute, issigned, isfloatingpoint, T>(cure, curm, pbufferhi);
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 				if constexpr(isfloatingpoint == absolute && !(absolute && !issigned)){
@@ -8273,15 +9149,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
 			}
 		}else{// not in reverse order
-			long double *pinput{input};
-			long double *pbuffer{buffer};
+			T *pinput{input};
+			T *pbuffer{buffer};
 			ptrdiff_t i{static_cast<ptrdiff_t>(count)};
 			do{
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(pinput) + 1)};
 				uint_least64_t curm{*reinterpret_cast<uint_least64_t const *>(pinput)};
 				++pinput;
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
-					filterinput<absolute, issigned, isfloatingpoint, long double>(curm, cure, pbuffer);
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure, pbuffer);
 					++pbuffer;
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -8321,7 +9197,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, long double>(count, offsets, movetobuffer)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, T>(count, offsets, movetobuffer)};
 
 		// perform the bidirectional 8-bit sorting sequence
 		if(runsteps)
@@ -8329,7 +9205,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{
-			long double *psrclo{input}, *pdst{buffer};
+			T *psrclo{input}, *pdst{buffer};
 			unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				psrclo = buffer;
@@ -8338,8 +9214,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// skip a step if possible
 			runsteps >>= shifter;
 			size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
-			long double *psrchi{psrclo + count};
-			long double *pdstnext{psrclo};// for the next iteration
+			T *psrchi{psrclo + count};
+			T *pdstnext{psrclo};// for the next iteration
 			if(80 / 8 - 2 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 				[[unlikely]]
@@ -8359,11 +9235,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
 					uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
 					--psrchi;
-					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, outhim, outhie, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
-					long double *pwlo = pdst + offsetlo;
-					long double *pwhi = pdst + offsethi;
+					T *pwlo = pdst + offsetlo;
+					T *pwhi = pdst + offsethi;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -8372,9 +9248,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
 					uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
-					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, shifter)};
 					size_t offsetlo{poffset[curlo]};
-					long double *pwlo = pdst + offsetlo;
+					T *pwlo = pdst + offsetlo;
 					*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 					*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 				}
@@ -8417,11 +9293,11 @@ handletop16:
 							U outhie{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrchi) + 1)};
 							uint_least64_t outhim{*reinterpret_cast<uint_least64_t const *>(psrchi)};
 							--psrchi;
-							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe, outhim, outhie)};
+							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe, outhim, outhie)};
 							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 							size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-							long double *pwlo = pdst + offsetlo;
-							long double *pwhi = pdst + offsethi;
+							T *pwlo = pdst + offsetlo;
+							T *pwhi = pdst + offsethi;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -8430,9 +9306,9 @@ handletop16:
 						if(psrclo == psrchi){// fill in the final item for odd counts
 							U outloe{*reinterpret_cast<W const *>(reinterpret_cast<uint_least64_t const *>(psrclo) + 1)};
 							uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
-							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, long double, U>(outlom, outloe)};
+							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlom, outloe)};
 							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]};
-							long double *pwlo = pdst + offsetlo;
+							T *pwlo = pdst + offsetlo;
 							*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 							*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 						}
@@ -8459,8 +9335,8 @@ handletop8:
 						auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe, outhie)};
 						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 						size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-						long double *pwlo = pdst + offsetlo;
-						long double *pwhi = pdst + offsethi;
+						T *pwlo = pdst + offsetlo;
+						T *pwhi = pdst + offsethi;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwhi) + 1) = static_cast<W>(outhie);
@@ -8471,7 +9347,7 @@ handletop8:
 						uint_least64_t outlom{*reinterpret_cast<uint_least64_t const *>(psrclo)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outloe)};
 						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]};
-						long double *pwlo = pdst + offsetlo;
+						T *pwlo = pdst + offsetlo;
 						*reinterpret_cast<W *>(*reinterpret_cast<uint_least64_t *>(pwlo) + 1) = static_cast<W>(outloe);
 						*reinterpret_cast<uint_least64_t *>(pwlo) = outlom;
 					}
@@ -8490,9 +9366,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static T constexpr highbit{generatehighbit<T>()};
@@ -9741,7 +10617,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, shifter, varparameters...)};
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
 					auto outhi{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, shifter, varparameters...)};
-					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						U>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
@@ -9751,7 +10629,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
-					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						U>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
 				}
@@ -9824,6 +10704,295 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 	}
 }
 
+// radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	(std::is_member_function_pointer_v<decltype(indirection1)> ||
+	std::is_member_object_pointer_v<decltype(indirection1)>) &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using T = std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
+	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+		static size_t constexpr offsetsstride{80 * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
+
+		// count the 256 configurations, all in one go
+		ptrdiff_t i{static_cast<ptrdiff_t>(count)};
+		if constexpr(reverseorder){// also reverse the array at the same time
+			V *const *pinput{input};
+			do{
+				V *p{*pinput++};
+				output[i] = p;
+				buffer[i] = p;
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}while(0 <= --i);
+		}else{// not in reverse order
+			do{
+				V *p{input[i]};
+				output[i] = p;
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}while(0 <= --i);
+		}
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, T>(count, offsets)};
+
+		// perform the bidirectional 8-bit sorting sequence
+		if(runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{
+			V **pdst{buffer}, **pdstnext{output};// for the next iteration
+			unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			V *const *psrclo, *const *psrchi;
+			if constexpr(!reverseorder){
+				psrclo = input;
+				psrchi = input + count;
+			}
+			if(paritybool){// swap if the count of sorting actions to do is odd
+				pdst = output;
+				pdstnext = buffer;
+			}
+			// skip a step if possible
+			runsteps >>= shifter;
+			size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+			if constexpr(reverseorder){
+				psrclo = pdstnext;
+				psrchi = pdstnext + count;
+			}
+			if(80 / 8 - 2 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+			goto handletop16;// rare, but possible
+			if(80 / 8 - 2 < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+			goto handletop8;// rare, but possible
+			if constexpr(!isaddressingsubdivisable) shifter *= 8;
+			for(;;){
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
+					auto imhi{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, shifter, varparameters...)};
+					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
+					auto outhi{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, shifter, varparameters...)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi, shifter)};
+					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *plo{*psrclo};
+					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
+					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, shifter)};
+					size_t offsetlo{poffset[curlo]};
+					pdst[offsetlo] = plo;
+				}
+				runsteps >>= 1;
+				if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					break;
+				{
+					unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+					if constexpr(!isaddressingsubdivisable) shifter += 8;
+					else ++shifter;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = const_cast<V **>(psrclo);// never written past the first iteration
+					// skip a step if possible
+					runsteps >>= index;
+					if constexpr(!isaddressingsubdivisable) shifter += index * 8;
+					else shifter += index;
+					poffset += static_cast<size_t>(index) * 256;
+				}
+				// handle the top two parts differently
+				if((isaddressingsubdivisable? 80 / 8 - 2 : 80 - 16) <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+					if((isaddressingsubdivisable? 80 / 8 - 2 : 80 - 16) == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+					{
+handletop16:
+						do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+							V *plo{*psrclo++};
+							V *phi{*psrchi--};
+							auto imlo{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+							auto imhi{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, varparameters...)};
+							auto outlo{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+							auto outhi{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, varparameters...)};
+							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlo, outhi)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+							pdst[offsetlo] = plo;
+							pdst[offsethi] = phi;
+						}while(psrclo < psrchi);
+						if(psrclo == psrchi){// fill in the final item for odd counts
+							V *plo{*psrclo};
+							auto imlo{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+							auto outlo{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlo)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]};
+							pdst[offsetlo] = plo;
+						}
+						runsteps >>= 1;
+						if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+							[[unlikely]]
+#endif
+							break;
+						// swap the pointers for the next round, data is moved on each iteration
+						psrclo = pdst;
+						psrchi = pdst + count;
+						pdst = pdstnext;
+						// unused: pdstnext = const_cast<V **>(psrclo);// never written past the first iteration
+					}
+handletop8:
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, varparameters...)};
+						auto outlo{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+						auto outhi{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, varparameters...)};
+						size_t curlo, curhi;
+						if constexpr(std::is_integral_v<decltype(outlo)>){
+							std::pair<size_t, size_t> cur{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi)};
+							curlo = cur.first, curhi = cur.second;
+						}else{// only feed the exponent and sign parts to the filter
+							std::pair<size_t, size_t> cur{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outlo.second, outhi.second)};
+							curlo = cur.first, curhi = cur.second;
+						}
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *plo{*psrclo};
+						auto imlo{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+						auto outlo{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+						size_t curlo;
+						if constexpr(std::is_integral_v<decltype(outlo)>){
+							curlo = filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo);
+						}else{// only feed the exponent and sign part to the filter
+							curlo = filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outlo.second);
+						}
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]};
+						pdst[offsetlo] = plo;
+					}
+					break;// no further processing beyond the top part
+				}
+			}
+		}
+	}
+}
+
 // radixsortnoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
@@ -9832,9 +11001,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static T constexpr highbit{generatehighbit<T>()};
@@ -11250,6 +12419,361 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 						auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, (sizeof(T) - 1) * (1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1))), varparameters...)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo)};
 						size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+						pdst[offsetlo] = plo;
+					}
+					break;// no further processing beyond the top part
+				}
+			}
+		}
+	}
+}
+
+// radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	(std::is_member_function_pointer_v<decltype(indirection1)> ||
+	std::is_member_object_pointer_v<decltype(indirection1)>) &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	using T = std::remove_pointer_t<std::remove_cvref_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
+		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
+		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;
+	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	static bool constexpr isaddressingsubdivisable{
+		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
+#ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
+		false
+#else
+		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
+		(std::is_member_object_pointer_v<decltype(indirection1)> ||
+		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+#endif
+	};
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(0 < static_cast<ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+		static size_t constexpr offsetsstride{80 * 256 / 8 - (absolute && issigned) * (127 + isfloatingpoint)};// shrink the offsets size if possible
+		size_t offsets[offsetsstride * 2];// a sizeable amount of indices, but it's worth it, and this function never calls functions either to further increase stack usage anyway
+		std::memset(offsets, 0, sizeof(offsets) / 2);// only the low half
+
+		// count the 256 configurations, all in one go
+		if constexpr(reverseorder){// also reverse the array at the same time
+			V **pinputlo{input}, **pinputhi{input + count};
+			V **pbufferlo{buffer}, **pbufferhi{buffer + count};
+			do{
+				V *plo{*pinputlo};
+				V *phi{*pinputhi};
+				*pinputhi-- = plo;
+				*pbufferhi-- = plo;
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				*pinputlo++ = phi;
+				*pbufferlo++ = phi;
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				auto[curmlo, curelo]{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				auto[curmhi, curehi]{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, T>(curmlo, curelo, curmhi, curehi);
+				}
+				// register pressure performance issue on several platforms: first do the low half here
+				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				curmlo >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(curelo)];
+				if constexpr(absolute && issigned && isfloatingpoint) curelo &= 0x7Fu;
+				++offsets[curmlo0];
+				curmlo1 &= sizeof(void *) * 0xFFu;
+				curmlo2 &= sizeof(void *) * 0xFFu;
+				curmlo3 &= sizeof(void *) * 0xFFu;
+				curmlo4 &= sizeof(void *) * 0xFFu;
+				curmlo5 &= sizeof(void *) * 0xFFu;
+				curmlo6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curmlo)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+				// register pressure performance issue on several platforms: do the low half here second
+				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				curmhi >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(curehi)];
+				if constexpr(absolute && issigned && isfloatingpoint) curehi &= 0x7Fu;
+				++offsets[curmhi0];
+				curmhi1 &= sizeof(void *) * 0xFFu;
+				curmhi2 &= sizeof(void *) * 0xFFu;
+				curmhi3 &= sizeof(void *) * 0xFFu;
+				curmhi4 &= sizeof(void *) * 0xFFu;
+				curmhi5 &= sizeof(void *) * 0xFFu;
+				curmhi6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curmhi)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+			}while(pinputlo < pinputhi);
+			if(pinputlo == pinputhi){// possibly finalize 1 entry after the loop above
+				V *p{*pinputlo};
+				// no write to input, as this is the midpoint
+				*pbufferhi = p;
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}
+		}else{// not in reverse order
+			ptrdiff_t i{static_cast<ptrdiff_t>(count)};
+			do{
+				V *p{input[i]};
+				buffer[i] = p;
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
+					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
+				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
+				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
+				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
+				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
+				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				curm >>= 56;
+				++offsets[8 * 256 + static_cast<size_t>(cure)];
+				if constexpr(absolute && issigned && isfloatingpoint) cure &= 0x7Fu;
+				++offsets[curm0];
+				curm1 &= sizeof(void *) * 0xFFu;
+				curm2 &= sizeof(void *) * 0xFFu;
+				curm3 &= sizeof(void *) * 0xFFu;
+				curm4 &= sizeof(void *) * 0xFFu;
+				curm5 &= sizeof(void *) * 0xFFu;
+				curm6 &= sizeof(void *) * 0xFFu;
+				++offsets[7 * 256 + static_cast<size_t>(curm)];
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
+				++*reinterpret_cast<size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+			}while(0 < --i);
+		}
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		auto[runsteps, paritybool]{generateoffsetsmulti<reversesort, absolute, issigned, isfloatingpoint, T>(count, offsets, movetobuffer)};
+
+		// perform the bidirectional 8-bit sorting sequence
+		if(runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{
+			V **psrclo{input}, **pdst{buffer};
+			unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			if(paritybool){// swap if the count of sorting actions to do is odd
+				psrclo = buffer;
+				pdst = input;
+			}
+			// skip a step if possible
+			runsteps >>= shifter;
+			size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+			V **psrchi{psrclo + count};
+			V **pdstnext{psrclo};// for the next iteration
+			if(80 / 8 - 2 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+			goto handletop16;// rare, but possible
+			if(80 / 8 - 2 < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+			goto handletop8;// rare, but possible
+			if constexpr(!isaddressingsubdivisable) shifter *= 8;
+			for(;;){
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
+					auto imhi{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, shifter, varparameters...)};
+					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
+					auto outhi{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, shifter, varparameters...)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						U>(outlo, outhi, shifter)};
+					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *plo{*psrclo};
+					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
+					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						U>(outlo, shifter)};
+					size_t offsetlo{poffset[curlo]};
+					pdst[offsetlo] = plo;
+				}
+				runsteps >>= 1;
+				if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					break;
+				{
+					unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+					if constexpr(!isaddressingsubdivisable) shifter += 8;
+					else ++shifter;
+					poffset += 256;
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					psrchi = pdst + count;
+					pdst = pdstnext;
+					pdstnext = psrclo;
+					// skip a step if possible
+					runsteps >>= index;
+					if constexpr(!isaddressingsubdivisable) shifter += index * 8;
+					else shifter += index;
+					poffset += static_cast<size_t>(index) * 256;
+				}
+				// handle the top two parts differently
+				if((isaddressingsubdivisable? 80 / 8 - 2 : 80 - 16) <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+				{
+					if((isaddressingsubdivisable? 80 / 8 - 2 : 80 - 16) == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+					{
+handletop16:
+						do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+							V *plo{*psrclo++};
+							V *phi{*psrchi--};
+							auto imlo{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+							auto imhi{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, varparameters...)};
+							auto outlo{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+							auto outhi{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, varparameters...)};
+							auto[curlo, curhi]{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlo, outhi)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+							pdst[offsetlo] = plo;
+							pdst[offsethi] = phi;
+						}while(psrclo < psrchi);
+						if(psrclo == psrchi){// fill in the final item for odd counts
+							V *plo{*psrclo};
+							auto imlo{indirectinputbelowtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+							auto outlo{indirectinputbelowtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+							size_t curlo{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(outlo)};
+							size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]};
+							pdst[offsetlo] = plo;
+						}
+						runsteps >>= 1;
+						if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+							[[unlikely]]
+#endif
+							break;
+						// swap the pointers for the next round, data is moved on each iteration
+						psrclo = pdst;
+						psrchi = pdst + count;
+						pdst = pdstnext;
+						// unused: pdstnext = psrclo;
+					}
+handletop8:
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, varparameters...)};
+						auto outlo{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+						auto outhi{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, varparameters...)};
+						size_t curlo, curhi;
+						if constexpr(std::is_integral_v<decltype(outlo)>){
+							std::pair<size_t, size_t> cur{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi)};
+							curlo = cur.first, curhi = cur.second;
+						}else{// only feed the exponent and sign parts to the filter
+							std::pair<size_t, size_t> cur{filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outlo.second, outhi.second)};
+							curlo = cur.first, curhi = cur.second;
+						}
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *plo{*psrclo};
+						auto imlo{indirectinputtop1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, varparameters...)};
+						auto outlo{indirectinputtop2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, varparameters...)};
+						size_t curlo;
+						if constexpr(std::is_integral_v<decltype(outlo)>){
+							curlo = filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo);
+						}else{// only feed the exponent and sign part to the filter
+							curlo = filtertop8<absolute, issigned, isfloatingpoint, uint_least16_t, U>(outlo.second);
+						}
+						size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]};
 						pdst[offsetlo] = plo;
 					}
 					break;// no further processing beyond the top part
@@ -13203,9 +14727,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using W = std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -13234,9 +14758,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using W = std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -13269,9 +14793,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>>),
-	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using W = std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -13299,9 +14823,9 @@ template<auto indirection1, sortingdirection direction = ascendingforwardordered
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters);
 }
@@ -13316,9 +14840,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>>),
-	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using W = std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -13347,9 +14871,9 @@ template<auto indirection1, sortingdirection direction = ascendingforwardordered
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
-	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	using W = std::remove_cvref_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -13395,9 +14919,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+		, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	auto
 #if defined(_POSIX_C_SOURCE)
 		[buffer, allocsize]
@@ -13438,9 +14962,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+		, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 	auto
 #if defined(_POSIX_C_SOURCE)
 		[buffer, allocsize]
@@ -13480,9 +15004,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)
-	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+		, vararguments... varparameters)noexcept(
+	std::is_member_object_pointer_v<decltype(indirection1)> ||
+	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 	assert(!(largepagesize - 1 & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
