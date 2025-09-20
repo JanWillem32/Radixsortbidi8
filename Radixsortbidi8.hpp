@@ -59,10 +59,6 @@
 // = rsdb8::allocatearray()
 // = rsdb8::deallocatearray()
 // This library only includes the common use scenarios to deal with input from first- and second-level indirection.
-// Similarly, editing the usually parallel input filter inlined template functions is an option to use custom transforms:
-// = rsdb8::helper::filtertop8() (2 variants, for 1 and 2 inputs)
-// = rsdb8::helper::filtershift8() (2 variants, for 1 and 2 inputs)
-// = rsdb8::helper::filterinput() (many variants, usage is dependent on input data size and reverse ordering scenarios)
 
 // Examples of using the 4 templates with input from second-level indirection (automatically deduced template parameters are omitted here):
 // As the use case for these almost always involve multi-pass techniques, the user is advised to allocate the (reusable) buffers accordingly and avoid the use of radixsortcopy() and radixsort().
@@ -78,29 +74,29 @@
 //
 // rsdb8::radixsortcopynoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr, getterparameters...);
 // rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
-// rsdb8::radixsortcopynoalloc<long, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
+// rsdb8::radixsortcopynoalloc<long *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
 //
 // rsdb8::radixsortnoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false, getterparameters...);
 // rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false);
-// rsdb8::radixsortnoalloc<wchar_t, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false);
+// rsdb8::radixsortnoalloc<wchar_t *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false);
 //
 // Examples of using the 2 templates with indexed second-level indirection:
 //
 // rsdb8::radixsortcopynoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex, getterparameters...);
 // rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
-// rsdb8::radixsortcopynoalloc<double, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
+// rsdb8::radixsortcopynoalloc<double *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
 //
 // rsdb8::radixsortnoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex, getterparameters...);
 // rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
-// rsdb8::radixsortnoalloc<unsigned long, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
+// rsdb8::radixsortnoalloc<unsigned long *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
 //
 // Examples of using the 2 templates with indexed first- and second-level indirection:
 //
 // rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
-// rsdb8::radixsortcopynoalloc<long double, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
+// rsdb8::radixsortcopynoalloc<long double *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
 //
 // rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
-// rsdb8::radixsortnoalloc<short, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
+// rsdb8::radixsortnoalloc<short *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
 
 // The 4 main sorting template functions that are implemented here
 // = radixsortnoalloc():
