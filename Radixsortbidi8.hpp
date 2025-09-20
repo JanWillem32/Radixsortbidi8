@@ -17,13 +17,13 @@
 // See "Performance tests" for more details about array sizes, types and achievable improvements in speed when sorting large arrays with this library.
 
 // Examples of using the 4 templates with simple arrays as input (automatically deduced template parameters are omitted here):
-// The rsdb8::radixsort() and rsdb8::radixsortcopy() template wrapper functions (typically) merely allocate memory prior to using the actual sorting functions.
+// The rsbd8::radixsort() and rsbd8::radixsortcopy() template wrapper functions (typically) merely allocate memory prior to using the actual sorting functions.
 // No intermediate buffer array is required when any variant of radixsortcopynoalloc() is used for sorting 8-bit types.
 //
-// bool succeeded{rsdb8::radixsort(count, inputarr, pagesizeoptional)};
-// bool succeeded{rsdb8::radixsortcopy(count, inputarr, outputarr, pagesizeoptional)};
-// rsdb8::radixsortnoalloc(count, inputarr, bufferarr, false);
-// rsdb8::radixsortcopynoalloc(count, inputarr, outputarr, bufferarr);
+// bool succeeded{rsbd8::radixsort(count, inputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsortcopy(count, inputarr, outputarr, pagesizeoptional)};
+// rsbd8::radixsortnoalloc(count, inputarr, bufferarr, false);
+// rsbd8::radixsortcopynoalloc(count, inputarr, outputarr, bufferarr);
 
 // Examples of using the 4 templates with input from first-level indirection (automatically deduced template parameters are omitted here):
 // The address offset template parameters displace the pointers they act on like a flat "std::byte const *", so not as some sort of array indices.
@@ -32,37 +32,37 @@
 // Another advanced use case can be set by a macro, RSBD8_DISABLE_ADDRESS_SUBDIVISION.
 // This disables a compile-time optimisation if preferred, for example when benchmarking several indirection modes.
 //
-// bool succeeded{rsdb8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
-// bool succeeded{rsdb8::radixsort<&myclass::member>(count, inputarr, pagesizeoptional)};
-// bool succeeded{rsdb8::radixsort<uint64_t, addressoffset>(count, inputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsort<&myclass::member>(count, inputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsort<uint64_t, addressoffset>(count, inputarr, pagesizeoptional)};
 //
-// bool succeeded{rsdb8::radixsortcopy<&myclass::getterfunc>(count, inputarr, outputarr, pagesizeoptional, getterparameters...)};
-// bool succeeded{rsdb8::radixsortcopy<&myclass::member>(count, inputarr, outputarr, pagesizeoptional)};
-// bool succeeded{rsdb8::radixsortcopy<bool, addressoffset>(count, inputarr, outputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsortcopy<&myclass::getterfunc>(count, inputarr, outputarr, pagesizeoptional, getterparameters...)};
+// bool succeeded{rsbd8::radixsortcopy<&myclass::member>(count, inputarr, outputarr, pagesizeoptional)};
+// bool succeeded{rsbd8::radixsortcopy<bool, addressoffset>(count, inputarr, outputarr, pagesizeoptional)};
 //
-// rsdb8::radixsortnoalloc<&myclass::getterfunc>(count, inputarr, bufferarr, false, getterparameters...);
-// rsdb8::radixsortnoalloc<&myclass::member>(count, inputarr, bufferarr, false);
-// rsdb8::radixsortnoalloc<int16_t, addressoffset>(count, inputarr, bufferarr, false);
+// rsbd8::radixsortnoalloc<&myclass::getterfunc>(count, inputarr, bufferarr, false, getterparameters...);
+// rsbd8::radixsortnoalloc<&myclass::member>(count, inputarr, bufferarr, false);
+// rsbd8::radixsortnoalloc<int16_t, addressoffset>(count, inputarr, bufferarr, false);
 //
-// rsdb8::radixsortcopynoalloc<&myclass::getterfunc>(count, inputarr, outputarr, bufferarr, getterparameters...);
-// rsdb8::radixsortcopynoalloc<&myclass::member>(count, inputarr, outputarr, bufferarr);
-// rsdb8::radixsortcopynoalloc<float, addressoffset>(count, inputarr, outputarr, bufferarr);
+// rsbd8::radixsortcopynoalloc<&myclass::getterfunc>(count, inputarr, outputarr, bufferarr, getterparameters...);
+// rsbd8::radixsortcopynoalloc<&myclass::member>(count, inputarr, outputarr, bufferarr);
+// rsbd8::radixsortcopynoalloc<float, addressoffset>(count, inputarr, outputarr, bufferarr);
 //
 // There are only 4 template functions that almost directly implement sorting with indirection here:
-// = rsdb8::radixsortcopynoalloc()
-// = rsdb8::radixsortnoalloc()
+// = rsbd8::radixsortcopynoalloc()
+// = rsbd8::radixsortnoalloc()
 // These both have an 8-bit type and a minimum 16-bit type template function.
 // These 4 are also the only template functions where no attempt has been made to (force) inline them.
 // All other template functions are inlined wrapper template functions for these 4.
 // The user of this library can expand on the base functionality by utilising the tools:
-// = rsdb8::GetOffsetOf
-// = rsdb8::allocatearray()
-// = rsdb8::deallocatearray()
+// = rsbd8::GetOffsetOf
+// = rsbd8::allocatearray()
+// = rsbd8::deallocatearray()
 // This library only includes the common use scenarios to deal with input from first- and second-level indirection.
 
 // Examples of using the 4 templates with input from second-level indirection (automatically deduced template parameters are omitted here):
 // As the use case for these almost always involve multi-pass techniques, the user is advised to allocate the (reusable) buffers accordingly and avoid the use of radixsortcopy() and radixsort().
-// The rsdb8::allocatearray() and rsdb8::deallocatearray() inline function templates are provided for handling an intermediate buffer.
+// The rsbd8::allocatearray() and rsbd8::deallocatearray() inline function templates are provided for handling an intermediate buffer.
 // Again, no intermediate buffer is required when radixsortcopynoalloc() is used for sorting a single-part type.
 // These will internally first retrieve a pointer to a "T" type array "T *myarray".
 // After that it's dereferenced at the origin (first set of examples) or indexed (second set of examples) as "myarray[indirectionindex]" to retrieve the value used for sorting.
@@ -72,31 +72,31 @@
 //
 // Examples of using the 2 templates with no indexed second-level indirection:
 //
-// rsdb8::radixsortcopynoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr, getterparameters...);
-// rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
-// rsdb8::radixsortcopynoalloc<long *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
+// rsbd8::radixsortcopynoalloc<&myclass::getterfunc, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr, getterparameters...);
+// rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
+// rsbd8::radixsortcopynoalloc<long *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, outputarr, bufferarr);
 //
-// rsdb8::radixsortnoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false, getterparameters...);
-// rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false);
-// rsdb8::radixsortnoalloc<wchar_t *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2>(count, inputarr, bufferarr, false);
+// rsbd8::radixsortnoalloc<&myclass::getterfunc, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, bufferarr, false, getterparameters...);
+// rsbd8::radixsortnoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, bufferarr, false);
+// rsbd8::radixsortnoalloc<wchar_t *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2>(count, inputarr, bufferarr, false);
 //
 // Examples of using the 2 templates with indexed second-level indirection:
 //
-// rsdb8::radixsortcopynoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex, getterparameters...);
-// rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
-// rsdb8::radixsortcopynoalloc<double *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
+// rsbd8::radixsortcopynoalloc<&myclass::getterfunc, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex, getterparameters...);
+// rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
+// rsbd8::radixsortcopynoalloc<double *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex);
 //
-// rsdb8::radixsortnoalloc<&myclass::getterfunc, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex, getterparameters...);
-// rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
-// rsdb8::radixsortnoalloc<unsigned long *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
+// rsbd8::radixsortnoalloc<&myclass::getterfunc, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex, getterparameters...);
+// rsbd8::radixsortnoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
+// rsbd8::radixsortnoalloc<unsigned long *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex);
 //
 // Examples of using the 2 templates with indexed first- and second-level indirection:
 //
-// rsdb8::radixsortcopynoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
-// rsdb8::radixsortcopynoalloc<long double *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
+// rsbd8::radixsortcopynoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
+// rsbd8::radixsortcopynoalloc<long double *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, outputarr, bufferarr, indirectionindex1, indirectionindex2);
 //
-// rsdb8::radixsortnoalloc<&myclass::member, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
-// rsdb8::radixsortnoalloc<short *, addressoffset1, ascendingforwardordered, nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
+// rsbd8::radixsortnoalloc<&myclass::member, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
+// rsbd8::radixsortnoalloc<short *, addressoffset1, rsbd8::ascendingforwardordered, rsbd8::nativemode, addressoffset2, true>(count, inputarr, bufferarr, false, indirectionindex1, indirectionindex2);
 
 // The 4 main sorting template functions that are implemented here
 // = radixsortnoalloc():
@@ -182,11 +182,11 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // To give an example of reversesort = true, reverseorder = false, as it's a bit tricky to imagine without a reference:
 // myclass collA[]{{1, "first"}, {1, "second"}, {-5, "third"}, {2, "fourth"}};// list construct
 // myclass *pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
-// rsbd8::radixsortnoalloc<&myclass::keyorder, decendingforwardordered>(4, pcollA, psomeunusedbuffer);
+// rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::decendingforwardordered>(4, pcollA, psomeunusedbuffer);
 // Members of "pcollA" will then get sorted according to their value "keyorder", in reverse order, while keeping the same array order.
 // Pointers will in this case point to: {2, "fourth"}, {1, "first"}, {1, "second"}, {-5, "third"}.
 // That is different from fully reversing the order when using this line instead of the above:
-// rsbd8::radixsortnoalloc<&myclass::keyorder, decendingreverseordered>(4, pcollA, psomeunusedbuffer);
+// rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::decendingreverseordered>(4, pcollA, psomeunusedbuffer);
 // Pointers will in this case point to: {2, "fourth"}, {1, "second"}, {1, "first"}, {-5, "third"}.
 // Notice the same reverse stable sorting here, but opposite placement when encountering the same value multiple times.
 }// namespace rsbd8
@@ -194,12 +194,13 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // Miscellaneous notes
 // Sorting unsigned values is the fastest, very closely followed up by signed values, followed up by floating-point values in this library.
 // Unsigned 128-bit and larger integers can be sorted by sequential sorting from the bottom to the top parts as unsigned (64-bit) elements when using indirection.
-// Signed 128-bit and larger integers are sorted the same, with only the topmost (64-bit) element sorted as signed because of the sign bit (assuming unfiltered input).
+// Signed (but otherwise unfiltered) 128-bit and larger integers are sorted the same, with only the topmost (64-bit) element sorted as signed because of the sign bit (assuming unfiltered input).
+// Likewise, regular absolute-filtered floating-point 128-bit and larger types can be sorted like that as a top part with one or more unsigned bottom parts.
 // Re-use the same intermediate buffer combined with radixsortnoalloc() or radixsortcopynoalloc() when sorting 128-bit and larger integers like this.
 // Inputs of type bool are reinterpreted as the unsigned integer type of the same size, but handling them is extremely efficient anyway.
 // Anything but 0 or 1 in bool source data will impact sorting, but this only happens if the user deliberately overrides the compiler behaviour for bool data.
 // The sign of type char is ambiguous, as by the original C standard, so cast inputs to char8_t * or unsigned char *, or force unsigned processing modes if unambiguously a binary sort of char characters is desired.
-// Floating-point -0. (implies not machine-generated) sorts below +0. by these functions. (Several functions in namespace std can do that.)
+// Floating-point -0. (implies not machine-generated) sorts below +0. by these functions in the default modes. (Several functions in namespace std can do that.)
 // Floating-point NaN values are sorted before negative infinity for the typical machine-generated "undefined" QNaN (0xFFF8'0000'0000'0000 on an IEEE double).
 // Floating-point NaN positive values (implies not machine-generated) are sorted after positive infinity (0x7FF0'0000'0000'0001 and onward on an IEEE double).
 // Floating-point SNaN (signalling) values do not trigger signals inside these functions. (Several functions in namespace std can do that.)
