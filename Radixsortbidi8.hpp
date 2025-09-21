@@ -10868,7 +10868,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(phi, shifter, varparameters...)};
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
 					auto outhi{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, shifter, varparameters...)};
-					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi, shifter)};
+					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_integral_v<decltype(outlo)>, decltype(outlo), T>,
+						U>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
@@ -10878,7 +10880,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{*psrclo};
 					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
-					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, shifter)};
+					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint,
+						std::conditional_t<std::is_integral_v<decltype(outlo)>, decltype(outlo), T>,
+						U>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
 				}
@@ -12655,7 +12659,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
 					auto outhi{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imhi, shifter, varparameters...)};
 					auto[curlo, curhi]{filtershift8<absolute, issigned, isfloatingpoint,
-						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						std::conditional_t<std::is_integral_v<decltype(outlo)>, decltype(outlo), T>,
 						U>(outlo, outhi, shifter)};
 					size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 					size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -12667,7 +12671,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, absolute, issigned, isfloatingpoint, isindexed2, T, V>(plo, shifter, varparameters...)};
 					auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, shifter, varparameters...)};
 					size_t curlo{filtershift8<absolute, issigned, isfloatingpoint,
-						std::conditional_t<std::is_same_v<uint_least64_t, decltype(outlo)>, uint_least64_t, T>,
+						std::conditional_t<std::is_integral_v<decltype(outlo)>, decltype(outlo), T>,
 						U>(outlo, shifter)};
 					size_t offsetlo{poffset[curlo]};
 					pdst[offsetlo] = plo;
