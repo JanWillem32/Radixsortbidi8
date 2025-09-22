@@ -204,6 +204,36 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // Floating-point NaN values are sorted before negative infinity for the typical machine-generated "undefined" QNaN (0xFFF8'0000'0000'0000 on an IEEE double).
 // Floating-point NaN positive values (implies not machine-generated) are sorted after positive infinity (0x7FF0'0000'0000'0001 and onward on an IEEE double).
 // Floating-point SNaN (signalling) values do not trigger signals inside these functions. (Several functions in namespace std can do that.)
+
+// Naming and tooling conventions used in this library
+// Textual:
+// All names are lowercase, with no separators, and any sort of length, based on convenience or frequency of local usage.
+// Any sort of global parts and namespace names are longer, to provide some context.
+// All user-facing functions have a general description in a comment in the line above them. This is generally what any IDE will display when giving a tooltip.
+// The few macro definitions are all uppercase, separated by underscores, starting with "RSDB8_".
+// There are most certainly no limitations on the lengths of functions, lines, comment blocks or other items. Everything is just kept sensible, in proper order, never spaghettified or obscured much, feature-rich (even if a little complicated sometimes), and very much optimised.
+// This library undefines its macro definitions at the end of the file and does not need to expose any macro definitions externally.
+// This library has three imported code sections that are clearly marked at the beginning and end. These basically don't get edited unless they get replaced again with a newer version.
+// Namespaces:
+// rsbd8:: is radixsortbidi8, the enveloping namespace for this library
+// rsbd8::helper:: is the underlying namespace for helper functions and constants. These are usually not directly invoked by the user of this library. No efforts are made to actually hide items from the user though.
+// Templates:
+// <typename T, typename U, typename V, typename W>
+// These are the basic 4 placeholders for types.
+// T is used for the main input type, or the primary type being referred to.
+// U is the deferred type, for example the unsigned variant of T, or an unsigned general working type that is larger than T.
+// V is always used as the class type of input and output arrays when dealing with indirection.
+// W is the wildcard type, often an automatically deduced item in templated helper functions, but also often just a companion type to U.
+// Some other template parts have defaults set up for them, especially for the longer lists of template parameters. This provides the user with often having less verbosity in their code.
+// Template variable arguments as a C++ feature are used extensively by this library. Function-based variable arguments passing as seen in the original C isn't needed.
+// All sorts of levels and configurations of template metaprogramming (C++17 and onward) are used in this library for optimisation, enhancing debugging or just making the code more concise.
+// Functional:
+// This is an optimal performance library. Of course, minor performance setbacks may arise from just compiler interpretation or functional issues. Keep the code close to the bare metal, in the right order to easily compile to instructions and use tons of optimisation features to overcome such issues.
+// Even if many parts here just don't comply with most of the programming world's "clean" code rules, performance is key first, reducing the total count of functions is second, and being descriptive of functionality in a combination of code and comments is third.
+// Defensive programming here is mostly left to template metaprogramming and compile-time assertions, as compile-time items don't hurt performance.
+// Parameter and environment checking is left to the absolute minimum outside of the debug mode. Of course, when allocating memory failure is handled, and likewise the case of potentially throwing functions.
+
+// Notes on ongoing research and development
 //
 // TODO, add support for types larger than 128 bits
 // = TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
@@ -326,6 +356,8 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // = The 4 main sorting template functions that are implemented here
 // = Modes of operation for the template functions
 // = Miscellaneous notes
+// = Naming and tooling conventions used in this library
+// = Notes on ongoing research and development
 // = Extended filtering information for each of the 8 main modes
 // = Performance tests
 // = Table of contents
