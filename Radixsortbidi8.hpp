@@ -14260,6 +14260,30 @@ RSBD8_FUNC_INLINE void deallocatearray(T *buffer
 #endif
 }
 
+// This class is a simple RAII wrapper for the buffer memory allocated with allocatearray().
+template<typename T>
+struct buffermemorywrapper{
+	T *ptr;
+#if defined(_POSIX_C_SOURCE)
+	size_t size;
+#endif
+	RSBD8_FUNC_INLINE ~buffermemorywrapper(){
+		deallocatearray(ptr
+#if defined(_POSIX_C_SOURCE)
+			, size
+#endif
+		);};
+	RSBD8_FUNC_INLINE buffermemorywrapper(T *ptrmem
+#if defined(_POSIX_C_SOURCE)
+		, sizemem
+#endif
+		)noexcept : ptr(ptrmem)
+#if defined(_POSIX_C_SOURCE)
+		, size(sizemem)
+#endif
+	{};
+};
+
 // Wrapper template functions for the 4 main sorting functions in this library
 
 // Wrapper for the multi-part radixsortcopynoalloc() function without indirection
@@ -14381,7 +14405,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	else helper::radixsortcopynoallocsingle<reversesort, reverseorder, absolute, issigned, isfloatingpoint, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
 }
 
-// Wrapper to implement the radixsort() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the radixsort() function without indirection, which only allocates some memory prior to sorting arrays
 // This requires no specialisation for handling the single-part types.
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
@@ -14422,7 +14446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -14463,7 +14487,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, typename T>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -14490,7 +14514,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper for the multi-part radixsortcopynoalloc() function with simple first-level indirection
-
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
@@ -14614,7 +14637,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	else helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V const **>(input), reinterpret_cast<V const **>(buffer), varparameters...);
 }
 
-// Wrapper to implement the radixsort() function with simple first-level indirection, which only allocates some memory prior to sorting arrays with simple first-level indirection
+// Wrapper to implement the radixsort() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
 // This requires no specialisation for handling the single-part types.
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
@@ -14655,7 +14678,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays with simple first-level indirection
+// Wrapper to implement the multi-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -14696,7 +14719,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays with simple first-level indirection
+// Wrapper to implement the single-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
 template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -14905,7 +14928,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// Wrapper to implement the radixsort() function with indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the radixsort() function with indirection, which only allocates some memory prior to sorting arrays
 // This requires no specialisation for handling the single-part types.
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
@@ -14937,18 +14960,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		)};
 	if(buffer){
-		radixsortnoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
-		deallocatearray(buffer
+		buffermemorywrapper<V *> guard{buffer
 #if defined(_POSIX_C_SOURCE)
 			, allocsize
 #endif
-			);
+		};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
+		radixsortnoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
 		return{true};
 	}
 	return{false};
 }
 
-// Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the multi-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
@@ -14980,18 +15003,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		)};
 	if(buffer){
-		radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
-		deallocatearray(buffer
+		buffermemorywrapper<V *> guard{buffer
 #if defined(_POSIX_C_SOURCE)
 			, allocsize
 #endif
-			);
+		};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
+		radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
 		return{true};
 	}
 	return{false};
 }
 
-// Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays without indirection
+// Wrapper to implement the single-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
 template<auto indirection1, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
