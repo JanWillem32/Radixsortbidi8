@@ -605,11 +605,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, vararguments... varparameters)noexcept{
 	return{p->*indirection1};
 }
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, size_t index2, vararguments... varparameters)noexcept(
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, W index2, vararguments... varparameters)noexcept(
 	std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
 	return{(p->*indirection1)(varparameters...)};
