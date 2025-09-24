@@ -581,9 +581,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #pragma pack(pop)
 		constexpr size_t sizecontainer{sizeof(Testmeclass)};
 		static_cast<void>(sizecontainer);
-		constexpr size_t offsetco{rsbd8::GetOffsetOf<&Testmeclass::co, Testmeclass>};
+		constexpr size_t offsetco{rsbd8::getoffsetof<&Testmeclass::co>};
 		static_cast<void>(offsetco);
-		constexpr size_t offsetsco{rsbd8::GetOffsetOf<&Testmeclass::sco, Testmeclass>};
+		constexpr size_t offsetsco{rsbd8::getoffsetof<&Testmeclass::sco>};
 		static_cast<void>(offsetsco);
 
 		Testmeclass cin[]{8, 0, 6, 4, 0, 2, 6};

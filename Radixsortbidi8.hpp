@@ -391,8 +391,11 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #error Compiler does not conform to C++17 to compile this library.
 #endif
 #endif
+// limited to C++17
 #include <utility>
+#include <cassert>
 #include <cstring>
+#include <climits>
 #include <cfloat>
 #if CHAR_BIT & 8 - 1
 #error This platform has an addressable unit that isn't divisible by 8. For these kinds of platforms it's better to re-write this library and not use an 8-bit indexed radix sort method.
@@ -400,8 +403,8 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #ifndef UINTPTR_MAX
 #error This platform has no uintptr_t type, which should be near impossible. This library can be edited to get around that, however it might be more advantageous to edit the compiler.
 #endif
-#include <cassert>
 #if 202002L <= __cplusplus || defined(_MSVC_LANG) && 202002L <= _MSVC_LANG
+// limited to C++20
 #include <bit>// (C++20)
 // Library feature-test macros (C++20)
 //
@@ -460,19 +463,19 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #endif
 // Start of imported section, to get compiler- and platform-specific intrinsic functions headers:
 #if defined(__clang__) && (defined(__x86_64__) || defined(__i386__))
-/* Clang-compatible compiler, targeting x86/x86-64 */
+// Clang-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
 #elif defined(__clang__) && (defined(__ARM_NEON__) || defined(__aarch64__))
-/* Clang-compatible compiler, targeting arm neon */
+// Clang-compatible compiler, targeting arm neon
 #include <arm_neon.h>
 #elif defined(_MSC_VER)
-/* Microsoft C/C++-compatible compiler */
+// Microsoft C/C++-compatible compiler
 #include <intrin.h>
 #elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-/* GCC-compatible compiler, targeting x86/x86-64 */
+// GCC-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
 #elif defined(__GNUC__) && (defined(__ARM_NEON__) || defined(__aarch64__))
-/* GCC-compatible compiler, targeting ARM with NEON */
+// GCC-compatible compiler, targeting ARM with NEON
 #include <arm_neon.h>
 #if defined (MISSING_ARM_VLD1)
 #include <ATen/cpu/vec256/missing_vld1_neon.h>
@@ -480,14 +483,13 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #include <ATen/cpu/vec256/missing_vst1_neon.h>
 #endif
 #elif defined(__GNUC__) && defined(__IWMMXT__)
-/* GCC-compatible compiler, targeting ARM with WMMX */
+// GCC-compatible compiler, targeting ARM with WMMX
 #include <mmintrin.h>
-#elif (defined(__GNUC__) || defined(__xlC__)) && \
-		(defined(__VEC__) || defined(__ALTIVEC__))
-/* XLC or GCC-compatible compiler, targeting PowerPC with VMX/VSX */
+#elif (defined(__GNUC__) || defined(__xlC__)) && (defined(__VEC__) || defined(__ALTIVEC__))
+// XLC or GCC-compatible compiler, targeting PowerPC with VMX/VSX
 #include <altivec.h>
 #elif defined(__GNUC__) && defined(__SPE__)
-/* GCC-compatible compiler, targeting PowerPC with SPE */
+// GCC-compatible compiler, targeting PowerPC with SPE
 #include <spe.h>
 #endif
 // End of imported section
@@ -577,7 +579,8 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<longdoubletest96, T> ||
 	std::is_same_v<longdoubletest80, T>,
 	T> generatehighbit(){
-	T out{.signexponent = 0x8000u};
+	T out{};
+	out.signexponent = 0x8000u;
 	return{out};
 }
 
@@ -595,38 +598,46 @@ struct memberobjectgenerator{
 };
 #pragma pack(pop)
 
-// Utility templates to call the getter function while splitting off the second-level indirection index parameter
-template<auto indirection1, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) splitget(V *p, auto index2, vararguments... varparameters)noexcept(
-	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<decltype(indirection1), V *, vararguments...>>){
-	static_cast<void>(index2);
-	// The top option is a dummy, but it does allow the non-function indirection1 version of this to exist.
-	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>) return p->*indirection1;
-	else return (p->*indirection1)(varparameters...);
+// Utility templates to call the getter function while optionally splitting off the second-level indirection index parameter
+template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, vararguments... varparameters)noexcept{
+	return{p->*indirection1};
 }
-template<auto indirection1, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) splitget(V *)noexcept{
-	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
-	return nullptr;
+template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	isindexed2,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, size_t index2, vararguments... varparameters)noexcept(
+	std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	static_cast<void>(index2);
+	return{(p->*indirection1)(varparameters...)};
+}
+template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	!isindexed2,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, vararguments... varparameters)noexcept(
+	std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	return{(p->*indirection1)(varparameters...)};
 }
 
 // Utility templates to split off the first parameter
-template<typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) splitparameter(auto first, vararguments...)noexcept{
-	return first;
+template<typename W, typename... vararguments>
+RSBD8_FUNC_INLINE W splitparameter(W first, vararguments...)noexcept{
+	return{first};
 }
-template<typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) splitparameter()noexcept{
+RSBD8_FUNC_INLINE std::nullptr_t splitparameter()noexcept{
 	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
-	return nullptr;
+	return{nullptr};
 }
 
 // Utility template to retrieve the first-level source for full outputs
 template<auto indirection1, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)	noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
@@ -675,7 +686,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -695,8 +706,8 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<std::byte const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}else{// second level without an index
 				return reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...));
 				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...)) + indirection2)};
@@ -769,7 +780,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 				};
 			}else{
 				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}
 		}else{// second level without an index
 			if constexpr(64 < CHAR_BIT * sizeof(T)){
@@ -796,7 +807,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<T>,
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
@@ -817,7 +828,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -892,7 +903,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -912,8 +923,8 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}else{// second level without an index
 				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
 				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
@@ -946,7 +957,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -1077,7 +1088,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 					};
 				}else{
 					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 				}
 			}
 		}else{// second level without an index
@@ -1120,7 +1131,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
@@ -1132,7 +1143,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -1188,7 +1199,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -1200,8 +1211,8 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}else{// second level without an index
 				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
 				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
@@ -1226,7 +1237,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pin
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -1334,7 +1345,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
@@ -1346,7 +1357,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -1394,7 +1405,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 			}else static_assert(false, "impossible second-level indirection indexing parameter count");
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -1406,8 +1417,8 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
+				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
+				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}else{// second level without an index
 				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
 				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
@@ -1432,7 +1443,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop2(unsigned char const *pinterme
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
@@ -1515,7 +1526,7 @@ template<auto indirection1, bool isindexed2, typename V, typename dummy = void, 
 // partial specialisation, by std::is_member_function_pointer_v
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
 struct memberpointerdeducebody<indirection1, isindexed2, V, std::enable_if_t<std::is_member_function_pointer_v<decltype(indirection1)>>, vararguments...>{
-	using type = std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>;
+	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 };
 // partial specialisation, by std::is_member_object_pointer_v
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
@@ -9412,14 +9423,12 @@ handletop8:
 // radixsortcopynoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static T constexpr highbit{generatehighbit<T>()};
@@ -9430,7 +9439,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -10759,8 +10768,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)>) &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -10771,7 +10779,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 < CHAR_BIT * sizeof(long double)),
 	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
@@ -10784,7 +10792,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -11059,14 +11067,12 @@ handletop8:
 // radixsortnoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>) &&
 	8 < CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static T constexpr highbit{generatehighbit<T>()};
@@ -11077,7 +11083,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -12495,8 +12501,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)>) &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12507,7 +12512,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 < CHAR_BIT * sizeof(long double)),
 	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,
@@ -12520,7 +12525,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
 		(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_pointer_v<std::invoke_result_t<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>>)
+		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>)
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -13467,13 +13472,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // radixsortcopynoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoallocsingle(size_t count, V *const input[], V *output[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -13807,13 +13810,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 // radixsortnoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
-	(std::is_member_function_pointer_v<decltype(indirection1)> ||
-	std::is_member_object_pointer_v<decltype(indirection1)> &&
-	std::is_unsigned_v<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>) &&
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoallocsingle(size_t count, V *input[], V *buffer[], vararguments... varparameters)
 	noexcept(std::is_member_object_pointer_v<decltype(indirection1)> ||
-		std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -14199,20 +14200,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 }// namespace helper
 
 // Definition of the GetOffsetOf template
+// Altered, to gain C++17 compatibility and make the simpler getoffsetof template with only one input.
 // Temporary, until a revision of "offsetof" is standardized in C++ with constexpr.
 // This part isn't used internally, but serves as a tool to the user for calculating compile-time offsets.
 // Section start of all rights reserved for the respective author (Sulley, 2024-06-15):
 // https://sulley.cc/2024/06/15/16/18/
-
-template <typename T>
-struct ClassMemberTraits;
-
-template <typename C, typename M>
-struct ClassMemberTraits<M C::*>
-{
-	using ClassType = C;
-	using MemberType = M;
-};
 
 #pragma pack(push, 1)
 template<typename M, std::size_t Offset>
@@ -14246,7 +14238,7 @@ template <
 	std::size_t Mid = (Low + High) / 2>
 struct OffsetHelper
 {
-	using M = ClassMemberTraits<decltype(MemberPtr)>::MemberType;
+	using M = std::remove_reference_t<decltype(std::declval<B>().*MemberPtr)>;
 
 	constexpr static PaddedUnion<B, M, Mid> dummy{};
 	constexpr static std::size_t GetOffsetOf()
@@ -14270,6 +14262,18 @@ struct OffsetHelper
 template <auto MemberPtr, typename B>
 constexpr std::size_t GetOffsetOf = OffsetHelper<MemberPtr, B, 0, sizeof(B)>::GetOffsetOf();
 // Section end
+
+template<auto memberptr>
+struct memberptrsplitter{
+	template<typename C, typename M>
+	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};};
+	static constexpr auto classptr{classgrabber(memberptr)};
+	using classtype = std::remove_pointer_t<decltype(classptr)>;
+	//static constexpr size_t size{sizeof(typename std::remove_pointer_t<decltype(classptr)>)};
+};
+
+template<auto memberptr>
+constexpr size_t getoffsetof = OffsetHelper<memberptr, typename memberptrsplitter<memberptr>::classtype, 0, sizeof(typename memberptrsplitter<memberptr>::classtype)>::GetOffsetOf();
 
 // Generic large array allocation and deallocation functions
 
@@ -14844,7 +14848,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -14859,12 +14863,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		helper::radixsortcopynoallocmulti<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
-	}else{
-		using U = helper::tounifunsigned<T>;
-		helper::radixsortcopynoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
-	}
+	helper::radixsortcopynoallocmulti<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
 }
 
 // Wrapper for the multi-part radixsortnoalloc() function with indirection
@@ -14875,7 +14874,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -14890,12 +14889,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		helper::radixsortnoallocmulti<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
-	}else{
-		using U = helper::tounifunsigned<T>;
-		helper::radixsortnoallocmulti<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
-	}
+	helper::radixsortnoallocmulti<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with indirection
@@ -14910,7 +14904,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -14925,12 +14919,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		helper::radixsortcopynoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, varparameters...);
-	}else{
-		using U = helper::tounifunsigned<T>;
-		helper::radixsortcopynoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, varparameters...);
-	}
+	helper::radixsortcopynoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with indirection with a dummy buffer argument
@@ -14940,9 +14929,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
-	radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters);
+	helper::radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() function with indirection
@@ -14957,7 +14946,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -14972,12 +14961,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	static bool constexpr isfloatingpoint{
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
-	if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		helper::radixsortnoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-	}else{
-		using U = helper::tounifunsigned<T>;
-		helper::radixsortnoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-	}
+	helper::radixsortnoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with indirection
@@ -14988,7 +14972,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>;
 	using T = helper::stripenum<std::remove_pointer_t<W>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
@@ -15005,17 +14989,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
 	if(!movetobuffer){
-		if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-			helper::radixsortnoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-		}else{
-			helper::radixsortnoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-		}
+		helper::radixsortnoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 	}else{
-		if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-			helper::radixsortcopynoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-		}else{
-			helper::radixsortcopynoallocsingle<reinterpret_cast<std::conditional_t<std::is_pointer_v<W>, U const *(V:: *), U(V:: *)>>(indirection1), reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
-		}
+		helper::radixsortcopynoallocsingle<indirection1, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 	}
 }
 
@@ -15036,7 +15012,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	auto
 #if defined(_POSIX_C_SOURCE)
 		[buffer, allocsize]
@@ -15079,7 +15055,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	auto
 #if defined(_POSIX_C_SOURCE)
 		[buffer, allocsize]
@@ -15121,7 +15097,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
-	std::is_nothrow_invocable_v<std::conditional_t<isindexed2, decltype(helper::splitget<indirection1, V, vararguments...>), decltype(indirection1)>, V *, vararguments...>){
+	std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 	assert(!(largepagesize - 1 & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
@@ -15225,7 +15201,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
-	radixsortcopynoallocsingle<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters);
+	helper::radixsortcopynoallocsingle<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() function with type and offset pointer indirection
