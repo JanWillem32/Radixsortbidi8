@@ -397,6 +397,11 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #include <cstring>
 #include <climits>
 #include <cfloat>
+#include <new>
+#if !defined(_WIN32) && defined(_POSIX_C_SOURCE)// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+#include <sys/types.h>
+#include <sys/mman.h>
+#endif
 #if CHAR_BIT & 8 - 1
 #error This platform has an addressable unit that isn't divisible by 8. For these kinds of platforms it's better to re-write this library and not use an 8-bit indexed radix sort method.
 #endif
@@ -431,6 +436,7 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 #endif
 // std::conditional_t (C++14)
 // std::enable_if_t (C++14)
+// std::make_unsigned_t (C++14)
 // std::make_signed_t (C++14)
 #ifndef __cpp_lib_transformation_trait_aliases
 #error Compiler does not meet requirements for __cpp_lib_transformation_trait_aliases for this library.
@@ -455,11 +461,6 @@ enum sortingdirection : unsigned char{// 2 bits as bitfields
 // __has_cpp_attribute(nodiscard)
 // [[maybe_unused]] (C++17)
 // __has_cpp_attribute(maybe_unused)
-#endif
-#include <new>
-#if !defined(_WIN32) && defined(_POSIX_C_SOURCE)// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-#include <sys/types.h>
-#include <sys/mman.h>
 #endif
 // Start of imported section, to get compiler- and platform-specific intrinsic functions headers:
 #if defined(__clang__) && (defined(__x86_64__) || defined(__i386__))
@@ -14269,7 +14270,6 @@ struct memberptrsplitter{
 	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};};
 	static constexpr auto classptr{classgrabber(memberptr)};
 	using classtype = std::remove_pointer_t<decltype(classptr)>;
-	//static constexpr size_t size{sizeof(typename std::remove_pointer_t<decltype(classptr)>)};
 };
 
 template<auto memberptr>
@@ -14741,7 +14741,7 @@ template<sortingdirection direction = ascendingforwardordered, sortingmode mode 
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	128 >= CHAR_BIT * sizeof(T),
-	bool> radixsort(size_t count, T input[]
+	bool> radixsort(size_t count, T *input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, size_t largepagesize = 0
 #elif defined(_POSIX_C_SOURCE)
@@ -15112,7 +15112,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Wrapper for the multi-part radixsortcopynoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
@@ -15139,7 +15138,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Wrapper for the multi-part radixsortnoalloc() function with type and offset pointer indirection
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
@@ -15168,7 +15166,6 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
@@ -15197,7 +15194,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 // Wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
@@ -15209,7 +15205,6 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movetobuffer argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(helper::stripenum<std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
@@ -15239,7 +15234,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 // This variant does not set the default "false" for the "movetobuffer" parameter.
 template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
 	using W = helper::stripenum<std::remove_pointer_t<T>>;
@@ -15273,7 +15267,6 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 [[nodiscard]]
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	bool> radixsort(size_t count, V *input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -15313,7 +15306,6 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 [[nodiscard]]
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	bool> radixsortcopy(size_t count, V *const input[], V output[]
@@ -15354,7 +15346,6 @@ template<typename T, ptrdiff_t indirection1 = 0, sortingdirection direction = as
 [[nodiscard]]
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_arithmetic_v<std::remove_pointer_t<T>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	bool> radixsortcopy(size_t count, V *const input[], V *output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
