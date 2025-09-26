@@ -629,14 +629,13 @@ template<typename W, typename... vararguments>
 RSBD8_FUNC_INLINE W splitparameter(W first, vararguments...)noexcept{
 	return{first};
 }
-RSBD8_FUNC_INLINE std::nullptr_t splitparameter()noexcept{
+RSBD8_FUNC_INLINE void splitparameter()noexcept{
 	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
-	return{nullptr};
 }
 
 // Utility template to retrieve the first-level source for full outputs
 template<auto indirection1, bool isindexed2, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)	noexcept(
+RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)noexcept(
 	std::is_member_object_pointer_v<decltype(indirection1)> ||
 	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
@@ -650,20 +649,20 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 				if constexpr(64 < CHAR_BIT * sizeof(T)){
 					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
 					return std::pair<uint_least64_t, W>{
-						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(p + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(p + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}else{
-					return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+					return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T V:: *>(indirection1);
 				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				if constexpr(64 < CHAR_BIT * sizeof(T)){
 					return std::pair<uint_least64_t, W>{
-						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						p->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}else{
-					return p->*reinterpret_cast<T(V:: *)>(indirection1);
+					return p->*reinterpret_cast<T V:: *>(indirection1);
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
@@ -841,45 +840,45 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 					if constexpr(absolute != isfloatingpoint){
 						std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
 						return std::pair<unsigned char, unsigned char>{
-							reinterpret_cast<V const *>(pfinal + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(pfinal + shifter)->*reinterpret_cast<unsigned char V:: *>(indirection1),
 							reinterpret_cast<V const *>(pfinal + highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							)->*reinterpret_cast<unsigned char(V:: *)>(indirection1)
+							)->*reinterpret_cast<unsigned char V:: *>(indirection1)
 						};
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char V:: *>(indirection1);
 					}
 				}else{
 					if constexpr(64 < CHAR_BIT * sizeof(T)){
 						std::byte const *pfinal{reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...))};
 						return std::pair<uint_least64_t, W>{
-							reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-							reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+							reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+							reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 						};
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T V:: *>(indirection1);
 					}
 				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
 						return std::pair<unsigned char, unsigned char>{
-							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1),
+							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char V:: *>(indirection1),
 							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset *
 							(1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1)))// 0 on big endian, 1 on little endian
-							)->*reinterpret_cast<unsigned char(V:: *)>(indirection1)
+							)->*reinterpret_cast<unsigned char V:: *>(indirection1)
 						};
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + shifter)->*reinterpret_cast<unsigned char V:: *>(indirection1);
 					}
 				}else{
 					if constexpr(64 < CHAR_BIT * sizeof(T)){
 						return std::pair<uint_least64_t, W>{
-							p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+							p->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+							reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 						};
 					}else{
-						return p->*reinterpret_cast<T(V:: *)>(indirection1);
+						return p->*reinterpret_cast<T V:: *>(indirection1);
 					}
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
@@ -1154,28 +1153,28 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<uint_least16_t(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<uint_least16_t V:: *>(indirection1);
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1 + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char V:: *>(indirection1);
 					}
 				}else{
 					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
 					return std::pair<uint_least64_t, W>{
-						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<uint_least16_t(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<uint_least16_t V:: *>(indirection1);
 					}else{
-						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+						return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset - 1)->*reinterpret_cast<unsigned char V:: *>(indirection1);
 					}
 				}else{
 					return std::pair<uint_least64_t, W>{
-						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						p->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
@@ -1367,21 +1366,21 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 				if constexpr(isaddressingsubdivisable){
-					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset + sizeof(T) * splitparameter(varparameters...))->*reinterpret_cast<unsigned char V:: *>(indirection1);
 				}else{
 					std::byte const *pfinal{reinterpret_cast<std::byte const *>(p) + sizeof(T) * splitparameter(varparameters...)};
 					return std::pair<uint_least64_t, W>{
-						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						reinterpret_cast<V const *>(pfinal)->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(pfinal + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				if constexpr(isaddressingsubdivisable){
-					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset)->*reinterpret_cast<unsigned char(V:: *)>(indirection1);
+					return reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + highbyteoffset)->*reinterpret_cast<unsigned char V:: *>(indirection1);
 				}else{
 					return std::pair<uint_least64_t, W>{
-						p->*reinterpret_cast<uint_least64_t(V:: *)>(indirection1),
-						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W(V:: *)>(indirection1)
+						p->*reinterpret_cast<uint_least64_t V:: *>(indirection1),
+						reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(uint_least64_t))->*reinterpret_cast<W V:: *>(indirection1)
 					};
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
@@ -2051,6 +2050,27 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<size_t>(cure & 0xFFu)};
 }
 
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<W> &&
+	64 >= CHAR_BIT * sizeof(W) &&
+	8 < CHAR_BIT * sizeof(W),
+	size_t> filterbelowtop8(std::pair<uint_least64_t, W> cur)noexcept{
+	// Use the function above.
+	return{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(cur.first, cur.second)};
+}
+
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<uint_least16_t, T> &&
@@ -2341,6 +2361,27 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cureb = curob;
 	}
 	return{static_cast<size_t>(curea & 0xFFu), static_cast<size_t>(cureb & 0xFFu)};
+}
+
+template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<longdoubletest128, T> ||
+	std::is_same_v<longdoubletest96, T> ||
+	std::is_same_v<longdoubletest80, T> ||
+	std::is_same_v<long double, T> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)) &&
+	std::is_unsigned_v<U> &&
+	64 >= CHAR_BIT * sizeof(U) &&
+	8 < CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<W> &&
+	64 >= CHAR_BIT * sizeof(W) &&
+	8 < CHAR_BIT * sizeof(W),
+	std::pair<size_t, size_t>> filterbelowtop8(std::pair<uint_least64_t, W> cura, std::pair<uint_least64_t, W> curb)noexcept{
+	// Use the function above.
+	return{filterbelowtop8<absolute, issigned, isfloatingpoint, T, U>(cura.first, cura.second, curb.first, curb.second)};
 }
 
 template<bool absolute, bool issigned, bool isfloatingpoint, typename T, typename U>
