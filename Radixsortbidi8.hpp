@@ -14634,8 +14634,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{true};
 }
 
-// Wrapper for the multi-part radixsortcopynoalloc() function with simple first-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper for the multi-part radixsortcopynoalloc() function with simple second-level indirection
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	128 >= CHAR_BIT * sizeof(T) &&
@@ -14660,8 +14660,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortcopynoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
-// Wrapper for the multi-part radixsortnoalloc() function with simple first-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper for the multi-part radixsortnoalloc() function with simple second-level indirection
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	128 >= CHAR_BIT * sizeof(T) &&
@@ -14686,8 +14686,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortnoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), movetobuffer, varparameters...);
 }
 
-// Wrapper for the single-part radixsortcopynoalloc() function with simple first-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14711,8 +14711,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), varparameters...);
 }
 
-// Wrapper for the single-part radixsortcopynoalloc() function with simple first-level indirection with a dummy buffer argument
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection with a dummy buffer argument
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14721,8 +14721,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	radixsortcopynoalloc<direction, mode, indirection1, T>(count, input, output, varparameters...);
 }
 
-// Wrapper for the single-part radixsortnoalloc() function with simple first-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper for the single-part radixsortnoalloc() function with simple second-level indirection
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14746,9 +14746,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	helper::radixsortnoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
-// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with simple first-level indirection
+// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with simple second-level indirection
 // This variant does not set the default "false" for the "movetobuffer" parameter.
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14773,9 +14773,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	else helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
-// Wrapper to implement the radixsort() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
+// Wrapper to implement the radixsort() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
 // This requires no specialisation for handling the single-part types.
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
@@ -14814,8 +14814,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the multi-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper to implement the multi-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
@@ -14855,8 +14855,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{false};
 }
 
-// Wrapper to implement the single-part radixsortcopy() function with simple first-level indirection, which only allocates some memory prior to sorting arrays
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection1 = 0, typename T, typename... vararguments>
+// Wrapper to implement the single-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
