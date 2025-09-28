@@ -599,27 +599,103 @@ struct memberobjectgenerator{
 };
 #pragma pack(pop)
 
-// Utility templates to call the getter function while optionally splitting off the second-level indirection index parameter, or in the first example, just dereference the member object pointer
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+// Utility templates to call the getter function while optionally splitting off the second-level indirection index parameter, or dereference the member object pointer
+// These will all reinterpret references as pointers.
+template<auto indirection1, bool isindexed2, typename V, typename U, typename W>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_member_object_pointer_v<decltype(indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, vararguments... varparameters)noexcept{
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index1, W index2)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1};
+}
+template<auto indirection1, bool isindexed2, typename V, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index1, W index2)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1))};// always reinterpret references as pointers
+}
+template<auto indirection1, bool isindexed2, typename V, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	if constexpr(isindexed2){
+		static_assert(std::is_pointer_v<T>, "invalid variable argument count for usage without second-level indirection");
+		return{p->*indirection1};
+	}else{
+		return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1};
+	}
+}
+template<auto indirection1, bool isindexed2, typename V, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	if constexpr(isindexed2){
+		return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
+	}else{
+		return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1))};// always reinterpret references as pointers
+	}
+}
+template<auto indirection1, bool isindexed2, typename V>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p)noexcept{
 	return{p->*indirection1};
+}
+template<auto indirection1, bool isindexed2, typename V>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
 }
 template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
-	isindexed2,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	isindexed2 &&
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
+	return{(p->*indirection1)(varparameters...)};
+}
+template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	static_cast<void>(index2);
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
+}
+template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	return{(p->*indirection1)(varparameters...)};
 }
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
-	!isindexed2,
+	!isindexed2 &&
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
 	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
-	return{(p->*indirection1)(varparameters...)};
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
 }
 
 // Utility templates to split off the first parameter
@@ -628,17 +704,17 @@ RSBD8_FUNC_INLINE W splitparameter(W first, vararguments...)noexcept{
 	return{first};
 }
 RSBD8_FUNC_INLINE void splitparameter()noexcept{
-	// This template of the function is a dummy, but it does allow the version without any extra arguments to exist.
+	// This function is a dummy, but it does allow the version without any extra arguments to exist.
 }
 
 // Utility template to retrieve the first-level source for full outputs
 template<auto indirection1, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
@@ -662,27 +738,11 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
-				return reinterpret_cast<std::byte const *>(p->*indirection1);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)};
-			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				if constexpr(isindexed2){// second level extra index
-					return reinterpret_cast<std::byte const *>(p->*indirection1);
-					//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
-				}else{// first level extra index
-					return reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
-				}
-			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-				std::pair indices{varparameters...};
-				return reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
-			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -699,15 +759,9 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, vararguments... varparamet
 #endif
 			}
 		}else{// indirection to second level pointer
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
-			}else{// second level without an index
-				return reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...));
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...)) + indirection2)};
-			}
+			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
@@ -727,7 +781,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 				};
 			}else{
 				return *reinterpret_cast<T const *>(pintermediate + indirection2);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)};
 			}
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
@@ -739,7 +792,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 					};
 				}else{
 					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-					//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
 				}
 			}else{// first level extra index
 				if constexpr(64 < CHAR_BIT * sizeof(T)){
@@ -750,7 +802,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 					};
 				}else{
 					return *reinterpret_cast<T const *>(pintermediate + indirection2);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 				}
 			}
 		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
@@ -763,7 +814,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 				};
 			}else{
 				return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
 			}
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
@@ -776,7 +826,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 				};
 			}else{
 				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-				//return{reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 			}
 		}else{// second level without an index
 			if constexpr(64 < CHAR_BIT * sizeof(T)){
@@ -787,7 +836,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(std::byte const *pintermediate, 
 				};
 			}else{
 				return *reinterpret_cast<T const *>(pintermediate + indirection2);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<std::byte const *>((p->*indirection1)(varparameters...)) + indirection2)};
 			}
 		}
 	}else static_assert(false, "unsupported indirection input type");
@@ -802,6 +850,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<T>,
 // Gave shifter the upgrade to a size_t, as it's all pointer logic in here.
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
@@ -813,7 +862,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 		64 == LDBL_MANT_DIG &&
 		16384 == LDBL_MAX_EXP &&
 		128 >= CHAR_BIT * sizeof(long double) &&
-		64 < CHAR_BIT * sizeof(long double))? sizeof(longdoubletest80) - 1 : sizeof(T) - 1};
+		64 < CHAR_BIT * sizeof(long double))? 80 / CHAR_BIT - 1 : sizeof(T) - 1};
 	static T constexpr highbit{generatehighbit<T>()};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
@@ -821,11 +870,10 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 		false
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
-		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>
+		std::is_pointer_v<U>
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
@@ -876,27 +924,11 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
-				return reinterpret_cast<unsigned char const *>(p->*indirection1);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
-			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				if constexpr(isindexed2){// second level extra index
-					return reinterpret_cast<unsigned char const *>(p->*indirection1);
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
-				}else{// first level extra index
-					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
-				}
-			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-				std::pair indices{varparameters...};
-				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
-			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -913,15 +945,9 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput1(V *p, size_t shifter, varargumen
 #endif
 			}
 		}else{// indirection to second level pointer
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
-			}else{// second level without an index
-				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
-			}
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
@@ -941,7 +967,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 		64 == LDBL_MANT_DIG &&
 		16384 == LDBL_MAX_EXP &&
 		128 >= CHAR_BIT * sizeof(long double) &&
-		64 < CHAR_BIT * sizeof(long double))? sizeof(longdoubletest80) - 1 : sizeof(T) - 1};
+		64 < CHAR_BIT * sizeof(long double))? 80 / CHAR_BIT - 1 : sizeof(T) - 1};
 	static T constexpr highbit{generatehighbit<T>()};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
@@ -975,7 +1001,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 					};
 				}else{
 					return *reinterpret_cast<T const *>(pintermediate + indirection2);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
 				}
 			}
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
@@ -1001,7 +1026,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 						};
 					}else{
 						return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-						//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
 					}
 				}
 			}else{// first level extra index
@@ -1026,7 +1050,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 						};
 					}else{
 						return *reinterpret_cast<T const *>(pintermediate + indirection2);
-						//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
 					}
 				}
 			}
@@ -1053,7 +1076,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 					};
 				}else{
 					return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
 				}
 			}
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
@@ -1080,7 +1102,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 					};
 				}else{
 					return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
 				}
 			}
 		}else{// second level without an index
@@ -1105,7 +1126,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinput2(unsigned char const *pintermedia
 					};
 				}else{
 					return *reinterpret_cast<T const *>(pintermediate + indirection2);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
 				}
 			}
 		}
@@ -1122,21 +1142,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// will convert references to pointers
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
-	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static size_t constexpr highbyteoffset{80 / CHAR_BIT - 1};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
 #ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
 		false
 #else
 		8 == CHAR_BIT &&// optimisation for multi-part addressable machines only
-		std::is_pointer_v<std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>>
+		std::is_pointer_v<U>
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
@@ -1168,27 +1188,11 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
-				return reinterpret_cast<unsigned char const *>(p->*indirection1);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
-			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				if constexpr(isindexed2){// second level extra index
-					return reinterpret_cast<unsigned char const *>(p->*indirection1);
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
-				}else{// first level extra index
-					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
-				}
-			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-				std::pair indices{varparameters...};
-				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
-			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -1197,15 +1201,9 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop1(V *p, vararguments... va
 				reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
 			};
 		}else{// indirection to second level pointer
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
-			}else{// second level without an index
-				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
-			}
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
@@ -1218,7 +1216,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pin
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
-	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static size_t constexpr highbyteoffset{80 / CHAR_BIT - 1};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
 #ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
@@ -1232,7 +1230,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pin
 		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1)	;
+					return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1)	;
 				}else{
 					return *(pintermediate + indirection2 + highbyteoffset - 1);
 				}
@@ -1261,7 +1259,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pin
 			}else{// first level extra index
 				if constexpr(isaddressingsubdivisable){
 					if constexpr(absolute != isfloatingpoint){
-						return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1);
+						return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1);
 					}else{
 						return *(pintermediate + indirection2 + highbyteoffset - 1);
 					}
@@ -1307,7 +1305,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputbelowtop2(unsigned char const *pin
 		}else{// second level without an index
 			if constexpr(isaddressingsubdivisable){
 				if constexpr(absolute != isfloatingpoint){
-					return *reinterpret_cast<uint_least16_t *>(pintermediate + indirection2 + highbyteoffset - 1);
+					return *reinterpret_cast<uint_least16_t const *>(pintermediate + indirection2 + highbyteoffset - 1);
 				}else{
 					return *(pintermediate + indirection2 + highbyteoffset - 1);
 				}
@@ -1332,10 +1330,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<!std::is_pointer_v<W>,
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool absolute, bool issigned, bool isfloatingpoint, bool isindexed2, typename T, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
-	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static size_t constexpr highbyteoffset{80 / CHAR_BIT - 1};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
 #ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
@@ -1346,7 +1345,6 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 #endif
 	};
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		using U = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
@@ -1370,27 +1368,11 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 				}
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
-				return reinterpret_cast<unsigned char const *>(p->*indirection1);
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)};
-			}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				if constexpr(isindexed2){// second level extra index
-					return reinterpret_cast<unsigned char const *>(p->*indirection1);
-					//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(p->*indirection1) + indirection2)[splitparameter(varparameters...)]};
-				}else{// first level extra index
-					return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1);
-					//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * splitparameter(varparameters...))->*indirection1) + indirection2)};
-				}
-			}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
-				std::pair indices{varparameters...};
-				return reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1);
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(reinterpret_cast<V const *>(reinterpret_cast<std::byte const *>(p) + sizeof(void *) * indices.first)->*indirection1) + indirection2)[indices.second]};
-			}else static_assert(false, "impossible second-level indirection indexing parameter count");
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
@@ -1399,15 +1381,9 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop1(V *p, vararguments... varpara
 				reinterpret_cast<W *>(&val)[sizeof(uint_least64_t) / sizeof(W)]
 			};
 		}else{// indirection to second level pointer
-			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
+			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
-				//return{reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...)) + indirection2)[splitparameter(varparameters...)]};
-			}else{// second level without an index
-				return reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...));
-				//return{*reinterpret_cast<T const *>(reinterpret_cast<unsigned char const *>((p->*indirection1)(varparameters...)) + indirection2)};
-			}
+			return reinterpret_cast<unsigned char const *>(splitget<indirection1, isindexed2, V, vararguments...>(p, varparameters...));
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
@@ -1420,7 +1396,7 @@ RSBD8_FUNC_INLINE decltype(auto) indirectinputtop2(unsigned char const *pinterme
 	using W = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t,// the default for all platforms
 		std::conditional_t<96 == CHAR_BIT * sizeof(T), uint_least32_t,// only to support the 80-bit long double type with padding (always little endian)
 		std::conditional_t<80 == CHAR_BIT * sizeof(T), uint_least16_t, void>>>;// only to support the 80-bit long double type (always little endian)
-	static size_t constexpr highbyteoffset{sizeof(longdoubletest80) - 1};
+	static size_t constexpr highbyteoffset{80 / CHAR_BIT - 1};
 	static bool constexpr isaddressingsubdivisable{
 		!(absolute && !issigned) &&// the two tiered absolute types shift bits out of place during filering
 #ifdef RSBD8_DISABLE_ADDRESS_SUBDIVISION
@@ -1515,7 +1491,7 @@ struct memberpointerdeducebody<indirection1, isindexed2, V, std::enable_if_t<std
 // partial specialisation, by std::is_member_object_pointer_v
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
 struct memberpointerdeducebody<indirection1, isindexed2, V, std::enable_if_t<std::is_member_object_pointer_v<decltype(indirection1)>>, vararguments...>{
-	using type = decltype(std::declval<V>().*indirection1);
+	using type = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 };
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
 using memberpointerdeduce = typename memberpointerdeducebody<indirection1, isindexed2, V, void, vararguments...>::type;
@@ -9491,8 +9467,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i - 1] = plo;
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9551,7 +9527,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i] = p;
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -9587,8 +9563,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					output[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9646,7 +9622,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -9688,8 +9664,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i - 1] = plo;
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9742,7 +9718,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i] = p;
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -9775,8 +9751,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					output[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9828,7 +9804,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -9867,8 +9843,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i - 1] = plo;
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9915,7 +9891,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i] = p;
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -9945,8 +9921,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					output[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -9992,7 +9968,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10028,8 +10004,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i - 1] = plo;
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -10068,7 +10044,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i] = p;
 					buffer[i] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10095,8 +10071,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					output[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -10134,7 +10110,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10167,8 +10143,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i - 1] = pb;
 					buffer[i - 1] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10201,7 +10177,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[0] = p;
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10225,8 +10201,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					output[i - 1] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10258,7 +10234,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10297,9 +10273,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i + 1] = pc;
 					buffer[i + 1] = pc;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
@@ -10339,8 +10315,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i + 2] = pb;
 					buffer[i + 2] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10366,7 +10342,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[0] = p;
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10395,9 +10371,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					output[i] = pc;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
@@ -10434,8 +10410,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					output[i + 2] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10460,7 +10436,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10500,10 +10476,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i] = pd;
 					buffer[i] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
@@ -10539,8 +10515,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[i + 2] = pb;
 					buffer[i + 2] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10560,7 +10536,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					output[0] = p;
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10589,10 +10565,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 					output[i] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
@@ -10625,8 +10601,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					output[i + 2] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -10645,7 +10621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					output[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -10835,7 +10811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				output[i] = p;
 				buffer[i] = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
 				}
@@ -10872,7 +10848,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *p{input[i]};
 				output[i] = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
 				}
@@ -11127,8 +11103,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = phi;
 					*pbufferlo++ = phi;
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
@@ -11186,7 +11162,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11223,8 +11199,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -11282,7 +11258,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11324,8 +11300,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = phi;
 					*pbufferlo++ = phi;
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
@@ -11377,7 +11353,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11411,8 +11387,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -11464,7 +11440,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur, buffer);
 					}
@@ -11503,8 +11479,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = phi;
 					*pbufferlo++ = phi;
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
@@ -11578,8 +11554,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -11625,7 +11601,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11661,8 +11637,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = phi;
 					*pbufferlo++ = phi;
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curlo, curhi);
 					}
@@ -11700,7 +11676,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11728,8 +11704,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					buffer[i - 1] = plo;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curhi, curlo);
 					}
@@ -11768,7 +11744,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11801,8 +11777,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = pb;
 					*pbufferlo++ = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -11834,7 +11810,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11859,8 +11835,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					buffer[i - 1] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -11892,7 +11868,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -11935,10 +11911,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo[-1] = pd;
 					pbufferlo += 2;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
@@ -11983,8 +11959,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = pb;
 					*pbufferlo++ = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -12023,9 +11999,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pinputhi[1] = pc;
 					pbufferhi[1] = pc;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
@@ -12069,9 +12045,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo[2] = pf;
 					pbufferlo += 3;
 					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(curd, cure, curf);
@@ -12106,7 +12082,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -12135,9 +12111,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					buffer[i] = pc;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc);
 					}
@@ -12174,8 +12150,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					buffer[i + 1] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -12200,7 +12176,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -12227,8 +12203,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					*pinputlo++ = pb;
 					*pbufferlo++ = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -12268,10 +12244,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo[1] = pd;
 					pbufferlo += 2;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
@@ -12301,7 +12277,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -12330,10 +12306,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 					buffer[i] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					}
@@ -12366,8 +12342,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 					buffer[i + 2] = pb;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 					}
@@ -12386,7 +12362,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *p{input[0]};
 					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 						filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 					}
@@ -12502,7 +12478,7 @@ handletop8:// this prevents "!absolute && isfloatingpoint" to be made constexpr 
 						V *plo{*psrclo};
 						// short-circuit some of the options here to only get the top part once if possible, and not twice
 						auto imlo{indirectinput1<indirection1, true, true, true, isindexed2, T, V>(plo, (sizeof(T) - 1) * (1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1))), varparameters...)};
-						auto outlo{indirectinput2<indirection1, absolute, issigned, isfloatingpoint, indirection2, isindexed2, T, V>(imlo, (sizeof(T) - 1) * (1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1))), varparameters...)};
+						auto outlo{indirectinput2<indirection1, true, true, true, indirection2, isindexed2, T, V>(imlo, (sizeof(T) - 1) * (1 - (*reinterpret_cast<unsigned char const *>(&highbit) >> (8 - 1))), varparameters...)};
 						size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo)};
 						size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
 						pdst[offsetlo] = plo;
@@ -12565,8 +12541,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				*pinputlo++ = phi;
 				*pbufferlo++ = phi;
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto[curmlo, curelo]{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-				auto[curmhi, curehi]{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+				auto[curmlo, curelo]{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				auto[curmhi, curehi]{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 					filterinput<absolute, issigned, isfloatingpoint, T>(curmlo, curelo, curmhi, curehi);
 				}
@@ -12634,7 +12610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// no write to input, as this is the midpoint
 				*pbufferhi = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
 				}
@@ -12672,7 +12648,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *p{input[i]};
 				buffer[i] = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				auto[curm, cure]{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(isfloatingpoint != absolute || absolute && !issigned){
 					filterinput<absolute, issigned, isfloatingpoint, T>(curm, cure);
 				}
@@ -13487,7 +13463,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
+	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortcopynoallocsingle(size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -13524,10 +13500,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 					output[i + 4] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					++offsets[cura];
@@ -13549,10 +13525,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					output[i] = ph;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
 					filterinput<absolute, issigned, isfloatingpoint, T>(cure, curf, curg, curh);
 					++offsets[cure];
@@ -13576,14 +13552,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					output[i] = ph;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					if constexpr(absolute && isfloatingpoint){// one-register filters only
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 					}
@@ -13613,10 +13589,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				output[i + 4] = pd;
 				i -= 4;// required for the "if(2 & i){" part
 				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 				}
@@ -13633,8 +13609,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 				output[i + 6] = pb;
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 				}
@@ -13645,7 +13621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				V *p{pinput[0]};
 				output[0] = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 				}
@@ -13667,10 +13643,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					++offsets[cura];
@@ -13687,10 +13663,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
 					filterinput<absolute, issigned, isfloatingpoint, T>(cure, curf, curg, curh);
 					++offsets[cure];
@@ -13706,14 +13682,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					if constexpr(absolute && isfloatingpoint){// one-register filters only
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 					}
@@ -13738,10 +13714,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 				}
@@ -13755,8 +13731,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				V *pb{input[i + 6]};
 				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 				}
@@ -13766,7 +13742,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 			if(1 & i){// possibly finalize 1 entry after the loop above
 				V *p{input[0]};
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 				}
@@ -13788,8 +13764,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 				V *phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -13805,7 +13781,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -13823,7 +13799,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the V *buffer[] argument f
 template<auto indirection1, bool reversesort, bool reverseorder, bool absolute, bool issigned, bool isfloatingpoint, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argument from a multi-part version is detected here, and do not allow active compile-time evaluation with it
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>>>),
+	8 >= CHAR_BIT * sizeof(stripenum<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>),
 	void> radixsortnoallocsingle(size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -13862,10 +13838,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				pbufferlo[1] = pd;
 				pbufferlo += 2;
 				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 				}
@@ -13883,8 +13859,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				*pinputlo++ = pb;
 				*pbufferlo++ = pb;
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 				}
@@ -13913,10 +13889,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					pinputlo[1] = pd;
 					pbufferlo[1] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					++offsets[cura];
@@ -13945,10 +13921,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					pbufferlo[3] = ph;
 					pbufferlo += 4;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
 					filterinput<absolute, issigned, isfloatingpoint, T>(cure, curf, curg, curh);
 					++offsets[cure];
@@ -13984,14 +13960,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					pbufferlo[3] = ph;
 					pbufferlo += 4;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					if constexpr(absolute && isfloatingpoint){// one-register filters only
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 					}
@@ -14010,7 +13986,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				// no write to input, as this is the midpoint
 				*pbufferhi = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 				}
@@ -14036,10 +14012,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
 					buffer[i + 4] = pd;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 					++offsets[cura];
@@ -14060,10 +14036,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					buffer[i] = ph;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
 					filterinput<absolute, issigned, isfloatingpoint, T>(cure, curf, curg, curh);
 					++offsets[cure];
@@ -14087,14 +14063,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
 					buffer[i] = ph;
 					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2>(imh, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
 					if constexpr(absolute && isfloatingpoint){// one-register filters only
 						filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 					}
@@ -14123,10 +14099,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				buffer[i + 4] = pd;
 				i -= 4;// required for the "if(2 & i){" part
 				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2>(imd, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb, curc, curd);
 				}
@@ -14142,8 +14118,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
 				buffer[i + 6] = pb;
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2>(imb, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cura, curb);
 				}
@@ -14154,7 +14130,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				V *p{input[0]};
 				buffer[0] = p;
 				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2>(im, varparameters...)};
+				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 				if constexpr(absolute || isfloatingpoint){
 					filterinput<absolute, issigned, isfloatingpoint, T>(cur);
 				}
@@ -14176,8 +14152,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 				V *phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2>(imhi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				auto[curlo, curhi]{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo, outhi)};
 				size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -14193,7 +14169,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<// disable this if the bool movetobuffer argu
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *plo{*psrclo};
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2>(imlo, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 				size_t curlo{filtertop8<absolute, issigned, isfloatingpoint, decltype(outlo), U>(outlo)};
 				size_t offsetlo;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(reverseorder){
@@ -14276,7 +14252,7 @@ constexpr std::size_t GetOffsetOf = OffsetHelper<MemberPtr, B, 0, sizeof(B)>::Ge
 template<auto memberptr>
 struct memberptrsplitter{
 	template<typename C, typename M>
-	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};};
+	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};}
 	static constexpr auto classptr{classgrabber(memberptr)};
 	using classtype = std::remove_pointer_t<decltype(classptr)>;
 };
@@ -14361,7 +14337,7 @@ struct buffermemorywrapper{
 #if defined(_POSIX_C_SOURCE)
 			, size
 #endif
-		);};
+		);}
 	RSBD8_FUNC_INLINE buffermemorywrapper(T *ptrmem
 #if defined(_POSIX_C_SOURCE)
 		, sizemem
@@ -14370,7 +14346,7 @@ struct buffermemorywrapper{
 #if defined(_POSIX_C_SOURCE)
 		, size(sizemem)
 #endif
-	{};
+	{}
 };
 
 // Wrapper template functions for the 4 main sorting functions in this library
@@ -14603,7 +14579,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper for the multi-part radixsortcopynoalloc() function with simple second-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	128 >= CHAR_BIT * sizeof(T) &&
@@ -14621,15 +14597,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, indirection1>,
-		helper::memberobjectgenerator<U, indirection1>>>>;
-	helper::radixsortcopynoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), reinterpret_cast<V **>(buffer), varparameters...);
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
+		helper::memberobjectgenerator<U, 0>>>>;
+	helper::radixsortcopynoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // Wrapper for the multi-part radixsortnoalloc() function with simple second-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	128 >= CHAR_BIT * sizeof(T) &&
@@ -14647,15 +14623,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, indirection1>,
-		helper::memberobjectgenerator<U, indirection1>>>>;
-	helper::radixsortnoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), movetobuffer, varparameters...);
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
+		helper::memberobjectgenerator<U, 0>>>>;
+	helper::radixsortnoallocmulti<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), movetobuffer, varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14672,25 +14648,25 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, indirection1>,
-		helper::memberobjectgenerator<U, indirection1>>>>;
-	helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), varparameters...);
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
+		helper::memberobjectgenerator<U, 0>>>>;
+	helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), varparameters...);
 }
 
 // Wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection with a dummy buffer argument
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
-	radixsortcopynoalloc<direction, mode, indirection1, T>(count, input, output, varparameters...);
+	radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() function with simple second-level indirection
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14707,16 +14683,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, indirection1>,
-		helper::memberobjectgenerator<U, indirection1>>>>;
-	helper::radixsortnoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
+		helper::memberobjectgenerator<U, 0>>>>;
+	helper::radixsortnoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with simple second-level indirection
 // This variant does not set the default "false" for the "movetobuffer" parameter.
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T> &&
 	8 >= CHAR_BIT * sizeof(T),
@@ -14733,17 +14709,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(nativemode <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(nativemode > mode && static_cast<bool>(1 << 2 & mode))};
 	using U = helper::tounifunsigned<T>;
-	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, indirection1>,
-		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, indirection1>,
-		helper::memberobjectgenerator<U, indirection1>>>>;
+	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
+		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
+		helper::memberobjectgenerator<U, 0>>>>;
 	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
-	else helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
+	else helper::radixsortcopynoallocsingle<&V::object, reversesort, reverseorder, absolute, issigned, isfloatingpoint, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // Wrapper to implement the radixsort() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
 // This requires no specialisation for handling the single-part types.
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
@@ -14771,7 +14747,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		)};
 	if(buffer){
-		radixsortnoalloc<direction, mode, indirection1, T>(count, input, buffer, false, varparameters...);
+		radixsortnoalloc<direction, mode, indirection2, isindexed2, T>(count, input, buffer, false, varparameters...);
 		deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
 			, allocsize
@@ -14783,7 +14759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
@@ -14812,7 +14788,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		)};
 	if(buffer){
-		radixsortcopynoalloc<direction, mode, indirection1, T>(count, input, output, buffer, varparameters...);
+		radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, buffer, varparameters...);
 		deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
 			, allocsize
@@ -14824,7 +14800,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
-template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, typename T, typename... vararguments>
+template<sortingdirection direction = ascendingforwardordered, sortingmode mode = nativemode, ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename T, typename... vararguments>
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
 [[nodiscard]]
 #endif
@@ -14845,7 +14821,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static_cast<void>(mmapflags);
 #endif
 	// the single-part version never needs an extra buffer
-	radixsortcopynoalloc<direction, mode, indirection1, T>(count, input, output, varparameters...);
+	radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, varparameters...);
 	return{true};
 }
 
