@@ -2067,26 +2067,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			MessageBoxW(nullptr, L"SetPriorityClass() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
-		DWORD_PTR ProcessAffinityMask, SystemAffinityMask;
-		BOOL boGetProcessAffinityMask{GetProcessAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-1)), &ProcessAffinityMask, &SystemAffinityMask)};
-		if(!boGetProcessAffinityMask){
-			MessageBoxW(nullptr, L"GetProcessAffinityMask() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
-		// Setting the affinity masks is required because these methods must be tested with warmed-up caches for constant performance.
-		// Context switching to another processor or another processor core might cause changes to power states when context switches take place.
-		BOOL boSetProcessAffinityMask{SetProcessAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-1)), SystemAffinityMask & 1)};// only the first processor and only the first core
-		if(!boSetProcessAffinityMask){
-			MessageBoxW(nullptr, L"SetProcessAffinityMask() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
-		DWORD_PTR dpm{SetThreadAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-2)), SystemAffinityMask & 1)};// only the first processor and only the first core
-		static_cast<void>(dpm);// the old mask, this can be 0
-		BOOL boSetThreadPriority{SetThreadPriority(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-2)), THREAD_PRIORITY_TIME_CRITICAL)};
-		if(!boSetThreadPriority){
-			MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 
 		// Enable the permissions to use large pages for VirtualAlloc().
 		HANDLE hToken;
@@ -2118,7 +2098,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 	// allocate 1 GiB for the in- and outputs
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
-	upLargePageSize = !upLargePageSize? 1 : upLargePageSize;// just set it to 1 if the system doesn't support large pages
+	upLargePageSize = !upLargePageSize? 4096 : upLargePageSize;// just set it to 4096 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	size_t upLargePageSizem1{upLargePageSize - 1};
 	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824)) + 1073741824};// round up to the nearest multiple of upLargePageSize
@@ -2127,7 +2107,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + 2048)) + (1073741824 + 2048)};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + (upLargePageSize >> 1))) + (1073741824 + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -2136,7 +2116,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	void *out{reinterpret_cast<int8_t *>(oriout) + 2048};// offset by half a page, this is an optimization using the processor's addressing methods, and this is used in many memory copy routines
+	void *out{reinterpret_cast<int8_t *>(oriout) + (upLargePageSize >> 1)};// offset by half a page, this is an optimization using the processor's addressing methods, and this is used in many memory copy routines
 
 	// measure the TSC execution base time to subtract from the results (method taken from an Intel manual)
 	SwitchToThread();// prevent context switching during the benchmark
@@ -2244,7 +2224,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2343,7 +2323,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2442,7 +2422,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2541,7 +2521,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2640,7 +2620,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2739,7 +2719,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2838,7 +2818,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2937,7 +2917,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3036,7 +3016,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3135,7 +3115,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3234,7 +3214,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3333,7 +3313,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3432,7 +3412,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3533,7 +3513,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3571,7 +3551,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3609,7 +3589,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3647,7 +3627,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3685,7 +3665,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3723,7 +3703,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3761,7 +3741,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3799,7 +3779,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3837,7 +3817,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3875,7 +3855,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3913,7 +3893,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3951,7 +3931,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3989,7 +3969,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4027,7 +4007,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4065,7 +4045,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4103,7 +4083,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4141,7 +4121,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4179,7 +4159,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4217,7 +4197,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4255,7 +4235,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4293,7 +4273,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4331,7 +4311,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4369,7 +4349,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4407,7 +4387,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4445,7 +4425,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4483,7 +4463,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4521,7 +4501,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4559,7 +4539,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4597,7 +4577,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4635,7 +4615,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4673,7 +4653,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4711,7 +4691,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4749,7 +4729,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4787,7 +4767,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4825,7 +4805,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4863,7 +4843,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4901,7 +4881,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4939,7 +4919,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -4977,7 +4957,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5015,7 +4995,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5053,7 +5033,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5091,7 +5071,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5129,7 +5109,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5167,7 +5147,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5205,7 +5185,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5243,7 +5223,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5281,7 +5261,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5319,7 +5299,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5357,7 +5337,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5395,7 +5375,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5492,7 +5472,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5504,7 +5484,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(256 * 1024 * 1024 / sizeof(uint64_t), reinterpret_cast<uint64_t *>(out), upLargePageSize);
+		rsbd8::radixsort(1024 * 1024 * 1024 / sizeof(uint64_t), reinterpret_cast<uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		uint64_t u64stop;
@@ -5528,7 +5508,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 256 * 1024 * 1024 / sizeof(uint64_t)));
+		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 1024 * 1024 * 1024 / sizeof(uint64_t)));
 	}
 	OutputDebugStringW(L"Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.\nDiscard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.\n");
 	// memory layout: 2 tests take 32 MiB, the next 48 tests are spaced apart 4 MiB each to keep very high alignment, so the total is filled to 256 MiB here
@@ -5593,7 +5573,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5631,7 +5611,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5669,7 +5649,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5707,7 +5687,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5745,7 +5725,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5783,7 +5763,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5821,7 +5801,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5859,7 +5839,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5897,7 +5877,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5935,7 +5915,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5973,7 +5953,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6011,7 +5991,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6049,7 +6029,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6087,7 +6067,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6125,7 +6105,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6163,7 +6143,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6201,7 +6181,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6239,7 +6219,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6277,7 +6257,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6315,7 +6295,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6353,7 +6333,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6391,7 +6371,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6429,7 +6409,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6467,7 +6447,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6505,7 +6485,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6543,7 +6523,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6581,7 +6561,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6619,7 +6599,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6657,7 +6637,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6695,7 +6675,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6733,7 +6713,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6771,7 +6751,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6809,7 +6789,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6847,7 +6827,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6885,7 +6865,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6923,7 +6903,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6961,7 +6941,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -6999,7 +6979,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7037,7 +7017,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7075,7 +7055,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7113,7 +7093,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7151,7 +7131,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7189,7 +7169,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7227,7 +7207,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7265,7 +7245,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7303,7 +7283,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7341,7 +7321,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7379,7 +7359,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7417,7 +7397,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -7455,7 +7435,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution

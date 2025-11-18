@@ -326,26 +326,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			MessageBoxW(nullptr, L"SetPriorityClass() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 			return{0};// failure status
 		}
-		DWORD_PTR ProcessAffinityMask, SystemAffinityMask;
-		BOOL boGetProcessAffinityMask{GetProcessAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-1)), &ProcessAffinityMask, &SystemAffinityMask)};
-		if(!boGetProcessAffinityMask){
-			MessageBoxW(nullptr, L"GetProcessAffinityMask() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
-		// Setting the affinity masks is required because these methods must be tested with warmed-up caches for constant performance.
-		// Context switching to another processor or another processor core might cause changes to power states when context switches take place.
-		BOOL boSetProcessAffinityMask{SetProcessAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-1)), SystemAffinityMask & 1)};// only the first processor and only the first core
-		if(!boSetProcessAffinityMask){
-			MessageBoxW(nullptr, L"SetProcessAffinityMask() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
-		DWORD_PTR dpm{SetThreadAffinityMask(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-2)), SystemAffinityMask & 1)};// only the first processor and only the first core
-		static_cast<void>(dpm);// the old mask, this can be 0
-		BOOL boSetThreadPriority{SetThreadPriority(reinterpret_cast<HANDLE>(static_cast<intptr_t>(-2)), THREAD_PRIORITY_TIME_CRITICAL)};
-		if(!boSetThreadPriority){
-			MessageBoxW(nullptr, L"SetThreadPriority() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
-			return{0};// failure status
-		}
 
 		// Enable the permissions to use large pages for VirtualAlloc().
 		HANDLE hToken;
@@ -397,7 +377,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo80[6].mantissa[0] == 0 && ajo80[6].mantissa[1] == 0 && ajo80[6].mantissa[2] == 0 && ajo80[6].mantissa[3] == 0 && ajo80[6].signexponent == 0x7FFFu);// +inf
 
 		std::memset(ajb80, 0, sizeof(ajb80));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aji80), ajo80, ajb80, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji80), ajo80, ajb80, true);
 		assert(ajb80[0].mantissa[0] == 0 && ajb80[0].mantissa[1] == 0 && ajb80[0].mantissa[2] == 0 && ajb80[0].mantissa[3] == 0 && ajb80[0].signexponent == 0x7FFFu);// +inf
 		assert(ajb80[1].mantissa[0] == 0xFFFFu && ajb80[1].mantissa[1] == 0xFFFFu && ajb80[1].mantissa[2] == 0xFFFFu && ajb80[1].mantissa[3] == 0xFFFFu && ajb80[1].signexponent == 0x7FFEu);// max normal
 		assert(ajb80[2].mantissa[0] == 0 && ajb80[2].mantissa[1] == 0 && ajb80[2].mantissa[2] == 0 && ajb80[2].mantissa[3] == 0 && ajb80[2].signexponent == 1u);// min normal
@@ -425,7 +405,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo96[6].mantissa[0] == 0 && ajo96[6].mantissa[1] == 0 && ajo96[6].signexponent == 0x7FFFu && ajo96[6].padding == 0xD001u);// +inf
 
 		std::memset(ajb96, 0, sizeof(ajb96));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aji96), ajo96, ajb96, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji96), ajo96, ajb96, true);
 		assert(ajb96[0].mantissa[0] == 0 && ajb96[0].mantissa[1] == 0 && ajb96[0].signexponent == 0x7FFFu && ajb96[0].padding == 0xD001u);// +inf
 		assert(ajb96[1].mantissa[0] == 0xFFFFFFFFu && ajb96[1].mantissa[1] == 0xFFFFFFFFu && ajb96[1].signexponent == 0x7FFEu && ajb96[1].padding == 0x0101u);// max normal
 		assert(ajb96[2].mantissa[0] == 0 && ajb96[2].mantissa[1] == 0 && ajb96[2].signexponent == 1u && ajb96[2].padding == 0xFFF8u);// min normal
@@ -453,7 +433,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajo128[6].mantissa == 0 && ajo128[6].signexponent == 0x7FFFu && ajo128[6].padding[0] == 0xD001u && ajo128[6].padding[1] == 0x1111u && ajo128[6].padding[2] == 0x2222u);// +inf
 
 		std::memset(ajb128, 0, sizeof(ajb128));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aji128), ajo128, ajb128, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji128), ajo128, ajb128, true);
 		assert(ajb128[0].mantissa == 0 && ajb128[0].signexponent == 0x7FFFu && ajb128[0].padding[0] == 0xD001u && ajb128[0].padding[1] == 0x1111u && ajb128[0].padding[2] == 0x2222u);// +inf
 		assert(ajb128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[1].signexponent == 0x7FFEu && ajb128[1].padding[0] == 0x0101u && ajb128[1].padding[1] == 0x5555u && ajb128[1].padding[2] == 0x6666u);// max normal
 		assert(ajb128[2].mantissa == 0 && ajb128[2].signexponent == 1u && ajb128[2].padding[0] == 0xFFF8u && ajb128[2].padding[1] == 0x7777u && ajb128[2].padding[2] == 0x8888u);// min normal
@@ -476,7 +456,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako80[6]->mantissa[0] == 0 && ako80[6]->mantissa[1] == 0 && ako80[6]->mantissa[2] == 0 && ako80[6]->mantissa[3] == 0 && ako80[6]->signexponent == 0x7FFFu);// +inf
 
 		std::memset(akb80, 0, sizeof(akb80));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aki80), ako80, akb80, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki80), ako80, akb80, true);
 		assert(akb80[0]->mantissa[0] == 0 && akb80[0]->mantissa[1] == 0 && akb80[0]->mantissa[2] == 0 && akb80[0]->mantissa[3] == 0 && akb80[0]->signexponent == 0x7FFFu);// +inf
 		assert(akb80[1]->mantissa[0] == 0xFFFFu && akb80[1]->mantissa[1] == 0xFFFFu && akb80[1]->mantissa[2] == 0xFFFFu && akb80[1]->mantissa[3] == 0xFFFFu && akb80[1]->signexponent == 0x7FFEu);// max normal
 		assert(akb80[2]->mantissa[0] == 0 && akb80[2]->mantissa[1] == 0 && akb80[2]->mantissa[2] == 0 && akb80[2]->mantissa[3] == 0 && akb80[2]->signexponent == 1u);// min normal
@@ -497,7 +477,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako96[6]->mantissa[0] == 0 && ako96[6]->mantissa[1] == 0 && ako96[6]->signexponent == 0x7FFFu && ako96[6]->padding == 0xD001u);// +inf
 
 		std::memset(akb96, 0, sizeof(akb96));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aki96), ako96, akb96, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki96), ako96, akb96, true);
 		assert(akb96[0]->mantissa[0] == 0 && akb96[0]->mantissa[1] == 0 && akb96[0]->signexponent == 0x7FFFu && akb96[0]->padding == 0xD001u);// +inf
 		assert(akb96[1]->mantissa[0] == 0xFFFFFFFFu && akb96[1]->mantissa[1] == 0xFFFFFFFFu && akb96[1]->signexponent == 0x7FFEu && akb96[1]->padding == 0x0101u);// max normal
 		assert(akb96[2]->mantissa[0] == 0 && akb96[2]->mantissa[1] == 0 && akb96[2]->signexponent == 1u && akb96[2]->padding == 0xFFF8u);// min normal
@@ -518,7 +498,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ako128[6]->mantissa == 0 && ako128[6]->signexponent == 0x7FFFu && ako128[6]->padding[0] == 0xD001u && ako128[6]->padding[1] == 0x1111u && ako128[6]->padding[2] == 0x2222u);// +inf
 
 		std::memset(akb128, 0, sizeof(akb128));
-		rsbd8::radixsortnoalloc<rsbd8::decendingreverseordered>(_countof(aki128), ako128, akb128, true);
+		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki128), ako128, akb128, true);
 		assert(akb128[0]->mantissa == 0 && akb128[0]->signexponent == 0x7FFFu && akb128[0]->padding[0] == 0xD001u && akb128[0]->padding[1] == 0x1111u && akb128[0]->padding[2] == 0x2222u);// +inf
 		assert(akb128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[1]->signexponent == 0x7FFEu && akb128[1]->padding[0] == 0x0101u && akb128[1]->padding[1] == 0x5555u && akb128[1]->padding[2] == 0x6666u);// max normal
 		assert(akb128[2]->mantissa == 0 && akb128[2]->signexponent == 1u && akb128[2]->padding[0] == 0xFFF8u && akb128[2]->padding[1] == 0x7777u && akb128[2]->padding[2] == 0x8888u);// min normal
@@ -542,9 +522,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		static cert_v_binencoding64 constexpr tein[7]{$0, $B, $_, $i, $q, $U, $E};
 		cert_v_binencoding64 teout[_countof(tein)];
 		cert_v_binencoding64 tebuf[_countof(tein)];// dummy, as it's an 8-bit type
-		rsbd8::radixsortcopynoalloc<rsbd8::decendingreverseordered>(_countof(tein), tein, teout, tebuf);
+		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(tein), tein, teout, tebuf);
 		assert(teout[0] == $_ && teout[1] == $U && teout[2] == $E && teout[3] == $B && teout[4] == $q && teout[5] == $i && teout[6] == $0);
-		rsbd8::radixsortcopynoalloc<rsbd8::ascendingforwardordered>(_countof(tein), tein, teout);
+		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::ascfwdorder>(_countof(tein), tein, teout);
 		assert(teout[0] == $0 && teout[1] == $i && teout[2] == $q && teout[3] == $B && teout[4] == $E && teout[5] == $U && teout[6] == $_);
 
 		// 1 unit test: radixsortnoalloc(), write to buffer, float (multi-byte), no indirection, (implicit template statement) ascending
@@ -557,7 +537,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		uint32_t const *inim[7]{outm + 6, outm + 3, outm + 4, outm + 1, outm + 5, outm, outm + 2};
 		uint32_t const *outim[_countof(inim)];
 		uint32_t const *bufim[_countof(inim)];
-		rsbd8::radixsortcopynoalloc<rsbd8::decendingreverseordered>(_countof(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim), reinterpret_cast<float const **>(bufim));
+		rsbd8::radixsortcopynoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(inim), reinterpret_cast<float const *const *>(inim), reinterpret_cast<float const **>(outim), reinterpret_cast<float const **>(bufim));
 		assert(outim[0] == inim[0] && outim[1] == inim[4] && outim[2] == inim[2] && outim[3] == inim[1] && outim[4] == inim[6] && outim[5] == inim[3] && outim[6] == inim[5]);
 		rsbd8::radixsortnoalloc(_countof(inim), reinterpret_cast<float const **>(inim), reinterpret_cast<float const **>(bufim), false);
 		assert(*inim[0] == (1u << 31 | 18) && *inim[1] == (1u << 31 | 2) && *inim[2] == (1u << 31 | 2) && *inim[3] == 0 && *inim[4] == 3 && *inim[5] == 3 && *inim[6] == 8);
@@ -579,11 +559,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			constexpr __forceinline Testmeclass(uint64_t input)noexcept : co{input}, sco{static_cast<int64_t>(input) - 1} {};
 		};
 #pragma pack(pop)
-		constexpr size_t sizecontainer{sizeof(Testmeclass)};
+		static size_t constexpr sizecontainer{sizeof(Testmeclass)};
 		static_cast<void>(sizecontainer);
-		constexpr size_t offsetco{rsbd8::getoffsetof<&Testmeclass::co>};
+		static size_t constexpr offsetco{rsbd8::getoffsetof<&Testmeclass::co>};
 		static_cast<void>(offsetco);
-		constexpr size_t offsetsco{rsbd8::getoffsetof<&Testmeclass::sco>};
+		static size_t constexpr offsetsco{rsbd8::getoffsetof<&Testmeclass::sco>};
 		static_cast<void>(offsetsco);
 
 		Testmeclass cin[]{8, 0, 6, 4, 0, 2, 6};
@@ -629,7 +609,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 	// allocate 1 GiB for the in- and outputs
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
-	upLargePageSize = !upLargePageSize? 1 : upLargePageSize;// just set it to 1 if the system doesn't support large pages
+	upLargePageSize = !upLargePageSize? 4096 : upLargePageSize;// just set it to 4096 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	size_t upLargePageSizem1{upLargePageSize - 1};
 	size_t upSizeIn{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824)) + 1073741824};// round up to the nearest multiple of upLargePageSize
@@ -638,7 +618,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + 2048)) + (1073741824 + 2048)};// round up to the nearest multiple of upLargePageSize
+	size_t upSizeOut{(upLargePageSizem1 & -static_cast<ptrdiff_t>(1073741824 + (upLargePageSize >> 1))) + (1073741824 + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -647,7 +627,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	void *out{reinterpret_cast<int8_t *>(oriout) + 2048};// offset by half a page, this is an optimization using the processor's addressing methods, and this is used in many memory copy routines
+	void *out{reinterpret_cast<int8_t *>(oriout) + (upLargePageSize >> 1)};// offset by half a page, this is an optimization using the processor's addressing methods, and this is used in many memory copy routines
 
 	// measure the TSC execution base time to subtract from the results (method taken from an Intel manual)
 	SwitchToThread();// prevent context switching during the benchmark
@@ -755,7 +735,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -766,9 +746,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -790,8 +770,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -854,7 +835,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -953,7 +934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1052,7 +1033,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1063,9 +1044,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728);// in 134217728 batches of 8 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -1087,8 +1068,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1151,7 +1133,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1250,7 +1232,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1349,7 +1331,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1360,9 +1342,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -1384,8 +1366,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<uint64_t *>(out), reinterpret_cast<uint64_t *>(out) + 134217728));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1448,7 +1431,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1547,7 +1530,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1646,7 +1629,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1657,9 +1640,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -1681,8 +1664,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<int64_t *>(out), reinterpret_cast<int64_t *>(out) + 134217728));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1745,7 +1729,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1844,7 +1828,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1943,7 +1927,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -1954,9 +1938,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -1978,8 +1962,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<uint32_t *>(out), reinterpret_cast<uint32_t *>(out) + 268435456));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2042,7 +2027,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2141,7 +2126,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2240,7 +2225,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2251,9 +2236,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -2275,8 +2260,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<int32_t *>(out), reinterpret_cast<int32_t *>(out) + 268435456));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2339,7 +2325,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2438,7 +2424,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2537,7 +2523,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2548,9 +2534,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -2572,8 +2558,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<uint16_t *>(out), reinterpret_cast<uint16_t *>(out) + 536870912));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2636,7 +2623,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2735,7 +2722,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2834,7 +2821,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -2845,9 +2832,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -2869,8 +2856,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<int16_t *>(out), reinterpret_cast<int16_t *>(out) + 536870912));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2933,7 +2921,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3032,7 +3020,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3131,7 +3119,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3142,9 +3130,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -3166,8 +3154,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<uint8_t *>(out), reinterpret_cast<uint8_t *>(out) + 1073741824));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3230,7 +3219,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3329,7 +3318,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3428,7 +3417,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3439,9 +3428,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[3]);
 		}
 		uint64_t u64start{__rdtsc()};
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
-
+#endif
 		// stop measuring
 		uint64_t u64stop;
 		{
@@ -3463,8 +3452,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		assert(std::is_sorted(reinterpret_cast<int8_t *>(out), reinterpret_cast<int8_t *>(out) + 1073741824));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3527,7 +3517,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3626,7 +3616,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3728,7 +3718,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -3839,7 +3829,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
