@@ -359,153 +359,153 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// direct sorting tests with the 80-bit long double types
 
 		rsbd8::helper::longdoubletest80 aji80[7]{
-			{{0, 0, 0, 0}, 0xFFFFu},// -inf
-			{{0, 0, 0, 0}, 0x7FFFu},// +inf
-			{{0, 0, 0, 0x8000u}, 0xFFFFu},// QNaN, machine indeterminate
-			{{0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu}, 0x7FFEu},// max normal
-			{{0, 0, 0, 0}, 1u},// min normal
-			{{0xFFFFu, 0xFFFFu, 0xFFFFu, 0xFFFFu}, 0},// max subnormal
-			{{1u, 0, 0, 0}, 0}};// min subnormal
+			{0, 0xFFFFu},// -inf
+			{0, 0x7FFFu},// +inf
+			{0x8000000000000000u, 0xFFFFu},// QNaN, machine indeterminate
+			{0xFFFFFFFFFFFFFFFFu, 0x7FFEu},// max normal
+			{0, 1u},// min normal
+			{0xFFFFFFFFFFFFFFFFu, 0},// max subnormal
+			{1u, 0}};// min subnormal
 		rsbd8::helper::longdoubletest80 ajo80[_countof(aji80)], ajb80[_countof(aji80)];
 		rsbd8::radixsortcopynoalloc(_countof(aji80), aji80, ajo80, ajb80);
-		assert(ajo80[0].mantissa[0] == 0 && ajo80[0].mantissa[1] == 0 && ajo80[0].mantissa[2] == 0 && ajo80[0].mantissa[3] == 0x8000u && ajo80[0].signexponent == 0xFFFFu);// QNaN, machine indeterminate
-		assert(ajo80[1].mantissa[0] == 0 && ajo80[1].mantissa[1] == 0 && ajo80[1].mantissa[2] == 0 && ajo80[1].mantissa[3] == 0 && ajo80[1].signexponent == 0xFFFFu);// -inf
-		assert(ajo80[2].mantissa[0] == 1u && ajo80[2].mantissa[1] == 0 && ajo80[2].mantissa[2] == 0 && ajo80[2].mantissa[3] == 0 && ajo80[2].signexponent == 0);// min subnormal
-		assert(ajo80[3].mantissa[0] == 0xFFFFu && ajo80[3].mantissa[1] == 0xFFFFu && ajo80[3].mantissa[2] == 0xFFFFu && ajo80[3].mantissa[3] == 0xFFFFu && ajo80[3].signexponent == 0);// max subnormal
-		assert(ajo80[4].mantissa[0] == 0 && ajo80[4].mantissa[1] == 0 && ajo80[4].mantissa[2] == 0 && ajo80[4].mantissa[3] == 0 && ajo80[4].signexponent == 1u);// min normal
-		assert(ajo80[5].mantissa[0] == 0xFFFFu && ajo80[5].mantissa[1] == 0xFFFFu && ajo80[5].mantissa[2] == 0xFFFFu && ajo80[5].mantissa[3] == 0xFFFFu && ajo80[5].signexponent == 0x7FFEu);// max normal
-		assert(ajo80[6].mantissa[0] == 0 && ajo80[6].mantissa[1] == 0 && ajo80[6].mantissa[2] == 0 && ajo80[6].mantissa[3] == 0 && ajo80[6].signexponent == 0x7FFFu);// +inf
+		assert(ajo80[0].mantissa == 0x8000000000000000u && ajo80[0].signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		assert(ajo80[1].mantissa == 0 && ajo80[1].signexponent == 0xFFFFu);// -inf
+		assert(ajo80[2].mantissa == 1u && ajo80[2].signexponent == 0);// min subnormal
+		assert(ajo80[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[3].signexponent == 0);// max subnormal
+		assert(ajo80[4].mantissa == 0 && ajo80[4].signexponent == 1u);// min normal
+		assert(ajo80[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo80[5].signexponent == 0x7FFEu);// max normal
+		assert(ajo80[6].mantissa == 0 && ajo80[6].signexponent == 0x7FFFu);// +inf
 
 		std::memset(ajb80, 0, sizeof(ajb80));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji80), ajo80, ajb80, true);
-		assert(ajb80[0].mantissa[0] == 0 && ajb80[0].mantissa[1] == 0 && ajb80[0].mantissa[2] == 0 && ajb80[0].mantissa[3] == 0 && ajb80[0].signexponent == 0x7FFFu);// +inf
-		assert(ajb80[1].mantissa[0] == 0xFFFFu && ajb80[1].mantissa[1] == 0xFFFFu && ajb80[1].mantissa[2] == 0xFFFFu && ajb80[1].mantissa[3] == 0xFFFFu && ajb80[1].signexponent == 0x7FFEu);// max normal
-		assert(ajb80[2].mantissa[0] == 0 && ajb80[2].mantissa[1] == 0 && ajb80[2].mantissa[2] == 0 && ajb80[2].mantissa[3] == 0 && ajb80[2].signexponent == 1u);// min normal
-		assert(ajb80[3].mantissa[0] == 0xFFFFu && ajb80[3].mantissa[1] == 0xFFFFu && ajb80[3].mantissa[2] == 0xFFFFu && ajb80[3].mantissa[3] == 0xFFFFu && ajb80[3].signexponent == 0);// max subnormal
-		assert(ajb80[4].mantissa[0] == 1u && ajb80[4].mantissa[1] == 0 && ajb80[4].mantissa[2] == 0 && ajb80[4].mantissa[3] == 0 && ajb80[4].signexponent == 0);// min subnormal
-		assert(ajb80[5].mantissa[0] == 0 && ajb80[5].mantissa[1] == 0 && ajb80[5].mantissa[2] == 0 && ajb80[5].mantissa[3] == 0 && ajb80[5].signexponent == 0xFFFFu);// -inf
-		assert(ajb80[6].mantissa[0] == 0 && ajb80[6].mantissa[1] == 0 && ajb80[6].mantissa[2] == 0 && ajb80[6].mantissa[3] == 0x8000u && ajb80[6].signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		assert(ajb80[0].mantissa == 0 && ajb80[0].signexponent == 0x7FFFu);// +inf
+		assert(ajb80[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb80[1].signexponent == 0x7FFEu);// max normal
+		assert(ajb80[2].mantissa == 0 && ajb80[2].signexponent == 1u);// min normal
+		assert(ajb80[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb80[3].signexponent == 0);// max subnormal
+		assert(ajb80[4].mantissa == 1u && ajb80[4].signexponent == 0);// min subnormal
+		assert(ajb80[5].mantissa == 0 && ajb80[5].signexponent == 0xFFFFu);// -inf
+		assert(ajb80[6].mantissa == 0x8000000000000000u && ajb80[6].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest96 aji96[7]{
-			{{0, 0}, 0xFFFFu, 0xABABu},// -inf
-			{{0, 0}, 0x7FFFu, 0xD001u},// +inf
-			{{0, 0x80000000u}, 0xFFFFu, 0xEEEEu},// QNaN, machine indeterminate
-			{{0xFFFFFFFFu, 0xFFFFFFFFu}, 0x7FFEu, 0x0101u},// max normal
-			{{0, 0}, 1u, 0xFFF8u},// min normal
-			{{0xFFFFFFFFu, 0xFFFFFFFFu}, 0, 0xC7C8u},// max subnormal
-			{{1u, 0}, 0, 0xB371u}};// min subnormal
+			{0, 0xABABFFFFu},// -inf
+			{0, 0xD0017FFFu},// +inf
+			{0x8000000000000000u, 0xEEEEFFFFu},// QNaN, machine indeterminate
+			{0xFFFFFFFFFFFFFFFFu, 0x01017FFEu},// max normal
+			{0, 0xFFF80001u},// min normal
+			{0xFFFFFFFFFFFFFFFFu, 0xC7C80000u},// max subnormal
+			{1u, 0xB3710000u}};// min subnormal
 		rsbd8::helper::longdoubletest96 ajo96[_countof(aji96)], ajb96[_countof(aji96)];
 		rsbd8::radixsortcopynoalloc(_countof(aji96), aji96, ajo96, ajb96);
-		assert(ajo96[0].mantissa[0] == 0 && ajo96[0].mantissa[1] == 0x80000000u && ajo96[0].signexponent == 0xFFFFu && ajo96[0].padding == 0xEEEEu);// QNaN, machine indeterminate
-		assert(ajo96[1].mantissa[0] == 0 && ajo96[1].mantissa[1] == 0 && ajo96[1].signexponent == 0xFFFFu && ajo96[1].padding == 0xABABu);// -inf
-		assert(ajo96[2].mantissa[0] == 1u && ajo96[2].mantissa[1] == 0 && ajo96[2].signexponent == 0 && ajo96[2].padding == 0xB371u);// min subnormal
-		assert(ajo96[3].mantissa[0] == 0xFFFFFFFFu && ajo96[3].mantissa[1] == 0xFFFFFFFFu && ajo96[3].signexponent == 0 && ajo96[3].padding == 0xC7C8u);// max subnormal
-		assert(ajo96[4].mantissa[0] == 0 && ajo96[4].mantissa[1] == 0 && ajo96[4].signexponent == 1u && ajo96[4].padding == 0xFFF8u);// min normal
-		assert(ajo96[5].mantissa[0] == 0xFFFFFFFFu && ajo96[5].mantissa[1] == 0xFFFFFFFFu && ajo96[5].signexponent == 0x7FFEu && ajo96[5].padding == 0x0101u);// max normal
-		assert(ajo96[6].mantissa[0] == 0 && ajo96[6].mantissa[1] == 0 && ajo96[6].signexponent == 0x7FFFu && ajo96[6].padding == 0xD001u);// +inf
+		assert(ajo96[0].mantissa == 0x8000000000000000u && ajo96[0].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
+		assert(ajo96[1].mantissa == 0 && ajo96[1].signexponent == 0xABABFFFFu);// -inf
+		assert(ajo96[2].mantissa == 1u && ajo96[2].signexponent == 0xB3710000u);// min subnormal
+		assert(ajo96[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[3].signexponent == 0xC7C80000u);// max subnormal
+		assert(ajo96[4].mantissa == 0 && ajo96[4].signexponent == 0xFFF80001u);// min normal
+		assert(ajo96[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo96[5].signexponent == 0x01017FFEu);// max normal
+		assert(ajo96[6].mantissa == 0 && ajo96[6].signexponent == 0xD0017FFFu);// +inf
 
 		std::memset(ajb96, 0, sizeof(ajb96));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji96), ajo96, ajb96, true);
-		assert(ajb96[0].mantissa[0] == 0 && ajb96[0].mantissa[1] == 0 && ajb96[0].signexponent == 0x7FFFu && ajb96[0].padding == 0xD001u);// +inf
-		assert(ajb96[1].mantissa[0] == 0xFFFFFFFFu && ajb96[1].mantissa[1] == 0xFFFFFFFFu && ajb96[1].signexponent == 0x7FFEu && ajb96[1].padding == 0x0101u);// max normal
-		assert(ajb96[2].mantissa[0] == 0 && ajb96[2].mantissa[1] == 0 && ajb96[2].signexponent == 1u && ajb96[2].padding == 0xFFF8u);// min normal
-		assert(ajb96[3].mantissa[0] == 0xFFFFFFFFu && ajb96[3].mantissa[1] == 0xFFFFFFFFu && ajb96[3].signexponent == 0 && ajb96[3].padding == 0xC7C8u);// max subnormal
-		assert(ajb96[4].mantissa[0] == 1u && ajb96[4].mantissa[1] == 0 && ajb96[4].signexponent == 0 && ajb96[4].padding == 0xB371u);// min subnormal
-		assert(ajb96[5].mantissa[0] == 0 && ajb96[5].mantissa[1] == 0 && ajb96[5].signexponent == 0xFFFFu && ajb96[5].padding == 0xABABu);// -inf
-		assert(ajb96[6].mantissa[0] == 0 && ajb96[6].mantissa[1] == 0x80000000u && ajb96[6].signexponent == 0xFFFFu && ajb96[6].padding == 0xEEEEu);// QNaN, machine indeterminate
+		assert(ajb96[0].mantissa == 0 && ajb96[0].signexponent == 0xD0017FFFu);// +inf
+		assert(ajb96[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb96[1].signexponent == 0x01017FFEu);// max normal
+		assert(ajb96[2].mantissa == 0 && ajb96[2].signexponent == 0xFFF80001u);// min normal
+		assert(ajb96[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb96[3].signexponent == 0xC7C80000u);// max subnormal
+		assert(ajb96[4].mantissa == 1u && ajb96[4].signexponent == 0xB3710000u);// min subnormal
+		assert(ajb96[5].mantissa == 0 && ajb96[5].signexponent == 0xABABFFFFu);// -inf
+		assert(ajb96[6].mantissa == 0x8000000000000000u && ajb96[6].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest128 aji128[7]{
-			{0, 0xFFFFu, {0xABABu, 0xAAAAu, 0xBBBBu}},// -inf
-			{0, 0x7FFFu, {0xD001u, 0x1111u, 0x2222u}},// +inf
-			{0x8000000000000000u, 0xFFFFu, {0xEEEEu, 0x3333u, 0x4444u}},// QNaN, machine indeterminate
-			{0xFFFFFFFFFFFFFFFFu, 0x7FFEu, {0x0101u, 0x5555u, 0x6666u}},// max normal
-			{0, 1u, {0xFFF8u, 0x7777u, 0x8888u}},// min normal
-			{0xFFFFFFFFFFFFFFFFu, 0, {0xC7C8u, 0x9999u, 0xCCCCu}},// max subnormal
-			{1u, 0, {0xB371u, 0xDDDDu, 0xFFFFu}}};// min subnormal
+			{0, 0xBBBBAAAAABABFFFFu},// -inf
+			{0, 0x22221111D0017FFFu},// +inf
+			{0x8000000000000000u, 0x44443333EEEEFFFFu},// QNaN, machine indeterminate
+			{0xFFFFFFFFFFFFFFFFu, 0x6666555501017FFEu},// max normal
+			{0, 0x88887777FFF80001u},// min normal
+			{0xFFFFFFFFFFFFFFFFu, 0xCCCC9999C7C80000u},// max subnormal
+			{1u, 0xFFFFDDDDB3710000u}};// min subnormal
 		rsbd8::helper::longdoubletest128 ajo128[_countof(aji128)], ajb128[_countof(aji128)];
 		rsbd8::radixsortcopynoalloc(_countof(aji128), aji128, ajo128, ajb128);
-		assert(ajo128[0].mantissa == 0x8000000000000000u && ajo128[0].signexponent == 0xFFFFu && ajo128[0].padding[0] == 0xEEEEu && ajo128[0].padding[1] == 0x3333u && ajo128[0].padding[2] == 0x4444u);// QNaN, machine indeterminate
-		assert(ajo128[1].mantissa == 0 && ajo128[1].signexponent == 0xFFFFu && ajo128[1].padding[0] == 0xABABu && ajo128[1].padding[1] == 0xAAAAu && ajo128[1].padding[2] == 0xBBBBu);// -inf
-		assert(ajo128[2].mantissa == 1u && ajo128[2].signexponent == 0 && ajo128[2].padding[0] == 0xB371u && ajo128[2].padding[1] == 0xDDDDu && ajo128[2].padding[2] == 0xFFFFu);// min subnormal
-		assert(ajo128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[3].signexponent == 0 && ajo128[3].padding[0] == 0xC7C8u && ajo128[3].padding[1] == 0x9999u && ajo128[3].padding[2] == 0xCCCCu);// max subnormal
-		assert(ajo128[4].mantissa == 0 && ajo128[4].signexponent == 1u && ajo128[4].padding[0] == 0xFFF8u && ajo128[4].padding[1] == 0x7777u && ajo128[4].padding[2] == 0x8888u);// min normal
-		assert(ajo128[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[5].signexponent == 0x7FFEu && ajo128[5].padding[0] == 0x0101u && ajo128[5].padding[1] == 0x5555u && ajo128[5].padding[2] == 0x6666u);// max normal
-		assert(ajo128[6].mantissa == 0 && ajo128[6].signexponent == 0x7FFFu && ajo128[6].padding[0] == 0xD001u && ajo128[6].padding[1] == 0x1111u && ajo128[6].padding[2] == 0x2222u);// +inf
+		assert(ajo128[0].mantissa == 0x8000000000000000u && ajo128[0].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
+		assert(ajo128[1].mantissa == 0 && ajo128[1].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(ajo128[2].mantissa == 1u && ajo128[2].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(ajo128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[3].signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(ajo128[4].mantissa == 0 && ajo128[4].signexponent == 0x88887777FFF80001u);// min normal
+		assert(ajo128[5].mantissa == 0xFFFFFFFFFFFFFFFFu && ajo128[5].signexponent == 0x6666555501017FFEu);// max normal
+		assert(ajo128[6].mantissa == 0 && ajo128[6].signexponent == 0x22221111D0017FFFu);// +inf
 
 		std::memset(ajb128, 0, sizeof(ajb128));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aji128), ajo128, ajb128, true);
-		assert(ajb128[0].mantissa == 0 && ajb128[0].signexponent == 0x7FFFu && ajb128[0].padding[0] == 0xD001u && ajb128[0].padding[1] == 0x1111u && ajb128[0].padding[2] == 0x2222u);// +inf
-		assert(ajb128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[1].signexponent == 0x7FFEu && ajb128[1].padding[0] == 0x0101u && ajb128[1].padding[1] == 0x5555u && ajb128[1].padding[2] == 0x6666u);// max normal
-		assert(ajb128[2].mantissa == 0 && ajb128[2].signexponent == 1u && ajb128[2].padding[0] == 0xFFF8u && ajb128[2].padding[1] == 0x7777u && ajb128[2].padding[2] == 0x8888u);// min normal
-		assert(ajb128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[3].signexponent == 0 && ajb128[3].padding[0] == 0xC7C8u && ajb128[3].padding[1] == 0x9999u && ajb128[3].padding[2] == 0xCCCCu);// max subnormal
-		assert(ajb128[4].mantissa == 1u && ajb128[4].signexponent == 0 && ajb128[4].padding[0] == 0xB371u && ajb128[4].padding[1] == 0xDDDDu && ajb128[4].padding[2] == 0xFFFFu);// min subnormal
-		assert(ajb128[5].mantissa == 0 && ajb128[5].signexponent == 0xFFFFu && ajb128[5].padding[0] == 0xABABu && ajb128[5].padding[1] == 0xAAAAu && ajb128[5].padding[2] == 0xBBBBu);// -inf
-		assert(ajb128[6].mantissa == 0x8000000000000000u && ajb128[6].signexponent == 0xFFFFu && ajb128[6].padding[0] == 0xEEEEu && ajb128[6].padding[1] == 0x3333u && ajb128[6].padding[2] == 0x4444u);// QNaN, machine indeterminate
+		assert(ajb128[0].mantissa == 0 && ajb128[0].signexponent == 0x22221111D0017FFFu);// +inf
+		assert(ajb128[1].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[1].signexponent == 0x6666555501017FFEu);// max normal
+		assert(ajb128[2].mantissa == 0 && ajb128[2].signexponent == 0x88887777FFF80001u);// min normal
+		assert(ajb128[3].mantissa == 0xFFFFFFFFFFFFFFFFu && ajb128[3].signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(ajb128[4].mantissa == 1u && ajb128[4].signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(ajb128[5].mantissa == 0 && ajb128[5].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(ajb128[6].mantissa == 0x8000000000000000u && ajb128[6].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 
 		// basic indirect sorting tests with the 80-bit long double types
 
 		rsbd8::helper::longdoubletest80 *ako80[_countof(aji80)], *akb80[_countof(aji80)], *aki80[_countof(aji80)]{
 			aji80, aji80 + 1, aji80 + 2, aji80 + 3, aji80 + 4, aji80 + 5, aji80 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki80), aki80, ako80, akb80);
-		assert(ako80[0]->mantissa[0] == 0 && ako80[0]->mantissa[1] == 0 && ako80[0]->mantissa[2] == 0 && ako80[0]->mantissa[3] == 0x8000u && ako80[0]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
-		assert(ako80[1]->mantissa[0] == 0 && ako80[1]->mantissa[1] == 0 && ako80[1]->mantissa[2] == 0 && ako80[1]->mantissa[3] == 0 && ako80[1]->signexponent == 0xFFFFu);// -inf
-		assert(ako80[2]->mantissa[0] == 1u && ako80[2]->mantissa[1] == 0 && ako80[2]->mantissa[2] == 0 && ako80[2]->mantissa[3] == 0 && ako80[2]->signexponent == 0);// min subnormal
-		assert(ako80[3]->mantissa[0] == 0xFFFFu && ako80[3]->mantissa[1] == 0xFFFFu && ako80[3]->mantissa[2] == 0xFFFFu && ako80[3]->mantissa[3] == 0xFFFFu && ako80[3]->signexponent == 0);// max subnormal
-		assert(ako80[4]->mantissa[0] == 0 && ako80[4]->mantissa[1] == 0 && ako80[4]->mantissa[2] == 0 && ako80[4]->mantissa[3] == 0 && ako80[4]->signexponent == 1u);// min normal
-		assert(ako80[5]->mantissa[0] == 0xFFFFu && ako80[5]->mantissa[1] == 0xFFFFu && ako80[5]->mantissa[2] == 0xFFFFu && ako80[5]->mantissa[3] == 0xFFFFu && ako80[5]->signexponent == 0x7FFEu);// max normal
-		assert(ako80[6]->mantissa[0] == 0 && ako80[6]->mantissa[1] == 0 && ako80[6]->mantissa[2] == 0 && ako80[6]->mantissa[3] == 0 && ako80[6]->signexponent == 0x7FFFu);// +inf
+		assert(ako80[0]->mantissa == 0x8000000000000000u && ako80[0]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		assert(ako80[1]->mantissa == 0 && ako80[1]->signexponent == 0xFFFFu);// -inf
+		assert(ako80[2]->mantissa == 1u && ako80[2]->signexponent == 0);// min subnormal
+		assert(ako80[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[3]->signexponent == 0);// max subnormal
+		assert(ako80[4]->mantissa == 0 && ako80[4]->signexponent == 1u);// min normal
+		assert(ako80[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako80[5]->signexponent == 0x7FFEu);// max normal
+		assert(ako80[6]->mantissa == 0 && ako80[6]->signexponent == 0x7FFFu);// +inf
 
 		std::memset(akb80, 0, sizeof(akb80));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki80), ako80, akb80, true);
-		assert(akb80[0]->mantissa[0] == 0 && akb80[0]->mantissa[1] == 0 && akb80[0]->mantissa[2] == 0 && akb80[0]->mantissa[3] == 0 && akb80[0]->signexponent == 0x7FFFu);// +inf
-		assert(akb80[1]->mantissa[0] == 0xFFFFu && akb80[1]->mantissa[1] == 0xFFFFu && akb80[1]->mantissa[2] == 0xFFFFu && akb80[1]->mantissa[3] == 0xFFFFu && akb80[1]->signexponent == 0x7FFEu);// max normal
-		assert(akb80[2]->mantissa[0] == 0 && akb80[2]->mantissa[1] == 0 && akb80[2]->mantissa[2] == 0 && akb80[2]->mantissa[3] == 0 && akb80[2]->signexponent == 1u);// min normal
-		assert(akb80[3]->mantissa[0] == 0xFFFFu && akb80[3]->mantissa[1] == 0xFFFFu && akb80[3]->mantissa[2] == 0xFFFFu && akb80[3]->mantissa[3] == 0xFFFFu && akb80[3]->signexponent == 0);// max subnormal
-		assert(akb80[4]->mantissa[0] == 1u && akb80[4]->mantissa[1] == 0 && akb80[4]->mantissa[2] == 0 && akb80[4]->mantissa[3] == 0 && akb80[4]->signexponent == 0);// min subnormal
-		assert(akb80[5]->mantissa[0] == 0 && akb80[5]->mantissa[1] == 0 && akb80[5]->mantissa[2] == 0 && akb80[5]->mantissa[3] == 0 && akb80[5]->signexponent == 0xFFFFu);// -inf
-		assert(akb80[6]->mantissa[0] == 0 && akb80[6]->mantissa[1] == 0 && akb80[6]->mantissa[2] == 0 && akb80[6]->mantissa[3] == 0x8000u && akb80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
+		assert(akb80[0]->mantissa == 0 && akb80[0]->signexponent == 0x7FFFu);// +inf
+		assert(akb80[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb80[1]->signexponent == 0x7FFEu);// max normal
+		assert(akb80[2]->mantissa == 0 && akb80[2]->signexponent == 1u);// min normal
+		assert(akb80[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb80[3]->signexponent == 0);// max subnormal
+		assert(akb80[4]->mantissa == 1u && akb80[4]->signexponent == 0);// min subnormal
+		assert(akb80[5]->mantissa == 0 && akb80[5]->signexponent == 0xFFFFu);// -inf
+		assert(akb80[6]->mantissa == 0x8000000000000000u && akb80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest96 *ako96[_countof(aji96)], *akb96[_countof(aji96)], *aki96[_countof(aji96)]{
 			aji96, aji96 + 1, aji96 + 2, aji96 + 3, aji96 + 4, aji96 + 5, aji96 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki96), aki96, ako96, akb96);
-		assert(ako96[0]->mantissa[0] == 0 && ako96[0]->mantissa[1] == 0x80000000u && ako96[0]->signexponent == 0xFFFFu && ako96[0]->padding == 0xEEEEu);// QNaN, machine indeterminate
-		assert(ako96[1]->mantissa[0] == 0 && ako96[1]->mantissa[1] == 0 && ako96[1]->signexponent == 0xFFFFu && ako96[1]->padding == 0xABABu);// -inf
-		assert(ako96[2]->mantissa[0] == 1u && ako96[2]->mantissa[1] == 0 && ako96[2]->signexponent == 0 && ako96[2]->padding == 0xB371u);// min subnormal
-		assert(ako96[3]->mantissa[0] == 0xFFFFFFFFu && ako96[3]->mantissa[1] == 0xFFFFFFFFu && ako96[3]->signexponent == 0 && ako96[3]->padding == 0xC7C8u);// max subnormal
-		assert(ako96[4]->mantissa[0] == 0 && ako96[4]->mantissa[1] == 0 && ako96[4]->signexponent == 1u && ako96[4]->padding == 0xFFF8u);// min normal
-		assert(ako96[5]->mantissa[0] == 0xFFFFFFFFu && ako96[5]->mantissa[1] == 0xFFFFFFFFu && ako96[5]->signexponent == 0x7FFEu && ako96[5]->padding == 0x0101u);// max normal
-		assert(ako96[6]->mantissa[0] == 0 && ako96[6]->mantissa[1] == 0 && ako96[6]->signexponent == 0x7FFFu && ako96[6]->padding == 0xD001u);// +inf
+		assert(ako96[0]->mantissa == 0x8000000000000000u && ako96[0]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
+		assert(ako96[1]->mantissa == 0 && ako96[1]->signexponent == 0xABABFFFFu);// -inf
+		assert(ako96[2]->mantissa == 1u && ako96[2]->signexponent == 0xB3710000u);// min subnormal
+		assert(ako96[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[3]->signexponent == 0xC7C80000u);// max subnormal
+		assert(ako96[4]->mantissa == 0 && ako96[4]->signexponent == 0xFFF80001u);// min normal
+		assert(ako96[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako96[5]->signexponent == 0x01017FFEu);// max normal
+		assert(ako96[6]->mantissa == 0 && ako96[6]->signexponent == 0xD0017FFFu);// +inf
 
 		std::memset(akb96, 0, sizeof(akb96));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki96), ako96, akb96, true);
-		assert(akb96[0]->mantissa[0] == 0 && akb96[0]->mantissa[1] == 0 && akb96[0]->signexponent == 0x7FFFu && akb96[0]->padding == 0xD001u);// +inf
-		assert(akb96[1]->mantissa[0] == 0xFFFFFFFFu && akb96[1]->mantissa[1] == 0xFFFFFFFFu && akb96[1]->signexponent == 0x7FFEu && akb96[1]->padding == 0x0101u);// max normal
-		assert(akb96[2]->mantissa[0] == 0 && akb96[2]->mantissa[1] == 0 && akb96[2]->signexponent == 1u && akb96[2]->padding == 0xFFF8u);// min normal
-		assert(akb96[3]->mantissa[0] == 0xFFFFFFFFu && akb96[3]->mantissa[1] == 0xFFFFFFFFu && akb96[3]->signexponent == 0 && akb96[3]->padding == 0xC7C8u);// max subnormal
-		assert(akb96[4]->mantissa[0] == 1u && akb96[4]->mantissa[1] == 0 && akb96[4]->signexponent == 0 && akb96[4]->padding == 0xB371u);// min subnormal
-		assert(akb96[5]->mantissa[0] == 0 && akb96[5]->mantissa[1] == 0 && akb96[5]->signexponent == 0xFFFFu && akb96[5]->padding == 0xABABu);// -inf
-		assert(akb96[6]->mantissa[0] == 0 && akb96[6]->mantissa[1] == 0x80000000u && akb96[6]->signexponent == 0xFFFFu && akb96[6]->padding == 0xEEEEu);// QNaN, machine indeterminate
+		assert(akb96[0]->mantissa == 0 && akb96[0]->signexponent == 0xD0017FFFu);// +inf
+		assert(akb96[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb96[1]->signexponent == 0x01017FFEu);// max normal
+		assert(akb96[2]->mantissa == 0 && akb96[2]->signexponent == 0xFFF80001u);// min normal
+		assert(akb96[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb96[3]->signexponent == 0xC7C80000u);// max subnormal
+		assert(akb96[4]->mantissa == 1u && akb96[4]->signexponent == 0xB3710000u);// min subnormal
+		assert(akb96[5]->mantissa == 0 && akb96[5]->signexponent == 0xABABFFFFu);// -inf
+		assert(akb96[6]->mantissa == 0x8000000000000000u && akb96[6]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
 		rsbd8::helper::longdoubletest128 *ako128[_countof(aji128)], *akb128[_countof(aji128)], *aki128[_countof(aji128)]{
 			aji128, aji128 + 1, aji128 + 2, aji128 + 3, aji128 + 4, aji128 + 5, aji128 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki128), aki128, ako128, akb128);
-		assert(ako128[0]->mantissa == 0x8000000000000000u && ako128[0]->signexponent == 0xFFFFu && ako128[0]->padding[0] == 0xEEEEu && ako128[0]->padding[1] == 0x3333u && ako128[0]->padding[2] == 0x4444u);// QNaN, machine indeterminate
-		assert(ako128[1]->mantissa == 0 && ako128[1]->signexponent == 0xFFFFu && ako128[1]->padding[0] == 0xABABu && ako128[1]->padding[1] == 0xAAAAu && ako128[1]->padding[2] == 0xBBBBu);// -inf
-		assert(ako128[2]->mantissa == 1u && ako128[2]->signexponent == 0 && ako128[2]->padding[0] == 0xB371u && ako128[2]->padding[1] == 0xDDDDu && ako128[2]->padding[2] == 0xFFFFu);// min subnormal
-		assert(ako128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[3]->signexponent == 0 && ako128[3]->padding[0] == 0xC7C8u && ako128[3]->padding[1] == 0x9999u && ako128[3]->padding[2] == 0xCCCCu);// max subnormal
-		assert(ako128[4]->mantissa == 0 && ako128[4]->signexponent == 1u && ako128[4]->padding[0] == 0xFFF8u && ako128[4]->padding[1] == 0x7777u && ako128[4]->padding[2] == 0x8888u);// min normal
-		assert(ako128[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[5]->signexponent == 0x7FFEu && ako128[5]->padding[0] == 0x0101u && ako128[5]->padding[1] == 0x5555u && ako128[5]->padding[2] == 0x6666u);// max normal
-		assert(ako128[6]->mantissa == 0 && ako128[6]->signexponent == 0x7FFFu && ako128[6]->padding[0] == 0xD001u && ako128[6]->padding[1] == 0x1111u && ako128[6]->padding[2] == 0x2222u);// +inf
+		assert(ako128[0]->mantissa == 0x8000000000000000u && ako128[0]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
+		assert(ako128[1]->mantissa == 0 && ako128[1]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(ako128[2]->mantissa == 1u && ako128[2]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(ako128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[3]->signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(ako128[4]->mantissa == 0 && ako128[4]->signexponent == 0x88887777FFF80001u);// min normal
+		assert(ako128[5]->mantissa == 0xFFFFFFFFFFFFFFFFu && ako128[5]->signexponent == 0x6666555501017FFEu);// max normal
+		assert(ako128[6]->mantissa == 0 && ako128[6]->signexponent == 0x22221111D0017FFFu);// +inf
 
 		std::memset(akb128, 0, sizeof(akb128));
 		rsbd8::radixsortnoalloc<rsbd8::sortingdirection::dscrevorder>(_countof(aki128), ako128, akb128, true);
-		assert(akb128[0]->mantissa == 0 && akb128[0]->signexponent == 0x7FFFu && akb128[0]->padding[0] == 0xD001u && akb128[0]->padding[1] == 0x1111u && akb128[0]->padding[2] == 0x2222u);// +inf
-		assert(akb128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[1]->signexponent == 0x7FFEu && akb128[1]->padding[0] == 0x0101u && akb128[1]->padding[1] == 0x5555u && akb128[1]->padding[2] == 0x6666u);// max normal
-		assert(akb128[2]->mantissa == 0 && akb128[2]->signexponent == 1u && akb128[2]->padding[0] == 0xFFF8u && akb128[2]->padding[1] == 0x7777u && akb128[2]->padding[2] == 0x8888u);// min normal
-		assert(akb128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[3]->signexponent == 0 && akb128[3]->padding[0] == 0xC7C8u && akb128[3]->padding[1] == 0x9999u && akb128[3]->padding[2] == 0xCCCCu);// max subnormal
-		assert(akb128[4]->mantissa == 1u && akb128[4]->signexponent == 0 && akb128[4]->padding[0] == 0xB371u && akb128[4]->padding[1] == 0xDDDDu && akb128[4]->padding[2] == 0xFFFFu);// min subnormal
-		assert(akb128[5]->mantissa == 0 && akb128[5]->signexponent == 0xFFFFu && akb128[5]->padding[0] == 0xABABu && akb128[5]->padding[1] == 0xAAAAu && akb128[5]->padding[2] == 0xBBBBu);// -inf
-		assert(akb128[6]->mantissa == 0x8000000000000000u && akb128[6]->signexponent == 0xFFFFu && akb128[6]->padding[0] == 0xEEEEu && akb128[6]->padding[1] == 0x3333u && akb128[6]->padding[2] == 0x4444u);// QNaN, machine indeterminate
+		assert(akb128[0]->mantissa == 0 && akb128[0]->signexponent == 0x22221111D0017FFFu);// +inf
+		assert(akb128[1]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[1]->signexponent == 0x6666555501017FFEu);// max normal
+		assert(akb128[2]->mantissa == 0 && akb128[2]->signexponent == 0x88887777FFF80001u);// min normal
+		assert(akb128[3]->mantissa == 0xFFFFFFFFFFFFFFFFu && akb128[3]->signexponent == 0xCCCC9999C7C80000u);// max subnormal
+		assert(akb128[4]->mantissa == 1u && akb128[4]->signexponent == 0xFFFFDDDDB3710000u);// min subnormal
+		assert(akb128[5]->mantissa == 0 && akb128[5]->signexponent == 0xBBBBAAAAABABFFFFu);// -inf
+		assert(akb128[6]->mantissa == 0x8000000000000000u && akb128[6]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 	}
 
 	{// simple unit tests, mostly to track template compile-time issues
@@ -674,6 +674,394 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--j);
 	}
 
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsort(1073741824, reinterpret_cast<uint8_t *>(in), upLargePageSize);// in 1073741824 batches of 1 byte
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsortcopy(1073741824, reinterpret_cast<uint8_t *>(in), reinterpret_cast<uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"half rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<uint16_t *>(in), reinterpret_cast<uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"half rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1269,6 +1657,200 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsort(67108864, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);// in 67108864 batches of 16 bytes
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated long double rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
+		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
+		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		do{
+			uint32_t arx{pSource[0]}, ary{pSource[1]};
+			pSource += 2;
+			pDest[0] = arx;
+			pDest[1] = ary;
+			pDest += 2;
+		}while(--i);
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		uint64_t u64start{__rdtsc()};
+
+		rsbd8::radixsortcopy(67108864, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);// in 67108864 batches of 16 bytes
+
+		// stop measuring
+		uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated long double rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
