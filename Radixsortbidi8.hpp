@@ -540,7 +540,7 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){}
 #include <x86intrin.h>
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){_mm_pause();}
 
-#elif  (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
+#elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
 // GCC/Clang-compatible compiler, targeting ARM with NEON
 #include <arm_neon.h>
 #if defined (MISSING_ARM_VLD1)
@@ -588,7 +588,7 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
 	__asm__ __volatile__ ("or 27,27,27" ::: "memory");
 }
 
-#elif (defined(__GNUC__) || defined(__clang__)) && defined(__ia64__)  // IA64
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(__ia64__)// IA64
 // GCC/Clang-compatible compiler, targeting IA-64
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
 	__asm__ __volatile__ ("hint @pause" ::: "memory");
@@ -7341,7 +7341,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(size_t c
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
 		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
-		if constexpr(isfltpmode && !issignmode && isabsvalue){	
+		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 			ubase -= 256;
 		}
@@ -7655,7 +7655,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 		}else{// handle this set like regular unsigned
 			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
-			if constexpr(isfltpmode && !issignmode && isabsvalue){	
+			if constexpr(isfltpmode && !issignmode && isabsvalue){
 				tbase -= 256;
 				ubase -= 256;
 			}
@@ -7688,7 +7688,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
 		unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase)};
-		if constexpr(isfltpmode && !issignmode && isabsvalue){	
+		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 		}
 		paritybool ^= b;
