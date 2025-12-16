@@ -1076,7 +1076,6 @@ struct alignas(alignof(uint_least32_t) * 2) test64{
 		return std::tie(data[1], data[0]) <
 			std::tie(other.data[1], other.data[0]);
 #endif
-		}
 	}
 	RSBD8_FUNC_INLINE test64 &operator&=(intptr_t const &other)noexcept{
 		data[0] &= static_cast<uint_least32_t>(other);
@@ -9069,7 +9068,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pbufferlo = buffer;
 				pbufferhi = buffer + count;
 			}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-				ptrdiff_t stride{-static_cast<ptrdiff_t>(usemultithread) & static_cast<ptrdiff_t>((count + 1 + 8) >> 4 * 8)};
+				ptrdiff_t stride{-static_cast<ptrdiff_t>(usemultithread) & static_cast<ptrdiff_t>((count + 1 + 8) >> 4) * 8};
 				pinputlo = input + stride;
 				pinputhi = input + (count - stride);
 				pbufferlo = buffer + stride;
@@ -19823,7 +19822,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	T
 #else
-	std::conditional_t<64 == CHAR_BIT * sizeof(T)>, test64, T>
+	std::conditional_t<64 == CHAR_BIT * sizeof(T), test64, T>
 #endif
 	> convertinput(U cur)noexcept{
 	if constexpr(isfltpmode != isabsvalue){// two-register filtering
@@ -19882,7 +19881,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<T>(cur)};
 #else
 	if constexpr(64 == CHAR_BIT * sizeof(T)) return{reinterpret_cast<test64 &>(cur)};
-	}else return{static_cast<T>(cur)};
+	else return{static_cast<T>(cur)};
 #endif
 }
 
@@ -19895,7 +19894,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	std::pair<T, T>
 #else
-	std::conditional_t<64 == CHAR_BIT * sizeof(T)>, std::pair<test64, test64>, std::pair<T, T>>
+	std::conditional_t<64 == CHAR_BIT * sizeof(T), std::pair<test64, test64>, std::pair<T, T>>
 #endif
 	> convertinput(U cura, U curb)noexcept{
 	if constexpr(isfltpmode != isabsvalue){// two-register filtering
@@ -19990,7 +19989,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<T>(cura), static_cast<T>(curb)};
 #else
 	if constexpr(64 == CHAR_BIT * sizeof(T)) return{reinterpret_cast<test64 &>(cura), reinterpret_cast<test64 &>(curb)};
-	}else return{static_cast<T>(cura), static_cast<T>(curb)};
+	else return{static_cast<T>(cura), static_cast<T>(curb)};
 #endif
 }
 
@@ -20043,7 +20042,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultimtc(size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
 	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U>, U, intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U> &&
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
+#else
+		64 != CHAR_BIT * sizeof(T)// test64 case
+#endif
+		, U, intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -20254,7 +20259,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultimain(size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
 	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U>, U, intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U> &&
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
+#else
+		64 != CHAR_BIT * sizeof(T)// test64 case
+#endif
+		, U, intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -20521,7 +20532,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 	auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 	auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo)};
-	using M = std::conditional_t<std::is_integral_v<decltype(comphi)>, decltype(comphi), intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<decltype(comphi)> &&
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
+#else
+		64 != CHAR_BIT * sizeof(T)// test64 case
+#endif
+		, decltype(comphi), intptr_t>;// used for masking operations
 	do{
 		// line breaks are placed for clarity
 		// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
@@ -20650,7 +20667,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 	auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 	auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi)};
-	using M = std::conditional_t<std::is_integral_v<decltype(complo)>, decltype(complo), intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<decltype(complo)> &&
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
+#else
+		64 != CHAR_BIT * sizeof(T)// test64 case
+#endif
+		, decltype(complo), intptr_t>;// used for masking operations
 	do{
 		// line breaks are placed for clarity
 		// upper line(s) are for the output sequence, middle line(s) are for the new input sequence

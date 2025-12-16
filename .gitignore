@@ -1,27 +1,41 @@
 ﻿/seqptests/.vs
+/seqptests/Win32Debug
+/seqptests/Win32Release
 /seqptests/x64Debug
 /seqptests/x64Release
 
 /doubleptest/.vs
+/doubleptest/Win32Debug
+/doubleptest/Win32Release
 /doubleptest/x64Debug
 /doubleptest/x64Release
 
 /floatptest/.vs
+/floatptest/Win32Debug
+/floatptest/Win32Release
 /floatptest/x64Debug
 /floatptest/x64Release
 
 /u8ptest/.vs
+/u8ptest/Win32Debug
+/u8ptest/Win32Release
 /u8ptest/x64Debug
 /u8ptest/x64Release
 
 /u16ptest/.vs
+/u16ptest/Win32Debug
+/u16ptest/Win32Release
 /u16ptest/x64Debug
 /u16ptest/x64Release
 
 /u32ptest/.vs
+/u32ptest/Win32Debug
+/u32ptest/Win32Release
 /u32ptest/x64Debug
 /u32ptest/x64Release
 
 /u64ptest/.vs
+/u64ptest/Win32Debug
+/u64ptest/Win32Release
 /u64ptest/x64Debug
 /u64ptest/x64Release
