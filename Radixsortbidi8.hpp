@@ -20041,7 +20041,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmultimtc(size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
-	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, W>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U> &&
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
@@ -20258,7 +20258,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmultimain(size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
-	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, W>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U> &&
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
