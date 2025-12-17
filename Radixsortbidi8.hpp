@@ -20100,181 +20100,237 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(isabsvalue || issignmode || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo)};
 		do{
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-			// lower line(s) on the bottom half of the loop are for the converted comparison values
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				if(!isdescsort? comphi < complo : complo < comphi){
+					--pdatalo;
+					out = curlo;
+					curlo = *pdatalo;
+					complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+				}else{
+					--pdatahi;
+					out = curhi;
+					curhi = *pdatahi;
+					comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+				}
+				*pout-- = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+				// lower line(s) on the bottom half of the loop are for the converted comparison values
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				intptr_t notmask{~mask};
 
-			U outlo{curlo & static_cast<M>(mask)};
-			pdatalo += mask;
-			pdatahi += notmask;
+				U outlo{curlo & static_cast<M>(mask)};
+				pdatalo += mask;
+				pdatahi += notmask;
 
-			U outhi{curhi & static_cast<M>(notmask)};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+				U outhi{curhi & static_cast<M>(notmask)};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-			outlo |= outhi;
-			platestlo |= platesthi;
+				outlo |= outhi;
+				platestlo |= platesthi;
 
-			curlo &= static_cast<M>(notmask);
-			U latestlo{*reinterpret_cast<W *>(platestlo)};
-			complo &= static_cast<M>(notmask);
+				curlo &= static_cast<M>(notmask);
+				U latestlo{*reinterpret_cast<W *>(platestlo)};
+				complo &= static_cast<M>(notmask);
 
-			*pout = static_cast<W>(outlo);
-			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(latestlo)};// convert the value for unsigned comparison
-			comphi &= static_cast<M>(mask);
+				*pout = static_cast<W>(outlo);
+				auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(latestlo)};// convert the value for unsigned comparison
+				comphi &= static_cast<M>(mask);
 
-			curhi &= static_cast<M>(mask);
-			U latesthi{latestlo};
-			latestlo &= static_cast<M>(mask);
-			auto complatesthi{complatestlo};
-			complatestlo &= static_cast<M>(mask);
+				curhi &= static_cast<M>(mask);
+				U latesthi{latestlo};
+				latestlo &= static_cast<M>(mask);
+				auto complatesthi{complatestlo};
+				complatestlo &= static_cast<M>(mask);
 
-			latesthi &= static_cast<M>(notmask);
-			curlo |= latestlo;
-			complatesthi &= static_cast<M>(notmask);
-			complo |= complatestlo;
+				latesthi &= static_cast<M>(notmask);
+				curlo |= latestlo;
+				complatesthi &= static_cast<M>(notmask);
+				complo |= complatestlo;
 
-			--pout;
-			curhi |= latesthi;
-			comphi |= complatesthi;
+				--pout;
+				curhi |= latesthi;
+				comphi |= complatesthi;
+			}
 		}while(--halfcount);
 		if(1 & count){// odd counts will be handled here
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-			// lower line(s) on the bottom half of the loop are for the converted comparison values
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				// the only modification here is this part
+				// never sample beyond the lower division (half of count, rounded down) of the array
+				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+				if(!isdescsort? comphi < complo : complo < comphi){
+					--pdatalo;
+					if constexpr(!isrevorder) if(pdatalo < output) pdatalo = pdatahi;
+					out = curlo;
+					curlo = *pdatalo;
+					complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+				}else{
+					--pdatahi;
+					if constexpr(isrevorder) if(pdatahi < output) pdatahi = pdatalo;
+					out = curhi;
+					curhi = *pdatahi;
+					comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+				}
+				*pout-- = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+				// lower line(s) on the bottom half of the loop are for the converted comparison values
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				intptr_t notmask{~mask};
 
-			U outlo{curlo & static_cast<M>(mask)};
-			pdatalo += mask;
-			pdatahi += notmask;
+				U outlo{curlo & static_cast<M>(mask)};
+				pdatalo += mask;
+				pdatahi += notmask;
 
-			// the only modification here is this part
-			// never sample beyond the lower division (half of count, rounded down) of the array
-			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
-			if constexpr(!isrevorder){
-				if(pdatalo < reinterpret_cast<W const *>(input)) pdatalo = pdatahi;
-			}else if(pdatahi < reinterpret_cast<W const *>(input)) pdatahi = pdatalo;
+				// the only modification here is this part
+				// never sample beyond the lower division (half of count, rounded down) of the array
+				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+				if constexpr(!isrevorder){
+					if(pdatalo < reinterpret_cast<W const *>(input)) pdatalo = pdatahi;
+				}else if(pdatahi < reinterpret_cast<W const *>(input)) pdatahi = pdatalo;
 
-			U outhi{curhi & static_cast<M>(notmask)};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+				U outhi{curhi & static_cast<M>(notmask)};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-			outlo |= outhi;
-			platestlo |= platesthi;
+				outlo |= outhi;
+				platestlo |= platesthi;
 
-			curlo &= static_cast<M>(notmask);
-			U latestlo{*reinterpret_cast<W *>(platestlo)};
-			complo &= static_cast<M>(notmask);
+				curlo &= static_cast<M>(notmask);
+				U latestlo{*reinterpret_cast<W *>(platestlo)};
+				complo &= static_cast<M>(notmask);
 
-			*pout = static_cast<W>(outlo);
-			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(latestlo)};// convert the value for unsigned comparison
-			comphi &= static_cast<M>(mask);
+				*pout = static_cast<W>(outlo);
+				auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(latestlo)};// convert the value for unsigned comparison
+				comphi &= static_cast<M>(mask);
 
-			curhi &= static_cast<M>(mask);
-			U latesthi{latestlo};
-			latestlo &= static_cast<M>(mask);
-			auto complatesthi{complatestlo};
-			complatestlo &= static_cast<M>(mask);
+				curhi &= static_cast<M>(mask);
+				U latesthi{latestlo};
+				latestlo &= static_cast<M>(mask);
+				auto complatesthi{complatestlo};
+				complatestlo &= static_cast<M>(mask);
 
-			latesthi &= static_cast<M>(notmask);
-			curlo |= latestlo;
-			complatesthi &= static_cast<M>(notmask);
-			complo |= complatestlo;
+				latesthi &= static_cast<M>(notmask);
+				curlo |= latestlo;
+				complatesthi &= static_cast<M>(notmask);
+				complo |= complatestlo;
 
-			--pout;
-			curhi |= latesthi;
-			comphi |= complatesthi;
+				--pout;
+				curhi |= latesthi;
+				comphi |= complatesthi;
+			}
 		}
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
 			curhi = curlo;
 		}
-	}else{
-		// original, simple-case code before flattening the branch:
-		// do{
-		// U out;
-		// if(!isdescsort? curhi < curlo : curlo < curhi){
-		// --pdatalo;
-		// out = curlo;
-		// curlo = *pdatalo;
-		// }else{
-		// --pdatahi;
-		// out = curhi;
-		// curhi = *pdatahi;
-		// }
-		// *pout-- = static_cast<T>(out);
-		// }while(--halfcount);
+	}else{// unfiltered input, direct unsigned comparisons
 		do{
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					--pdatalo;
+					out = curlo;
+					curlo = *pdatalo;
+				}else{
+					--pdatahi;
+					out = curhi;
+					curhi = *pdatahi;
+				}
+				*pout-- = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
+				intptr_t notmask{~mask};
 
-			U outlo{curlo & static_cast<M>(mask)};
-			pdatalo += mask;
-			pdatahi += notmask;
+				U outlo{curlo & static_cast<M>(mask)};
+				pdatalo += mask;
+				pdatahi += notmask;
 
-			U outhi{curhi & static_cast<M>(notmask)};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+				U outhi{curhi & static_cast<M>(notmask)};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-			outlo |= outhi;
-			platestlo |= platesthi;
+				outlo |= outhi;
+				platestlo |= platesthi;
 
-			curlo &= static_cast<M>(notmask);
-			U latestlo{*reinterpret_cast<W *>(platestlo)};
+				curlo &= static_cast<M>(notmask);
+				U latestlo{*reinterpret_cast<W *>(platestlo)};
 
-			curhi &= static_cast<M>(mask);
-			U latesthi{latestlo};
-			latestlo &= static_cast<M>(mask);
+				curhi &= static_cast<M>(mask);
+				U latesthi{latestlo};
+				latestlo &= static_cast<M>(mask);
 
-			*pout = static_cast<W>(outlo);
-			latesthi &= static_cast<M>(notmask);
-			curlo |= latestlo;
+				*pout = static_cast<W>(outlo);
+				latesthi &= static_cast<M>(notmask);
+				curlo |= latestlo;
 
-			--pout;
-			curhi |= latesthi;
+				--pout;
+				curhi |= latesthi;
+			}
 		}while(--halfcount);
 		if(1 & count){// odd counts will be handled here
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				// the only modification here is this part
+				// never sample beyond the lower division (half of count, rounded down) of the array
+				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					--pdatalo;
+					if constexpr(!isrevorder) if(pdatalo < output) pdatalo = pdatahi;
+					out = curlo;
+					curlo = *pdatalo;
+				}else{
+					--pdatahi;
+					if constexpr(isrevorder) if(pdatahi < output) pdatahi = pdatalo;
+					out = curhi;
+					curhi = *pdatahi;
+				}
+				*pout-- = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
+				intptr_t notmask{~mask};
 
-			U outlo{curlo & static_cast<M>(mask)};
-			pdatalo += mask;
-			pdatahi += notmask;
+				U outlo{curlo & static_cast<M>(mask)};
+				pdatalo += mask;
+				pdatahi += notmask;
 
-			// the only modification here is this part
-			// never sample beyond the lower division (half of count, rounded down) of the array
-			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
-			if constexpr(!isrevorder){
-				if(pdatalo < output) pdatalo = pdatahi;
-			}else if(pdatahi < output) pdatahi = pdatalo;
+				// the only modification here is this part
+				// never sample beyond the lower division (half of count, rounded down) of the array
+				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+				if constexpr(!isrevorder){
+					if(pdatalo < output) pdatalo = pdatahi;
+				}else if(pdatahi < output) pdatahi = pdatalo;
 
-			U outhi{curhi & static_cast<M>(notmask)};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+				U outhi{curhi & static_cast<M>(notmask)};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-			outlo |= outhi;
-			platestlo |= platesthi;
+				outlo |= outhi;
+				platestlo |= platesthi;
 
-			curlo &= static_cast<M>(notmask);
-			U latestlo{*reinterpret_cast<W *>(platestlo)};
+				curlo &= static_cast<M>(notmask);
+				U latestlo{*reinterpret_cast<W *>(platestlo)};
 
-			curhi &= static_cast<M>(mask);
-			U latesthi{latestlo};
-			latestlo &= static_cast<M>(mask);
+				curhi &= static_cast<M>(mask);
+				U latesthi{latestlo};
+				latestlo &= static_cast<M>(mask);
 
-			*pout = static_cast<W>(outlo);
-			latesthi &= static_cast<M>(notmask);
-			curlo |= latestlo;
+				*pout = static_cast<W>(outlo);
+				latesthi &= static_cast<M>(notmask);
+				curlo |= latestlo;
 
-			--pout;
-			curhi |= latesthi;
+				--pout;
+				curhi |= latesthi;
+			}
 		}
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
@@ -20318,95 +20374,111 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(isabsvalue || issignmode || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi)};
 		do{
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-			// lower line(s) on the bottom half of the loop are for the converted comparison values
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				if(!isdescsort? comphi < complo : complo < comphi){
+					++pdatahi;
+					out = curhi;
+					curhi = *pdatahi;
+					comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+				}else{
+					++pdatalo;
+					out = curlo;
+					curlo = *pdatalo;
+					complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+				}
+				*pout++ = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+				// lower line(s) on the bottom half of the loop are for the converted comparison values
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				intptr_t notmask{~mask};
 
-			U outhi{curhi & static_cast<M>(mask)};
-			pdatahi -= mask;
-			pdatalo -= notmask;
+				U outhi{curhi & static_cast<M>(mask)};
+				pdatahi -= mask;
+				pdatalo -= notmask;
 
-			U outlo{curlo & static_cast<M>(notmask)};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
+				U outlo{curlo & static_cast<M>(notmask)};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
 
-			outhi |= outlo;
-			platesthi |= platestlo;
+				outhi |= outlo;
+				platesthi |= platestlo;
 
-			curhi &= static_cast<M>(notmask);
-			U latesthi{*reinterpret_cast<W *>(platesthi)};
-			comphi &= static_cast<M>(notmask);
+				curhi &= static_cast<M>(notmask);
+				U latesthi{*reinterpret_cast<W *>(platesthi)};
+				comphi &= static_cast<M>(notmask);
 
-			*pout = static_cast<W>(outhi);
-			auto complatesthi{convertinput<isabsvalue, issignmode, isfltpmode, T>(latesthi)};// convert the value for unsigned comparison
-			complo &= static_cast<M>(mask);
+				*pout = static_cast<W>(outhi);
+				auto complatesthi{convertinput<isabsvalue, issignmode, isfltpmode, T>(latesthi)};// convert the value for unsigned comparison
+				complo &= static_cast<M>(mask);
 
-			curlo &= static_cast<M>(mask);
-			U latestlo{latesthi};
-			latesthi &= static_cast<M>(mask);
-			auto complatestlo{complatesthi};
-			complatesthi &= static_cast<M>(mask);
+				curlo &= static_cast<M>(mask);
+				U latestlo{latesthi};
+				latesthi &= static_cast<M>(mask);
+				auto complatestlo{complatesthi};
+				complatesthi &= static_cast<M>(mask);
 
-			latestlo &= static_cast<M>(notmask);
-			curhi |= latesthi;
-			complatestlo &= static_cast<M>(notmask);
-			comphi |= complatesthi;
+				latestlo &= static_cast<M>(notmask);
+				curhi |= latesthi;
+				complatestlo &= static_cast<M>(notmask);
+				comphi |= complatesthi;
 
-			++pout;
-			curlo |= latestlo;
-			complo |= complatestlo;
+				++pout;
+				curlo |= latestlo;
+				complo |= complatestlo;
+			}
 		}while(--halfcount);
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
 			curlo = curhi;
 		}
 	}else{// unfiltered input
-		// original, simple-case code before flattening the branch:
-		// do{
-		// U out;
-		// if(!isdescsort? curhi < curlo : curlo < curhi){
-		// ++pdatahi;
-		// out = curhi;
-		// curhi = *pdatahi;
-		// }else{
-		// ++pdatalo;
-		// out = curlo;
-		// curlo = *pdatalo;
-		// }
-		// *pout++ = static_cast<T>(out);
-		// }while(--halfcount);
 		do{
-			// line breaks are placed for clarity
-			// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
-			intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
-			intptr_t notmask{~mask};
+			if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+				U out;
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					++pdatahi;
+					out = curhi;
+					curhi = *pdatahi;
+				}else{
+					++pdatalo;
+					out = curlo;
+					curlo = *pdatalo;
+				}
+				*pout++ = static_cast<W>(out);
+			}else{// flatten the branch, at a higher register pressure cost
+				// line breaks are placed for clarity
+				// upper line(s) are for the output sequence, lower line(s) are for the new input sequence
+				intptr_t mask{-static_cast<intptr_t>(!isdescsort? curhi < curlo : curlo < curhi)};
+				intptr_t notmask{~mask};
 
-			U outhi{curhi & static_cast<M>(mask)};
-			pdatahi -= mask;
-			pdatalo -= notmask;
+				U outhi{curhi & static_cast<M>(mask)};
+				pdatahi -= mask;
+				pdatalo -= notmask;
 
-			U outlo{curlo & static_cast<M>(notmask)};
-			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
-			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
+				U outlo{curlo & static_cast<M>(notmask)};
+				intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
+				intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
 
-			outhi |= outlo;
-			platesthi |= platestlo;
+				outhi |= outlo;
+				platesthi |= platestlo;
 
-			curhi &= static_cast<M>(notmask);
-			U latesthi{*reinterpret_cast<W *>(platesthi)};
+				curhi &= static_cast<M>(notmask);
+				U latesthi{*reinterpret_cast<W *>(platesthi)};
 
-			curlo &= static_cast<M>(mask);
-			U latestlo{latesthi};
-			latesthi &= static_cast<M>(mask);
+				curlo &= static_cast<M>(mask);
+				U latestlo{latesthi};
+				latesthi &= static_cast<M>(mask);
 
-			*pout = static_cast<W>(outhi);
-			latestlo &= static_cast<M>(notmask);
-			curhi |= latesthi;
+				*pout = static_cast<W>(outhi);
+				latestlo &= static_cast<M>(notmask);
+				curhi |= latesthi;
 
-			++pout;
-			curlo |= latestlo;
+				++pout;
+				curlo |= latestlo;
+			}
 		}while(--halfcount);
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
@@ -20440,7 +20512,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// process the upper half (rounded up) separately if possible
 				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
 				usemultithread = 1;
-				std::swap(output, buffer);// swap the buffers for the lower half processing
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
@@ -20489,7 +20561,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// process the upper half (rounded up) separately if possible
 				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
 				usemultithread = 1;
-				movetobuffer = !movetobuffer;// swap the buffers for the lower half processing
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
@@ -20576,99 +20648,144 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		, decltype(comphi), intptr_t>;// used for masking operations
 	do{
-		// line breaks are placed for clarity
-		// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-		// lower line(s) on the bottom half of the loop are for the converted comparison values
-		intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-		intptr_t notmask{~mask};
+		if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+			intptr_t out;
+			if(!isdescsort? comphi < complo : complo < comphi){
+				--pdatalo;
+				out = plo;
+				plo = *pdatalo;
+				imlo = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(plo), varparameters...);
+				curlo = indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...);
+				complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+			}else{
+				--pdatahi;
+				out = phi;
+				phi = *pdatahi;
+				imhi = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(phi), varparameters...);
+				curhi = indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...);
+				comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+			}
+			*pout-- = out;
+		}else{// flatten the branch, at a higher register pressure cost
+			// line breaks are placed for clarity
+			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+			// lower line(s) on the bottom half of the loop are for the converted comparison values
+			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+			intptr_t notmask{~mask};
 
-		intptr_t outlo{plo & mask};
-		pdatalo += mask;
-		pdatahi += notmask;
+			intptr_t outlo{plo & mask};
+			pdatalo += mask;
+			pdatahi += notmask;
 
-		intptr_t outhi{phi & notmask};
-		intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-		intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+			intptr_t outhi{phi & notmask};
+			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-		outlo |= outhi;
-		platestlo |= platesthi;
+			outlo |= outhi;
+			platestlo |= platesthi;
 
-		plo &= notmask;
-		intptr_t latestlo{*reinterpret_cast<intptr_t const *>(platestlo)};
-		complo &= static_cast<M>(notmask);
+			plo &= notmask;
+			intptr_t latestlo{*reinterpret_cast<intptr_t const *>(platestlo)};
+			complo &= static_cast<M>(notmask);
 
-		*pout = outlo;
-		auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
-		auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+			*pout = outlo;
+			auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 
-		phi &= mask;
-		auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
-		comphi &= static_cast<M>(mask);
+			phi &= mask;
+			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
+			comphi &= static_cast<M>(mask);
 
-		intptr_t latesthi{latestlo};
-		latestlo &= mask;
-		auto complatesthi{complatestlo};
-		complatestlo &= static_cast<M>(mask);
+			intptr_t latesthi{latestlo};
+			latestlo &= mask;
+			auto complatesthi{complatestlo};
+			complatestlo &= static_cast<M>(mask);
 
-		latesthi &= notmask;
-		plo |= latestlo;
-		complatesthi &= static_cast<M>(notmask);
-		complo |= complatestlo;
+			latesthi &= notmask;
+			plo |= latestlo;
+			complatesthi &= static_cast<M>(notmask);
+			complo |= complatestlo;
 
-		--pout;
-		phi |= latesthi;
-		comphi |= complatesthi;
+			--pout;
+			phi |= latesthi;
+			comphi |= complatesthi;
+		}
 	}while(--halfcount);
 	if(1 & count){// odd counts will be handled here
-		// line breaks are placed for clarity
-		// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-		// lower line(s) on the bottom half of the loop are for the converted comparison values
-		intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-		intptr_t notmask{~mask};
+		if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+			intptr_t out;
+			// the only modification here is this part
+			// never sample beyond the lower division (half of count, rounded down) of the array
+			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+			if(!isdescsort? comphi < complo : complo < comphi){
+				--pdatalo;
+				if constexpr(!isrevorder) if(pdatalo < reinterpret_cast<intptr_t const *>(input)) pdatalo = pdatahi;
+				out = plo;
+				plo = *pdatalo;
+				imlo = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(plo), varparameters...);
+				curlo = indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...);
+				complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+			}else{
+				--pdatahi;
+				if constexpr(isrevorder) if(pdatahi < reinterpret_cast<intptr_t const *>(input)) pdatahi = pdatalo;
+				out = phi;
+				phi = *pdatahi;
+				imhi = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(phi), varparameters...);
+				curhi = indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...);
+				comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+			}
+			*pout-- = out;
+		}else{// flatten the branch, at a higher register pressure cost
+			// line breaks are placed for clarity
+			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+			// lower line(s) on the bottom half of the loop are for the converted comparison values
+			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+			intptr_t notmask{~mask};
 
-		intptr_t outlo{plo & mask};
-		pdatalo += mask;
-		pdatahi += notmask;
+			intptr_t outlo{plo & mask};
+			pdatalo += mask;
+			pdatahi += notmask;
 
-		// the only modification here is this part
-		// never sample beyond the lower division (half of count, rounded down) of the array
-		// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
-		if constexpr(!isrevorder){
-			if(pdatalo < reinterpret_cast<intptr_t const *>(input)) pdatalo = pdatahi;
-		}else if(pdatahi < reinterpret_cast<intptr_t const *>(input)) pdatahi = pdatalo;
+			// the only modification here is this part
+			// never sample beyond the lower division (half of count, rounded down) of the array
+			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
+			if constexpr(!isrevorder){
+				if(pdatalo < reinterpret_cast<intptr_t const *>(input)) pdatalo = pdatahi;
+			}else if(pdatahi < reinterpret_cast<intptr_t const *>(input)) pdatahi = pdatalo;
 
-		intptr_t outhi{phi & notmask};
-		intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
-		intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
+			intptr_t outhi{phi & notmask};
+			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & mask};
+			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & notmask};
 
-		outlo |= outhi;
-		platestlo |= platesthi;
+			outlo |= outhi;
+			platestlo |= platesthi;
 
-		plo &= notmask;
-		intptr_t latestlo{*reinterpret_cast<intptr_t const *>(platestlo)};
-		complo &= static_cast<M>(notmask);
+			plo &= notmask;
+			intptr_t latestlo{*reinterpret_cast<intptr_t const *>(platestlo)};
+			complo &= static_cast<M>(notmask);
 
-		*pout = outlo;
-		auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
-		auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+			*pout = outlo;
+			auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 
-		phi &= mask;
-		auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
-		comphi &= static_cast<M>(mask);
+			phi &= mask;
+			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
+			comphi &= static_cast<M>(mask);
 
-		intptr_t latesthi{latestlo};
-		latestlo &= mask;
-		auto complatesthi{complatestlo};
-		complatestlo &= static_cast<M>(mask);
+			intptr_t latesthi{latestlo};
+			latestlo &= mask;
+			auto complatesthi{complatestlo};
+			complatestlo &= static_cast<M>(mask);
 
-		latesthi &= notmask;
-		plo |= latestlo;
-		complatesthi &= static_cast<M>(notmask);
-		complo |= complatestlo;
+			latesthi &= notmask;
+			plo |= latestlo;
+			complatesthi &= static_cast<M>(notmask);
+			complo |= complatestlo;
 
-		--pout;
-		phi |= latesthi;
-		comphi |= complatesthi;
+			--pout;
+			phi |= latesthi;
+			comphi |= complatesthi;
+		}
 	}
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
@@ -20711,48 +20828,68 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		, decltype(complo), intptr_t>;// used for masking operations
 	do{
-		// line breaks are placed for clarity
-		// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
-		// lower line(s) on the bottom half of the loop are for the converted comparison values
-		intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
-		intptr_t notmask{~mask};
+		if constexpr(defaultgprfilesize < gprfilesize::large){// don't flatten the branch when there's few registers
+			intptr_t out;
+			if(!isdescsort? comphi < complo : complo < comphi){
+				++pdatahi;
+				out = phi;
+				phi = *pdatahi;
+				imhi = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(phi), varparameters...);
+				curhi = indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...);
+				comphi = convertinput<isabsvalue, issignmode, isfltpmode, T>(curhi);// convert the value for unsigned comparison
+			}else{
+				++pdatalo;
+				out = plo;
+				plo = *pdatalo;
+				imlo = indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(plo), varparameters...);
+				curlo = indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...);
+				complo = convertinput<isabsvalue, issignmode, isfltpmode, T>(curlo);// convert the value for unsigned comparison
+			}
+			*pout++ = out;
+		}else{// flatten the branch, at a higher register pressure cost
+			// line breaks are placed for clarity
+			// upper line(s) are for the output sequence, middle line(s) are for the new input sequence
+			// lower line(s) on the bottom half of the loop are for the converted comparison values
+			intptr_t mask{-static_cast<intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+			intptr_t notmask{~mask};
 
-		intptr_t outhi{phi & mask};
-		pdatahi -= mask;
-		pdatalo -= notmask;
+			intptr_t outhi{phi & mask};
+			pdatahi -= mask;
+			pdatalo -= notmask;
 
-		intptr_t outlo{plo & notmask};
-		intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
-		intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
+			intptr_t outlo{plo & notmask};
+			intptr_t platesthi{reinterpret_cast<intptr_t>(pdatahi) & mask};
+			intptr_t platestlo{reinterpret_cast<intptr_t>(pdatalo) & notmask};
 
-		outhi |= outlo;
-		platesthi |= platestlo;
+			outhi |= outlo;
+			platesthi |= platestlo;
 
-		phi &= notmask;
-		intptr_t latesthi{*reinterpret_cast<intptr_t const *>(platesthi)};
-		comphi &= static_cast<M>(notmask);
+			phi &= notmask;
+			intptr_t latesthi{*reinterpret_cast<intptr_t const *>(platesthi)};
+			comphi &= static_cast<M>(notmask);
 
-		*pout = outhi;
-		auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latesthi), varparameters...)};
-		auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+			*pout = outhi;
+			auto im{indirectinput1<indirection1, isindexed2, T, V>(reinterpret_cast<V *>(latesthi), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 
-		plo &= mask;
-		auto complatesthi{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
-		complo &= static_cast<M>(mask);
+			plo &= mask;
+			auto complatesthi{convertinput<isabsvalue, issignmode, isfltpmode, T>(cur)};// convert the value for unsigned comparison
+			complo &= static_cast<M>(mask);
 
-		intptr_t latestlo{latesthi};
-		latesthi &= mask;
-		auto complatestlo{complatesthi};
-		complatesthi &= static_cast<M>(mask);
+			intptr_t latestlo{latesthi};
+			latesthi &= mask;
+			auto complatestlo{complatesthi};
+			complatesthi &= static_cast<M>(mask);
 
-		latestlo &= notmask;
-		phi |= latesthi;
-		complatestlo &= static_cast<M>(notmask);
-		comphi |= complatesthi;
+			latestlo &= notmask;
+			phi |= latesthi;
+			complatestlo &= static_cast<M>(notmask);
+			comphi |= complatesthi;
 
-		++pout;
-		plo |= latestlo;
-		complo |= complatestlo;
+			++pout;
+			plo |= latestlo;
+			complo |= complatestlo;
+		}
 	}while(--halfcount);
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
@@ -20785,7 +20922,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// process the upper half (rounded up) separately if possible
 				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
 				usemultithread = 1;
-				std::swap(output, buffer);// swap the buffers for the lower half processing
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
@@ -20834,7 +20971,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// process the upper half (rounded up) separately if possible
 				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
 				usemultithread = 1;
-				movetobuffer = !movetobuffer;// swap the buffers for the lower half processing
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
