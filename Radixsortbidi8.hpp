@@ -631,6 +631,42 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}while(atomiclightbarrier.load(std::memory_order_relaxed));
 };
 
+// General purpose register count constant
+// This is a generalisation of the purpose register count per architecture.
+enum struct gprfilesize : unsigned char{
+	small,
+// = architecture with less than 14 usable general-purpose registers
+// - unused in this version of the library, but older x86 without extensions and ARM 32-bit Thumb mode will fit here
+// - original 16/32-bit x86: 7 usable gprs, no real register renaming or store forwarding to use MMX or XMM registers as an advantage
+// ARM 32-bit Thumb mode: 7 usable gprs
+	medium,
+// = architecture with less than 30 usable general-purpose registers, used as a default for 32-bit architectures
+// - 32-bit x86 with extensions: 7 usable gprs, can use 8 MMX and 8 XMM (with SSE2) registers with almost zero-cost store forwarding (compiler support for this optimisation is often pretty decent in this regard)
+// - 32-bit ARM, not in Thumb mode (Thumb 2 mode is exempt): 14 usable gprs
+// - RISC-V, 32-bit RV32E variant: 15 usable gprs
+	large
+// = used as a default for 64-bit architectures and beyond
+// - x64: 15 (or 31 with APX) usable gprs, can use 8 MMX and 16 (or 32 with AVX-512) XMM registers with almost zero-cost store forwarding (compiler support for this optimisation is often pretty decent in this regard)
+// - 64-bit ARM (AArch64/ARM64): 31 usable gprs
+// - IA-64: many usable gprs, though some with specific purposes only
+// - IBM POWER/PowerPC/Cell Broadband Engine: 31 usable gprs
+// - DEC Alpha: 31 usable gprs
+// - MIPS: 30 usable gprs
+// - RISC-V, default 64-bit variant: 31 usable gprs
+// - Epiphany: up to 64 usable gprs (configurable)
+};
+gprfilesize constexpr defaultgprfilesize{
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX\
+	|| defined(__VEC__) || defined(__ALTIVEC__)\
+	|| defined(__SPE__)\
+	|| defined(__powerpc__) || defined(__ppc__) || defined(__PPC__)
+	// include the IBM POWER/PowerPC/Cell Broadband Engine macros from the previous section here as well, just to be sure
+	gprfilesize::large
+#else
+	gprfilesize::medium
+#endif
+};
+
 // Integer binary logarithm of the pointer size constant
 unsigned char constexpr log2ptrs{
 #ifdef __cpp_lib_int_pow2// (C++20)
