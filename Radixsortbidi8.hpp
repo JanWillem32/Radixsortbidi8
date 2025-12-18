@@ -702,7 +702,7 @@ struct alignas(alignof(uint_least64_t) * 2) longdoubletest128{
 #endif
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long long carrylo, carrymid;
+		unsigned long carrylo, carrymid;
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[0], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[1], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
 #endif
@@ -830,7 +830,7 @@ struct longdoubletest96{
 #endif
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long long carrylo, carrymid;
+		unsigned long carrylo, carrymid;
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[0], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[1], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
 #endif
@@ -945,7 +945,7 @@ struct longdoubletest80{
 #endif
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long long carrylo, carrymid;
+		unsigned long carrylo, carrymid;
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[0], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
 		__builtin_subcl(reinterpret_cast<uint_least32_t const *>(&mantissa)[1], reinterpret_cast<uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
 #endif
