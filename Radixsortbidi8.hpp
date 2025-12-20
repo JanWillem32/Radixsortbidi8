@@ -520,25 +520,25 @@ namespace rsbd8::helper{// Avoid putting any include files into this library's n
 // Microsoft C/C++-compatible compiler
 #include <intrin.h>
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){YieldProcessor();}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{YieldProcessor();}
 #elif (defined(_M_IX86) && !defined(_M_HYBRID_X86_ARM64)) || (defined(_M_X64) && !defined(_M_ARM64EC))
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){_mm_pause();}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
 #elif defined(_M_ARM64) || defined(_M_ARM64EC) || defined(_M_HYBRID_X86_ARM64)
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){__dmb(_ARM64_BARRIER_ISHST); __yield();}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM64_BARRIER_ISHST); __yield();}
 #elif defined(_M_ARM)
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){__dmb(_ARM_BARRIER_ISHST); __yield();}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM_BARRIER_ISHST); __yield();}
 #else
 #error Unsupported system architecture for this compiler. Edit this library to add support for it.
 #endif
 
 #elif defined(__armel__) || defined(__ARMEL__)
 // avoid using anything for this old ARM target
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
 // GCC/Clang-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){_mm_pause();}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
 // GCC/Clang-compatible compiler, targeting ARM with NEON
@@ -548,7 +548,7 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){_mm_pause();}
 #elif defined (MISSING_ARM_VST1)
 #include <ATen/cpu/vec256/missing_vst1_neon.h>
 #endif
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("isb sy" ::: "memory");
 	__asm__ __volatile__ ("yield" ::: "memory");
 }
@@ -556,14 +556,14 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(__IWMMXT__)
 // GCC/Clang-compatible compiler, targeting ARM with WMMX
 #include <mmintrin.h>
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("isb sy" ::: "memory");
 	__asm__ __volatile__ ("yield" ::: "memory");
 }
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__arm__) || (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__))
 // GCC/Clang-compatible compiler, targeting other ARM
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("isb sy" ::: "memory");
 	__asm__ __volatile__ ("yield" ::: "memory");
 }
@@ -571,32 +571,32 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
 #elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__)) && (defined(__VEC__) || defined(__ALTIVEC__))
 // GCC/Clang/XLC-compatible compiler, targeting PowerPC with VMX/VSX
 #include <altivec.h>
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("or 27,27,27" ::: "memory");
 }
 
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(__SPE__)
 // GCC/Clang-compatible compiler, targeting PowerPC with SPE
 #include <spe.h>
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("or 27,27,27" ::: "memory");
 }
 
 #elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__)) && (defined(__powerpc__) || defined(__ppc__) || defined(__PPC__))
 // GCC/Clang/XLC-compatible compiler, targeting other PowerPC
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("or 27,27,27" ::: "memory");
 }
 
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(__ia64__)// IA64
 // GCC/Clang-compatible compiler, targeting IA-64
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 	__asm__ __volatile__ ("hint @pause" ::: "memory");
 }
 
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(__riscv) && __riscv_xlen == 64
 // GCC/Clang-compatible compiler, targeting RISC-V 64
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 #ifdef __riscv_zihintpause
 	__asm__ __volatile__ ("pause" ::: "memory");
 #else
@@ -607,7 +607,7 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){
 #else
 // fallback, with warning
 #pragma message("Compiler and system architecture not detected. Edit this library to add support for it.")
-RSBD8_FUNC_INLINE void rsbd8::helper::spinpause(){}
+RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
 
 #endif
 namespace rsbd8{// Avoid putting any include files into this library's namespace.
@@ -623,7 +623,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	1 < threadcount &&// at least 2 threads
 	std::is_integral_v<T> &&
 	std::numeric_limits<std::make_unsigned_t<T>>::max()	 >= threadcount - 1,
-	void> simplebarrier(std::atomic<T> &atomiclightbarrier){
+	void> simplebarrier(std::atomic<T> &atomiclightbarrier)noexcept{
 	static T constexpr val{(threadnumber == threadcount - 1)? ~static_cast<T>(threadnumber) + 1 : static_cast<T>(1)};
 	T old{atomiclightbarrier.fetch_add(val)};// the only modification here
 	if(~val + 1 != old) do{// two's complement negation comparison
@@ -1588,15 +1588,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<typename std::conditional_t<std::is_enum_v<T>,
 		std::underlying_type<T>,
 		std::enable_if<true, T>>::type>,
-	unsigned> bitscanforwardportable(T input)noexcept{
+#if defined(_M_X64)
+	std::conditional_t<32 >= CHAR_BIT * sizeof(T), unsigned, uint_least64_t>
+#else
+	unsigned
+#endif
+	> bitscanforwardportable(T input)noexcept{
 	assert(input);// design decision: do not allow 0 as input as neither x86/x64 bsf nor using the de Bruijn sequence supports it
-#if defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))
-	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{static_cast<unsigned>(__builtin_ctz(input))};
-	else return{static_cast<unsigned>(__builtin_ctzll(input))};
-#elif defined(_M_X64)
+#ifdef _M_X64
 	// will run bsf (bit scan forward) on older architectures, which is fine
 	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{_tzcnt_u32(input)};
-	else return{static_cast<unsigned>(_tzcnt_u64(input))};
+	else return{_tzcnt_u64(input)};
 #elif defined(_M_IX86)
 	// will run bsf (bit scan forward) on older architectures, which is fine
 	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{_tzcnt_u32(input)};
@@ -1610,6 +1612,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64) || defined(_M_ARM64EC)
 	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{_CountTrailingZeros(input)};
 	else return{_CountTrailingZeros64(input)};
+#elif defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))
+	if constexpr(sizeof(unsigned) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctz(input))};
+	else if constexpr(sizeof(unsigned long) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctzl(input))};
+	else return{static_cast<unsigned>(__builtin_ctzll(input))};
 #elif defined(__cpp_lib_bitops)
 	return{static_cast<unsigned>(std::countr_zero(input))};
 #else// Count the consecutive zero bits (trailing) on the right with multiply and lookup.
