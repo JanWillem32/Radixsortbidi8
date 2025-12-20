@@ -31,7 +31,7 @@
 // For the more advanced use cases, an extra argument (run-time, variadic function parameter) can be added to index the indirection when dealing with a (member) pointer/array.
 // These index parameters are typically used in a more straightforward manner and use regular indexing.
 // The variant with a getter function allows any number of extra arguments to pass on to the getter function.
-// Using a getter function that can throw (meaning that it lacks "noexcept") will disable multithreading by this library for the entire sorting operation and will slow down sorting considerably.
+// Using a getter function that can throw (meaning that it lacks "noexcept") will incur some extra processing overhead.
 // Multithreading can be disabled completely by setting the macro RSBD8_DISABLE_MULTITHREADING.
 //
 // bool succeeded{rsbd8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
@@ -240,7 +240,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // = TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
 //
 // TODO, document computer system architecture-dependent code parts and add more options
-// = TODO, the current mode for pipelining (ILP - instruction level processing) is set to not need more than 15 integer registers, of which are 8 to 11 "hot" for parallel processing. This isn't a universally ideal option. To name two prominent systems, 32-bit x86 only has 7 available general-purpose registers, while ARM AArch64 (ARM64) has 31.
+// = TODO, the current mode for pipelining (ILP - instruction level processing) is set to mostly not need more than 15 integer registers, of which are 8 to 11 "hot" for parallel processing. This isn't a universally ideal option. To name two prominent systems, 32-bit x86 without extensions has only 7 available general-purpose registers, while ARM AArch64 (ARM64) has 31.
 // = TODO, investigate SIMD, in all of its shapes and sizes. Some experimentation has been done with x64+AVX-512 in an early version, but compared to other optimisations and strategies it never yielded much for these test functions.
 // = TODO, the current version of this library does not provide much optimisation for processing any 64-bit (or larger) types on 32-bit systems at all. This can be documented, and later on optimised.
 // = TODO, similarly, 16-bit systems still exist. (Even though these often do include a capable 32-bit capable data path line, see the history of x86 in this regard for example.) If this library can be optimised for use in a reasonably current 16-bit microcontroller, document and later on optimise for it.
@@ -430,7 +430,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // A more difficult test to implement here would be for example to detect mixed endianness between floating-point double and other data for on older ARM platforms.
 // The C++20 "std::endian" parts in the "bit" header currently unfortunately don't indicate more than little, big and undefined mixed endianness.
 namespace rsbd8::helper{// Avoid putting any include files into this library's namespace.
-	RSBD8_FUNC_INLINE void spinpause();// simple forward declaration for the spinlocks used in multithreaded processing
+	RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the spinlocks used in multithreaded processing
 }
 //
 // C++17 features detection
@@ -617,6 +617,7 @@ namespace helper{// This libary defines a number of helper items, so categorise 
 
 // Atomic light barrier for spinpause()-based loops (see above for that function)
 // This assumes that the initial state of atomiclightbarrier is zero.
+// This is not the variant that can also do exception-safe exit signalling, see atomicvarwrapper below for a part of that implementation.
 template<size_t threadnumber, size_t threadcount, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	threadnumber < threadcount &&// 0-based threadnumber, make sure to give every thread a unique, sequential number
@@ -631,6 +632,23 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}while(atomiclightbarrier.load(std::memory_order_relaxed));
 };
 
+// This class is a simple RAII wrapper for the atomic variable when an exit state on destruction is needed.
+// the barrier atomic variable must be able to signal exit, even if an exception occurs
+struct atomicvarwrapper{
+	std::atomic_uintptr_t &main;
+	RSBD8_FUNC_INLINE atomicvarwrapper(std::atomic_uintptr_t &init)noexcept : main{init}{}
+	RSBD8_FUNC_INLINE ~atomicvarwrapper()noexcept{
+		uintptr_t old{};// this function assumes that the barrier atomic variable freed state is zero
+		while(!main.compare_exchange_weak(old, reinterpret_cast<uintptr_t>(&main))){
+			if(reinterpret_cast<uintptr_t>(&main) == old) break;// exit state by another thread
+			old = 0;
+			spinpause();
+		}// set it to the pointer value of itself to signal exit, any other value is a busy state
+	}
+	atomicvarwrapper(atomicvarwrapper const &) = delete;
+	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
+};
+
 // General purpose register count constant
 // This is a generalisation of the purpose register count per architecture.
 enum struct gprfilesize : unsigned char{
@@ -638,7 +656,7 @@ enum struct gprfilesize : unsigned char{
 // = architecture with less than 14 usable general-purpose registers
 // - unused in this version of the library, but older x86 without extensions and ARM 32-bit Thumb mode will fit here
 // - original 16/32-bit x86: 7 usable gprs, no real register renaming or store forwarding to use MMX or XMM registers as an advantage
-// ARM 32-bit Thumb mode: 7 usable gprs
+// - ARM 32-bit Thumb mode: 7 usable gprs
 	medium,
 // = architecture with less than 30 usable general-purpose registers, used as a default for 32-bit architectures
 // - 32-bit x86 with extensions: 7 usable gprs, can use 8 MMX and 8 XMM (with SSE2) registers with almost zero-cost store forwarding (compiler support for this optimisation is often pretty decent in this regard)
@@ -11624,7 +11642,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadinitmtc(size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, size_t offsetscompanion[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadinitmtc(size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -11896,7 +11914,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmainmtc(size_t count, V *const input[], V *pdst[], V *pdstnext[], size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadmainmtc(size_t count, V *const input[], V *pdst[], V *pdstnext[], size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -11976,9 +11994,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * 8;
 			poffset += static_cast<size_t>(index) * 256;
-			if(!old) do{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~static_cast<uintptr_t>(0) == old);
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+			}
 		}
 		// handle the top two parts differently
 		if(80 - 16 <= shifter)
@@ -12031,9 +12057,17 @@ handletop16:
 					pdst = pdstnext;
 					// unused: pdstnext = psrchi;
 					psrchi += count;
-					if(!old) do{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(!old) do{
+							spinpause();
+						}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					}else{// detect exceptions
+						if(!old) do{
+							spinpause();
+							old = atomiclightbarrier.load(std::memory_order_relaxed);
+						}while(~static_cast<uintptr_t>(0) == old);
+						if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+					}
 				}
 handletop8:
 				size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
@@ -12186,9 +12220,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * 8;
 			poffset += static_cast<size_t>(index) * 256;
-			if constexpr(ismultithreadcapable) if(old < usemultithread) do{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			if constexpr(ismultithreadcapable){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(!old) do{
+						spinpause();
+					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				}else{// detect exceptions
+					if(!old) do{
+						spinpause();
+						old = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(~static_cast<uintptr_t>(0) == old);
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+				}
+			}
 		}
 		// handle the top two parts differently
 		if(80 - 16 <= shifter)
@@ -12269,9 +12313,19 @@ handletop16:
 				psrclo = pdst;
 				pdst = pdstnext;
 				// unused: pdstnext = psrclo;
-				if constexpr(ismultithreadcapable) if(old < usemultithread) do{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				if constexpr(ismultithreadcapable){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(!old) do{
+							spinpause();
+						}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					}else{// detect exceptions
+						if(!old) do{
+							spinpause();
+							old = atomiclightbarrier.load(std::memory_order_relaxed);
+						}while(~static_cast<uintptr_t>(0) == old);
+						if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+					}
+				}
 			}
 handletop8:
 			ptrdiff_t j;// rounded down in the bottom part, or no multithreading
@@ -12341,7 +12395,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortcopynoallocmulti2threadmtc(size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortcopynoallocmulti2threadmtc(size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
@@ -12349,16 +12403,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(buffer);
 	static size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V>(count, input, output, buffer, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -12371,6 +12439,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 		uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + 1};
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -12431,7 +12500,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -12451,6 +12520,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -12723,12 +12800,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -12742,6 +12827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 			uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + static_cast<uintptr_t>(usemultithread)};
@@ -12797,23 +12883,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadmtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	static size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -12826,6 +12926,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 		uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + 1};
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -12886,7 +12987,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -12905,6 +13006,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -13172,12 +13281,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -13191,6 +13308,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 			uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + static_cast<uintptr_t>(usemultithread)};
@@ -13240,7 +13358,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadinitmtc(size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, size_t offsetscompanion[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadinitmtc(size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
@@ -14449,7 +14567,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadmainmtc(size_t count, V *const input[], V *pdst[], V *pdstnext[], size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadmainmtc(size_t count, V *const input[], V *pdst[], V *pdstnext[], size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
@@ -14529,9 +14647,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * 8;
 				poffset += static_cast<size_t>(index) * 256;
 			}
-			if(!old) do{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~static_cast<uintptr_t>(0) == old);
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+			}
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && CHAR_BIT * sizeof(T) - 8 == shifter)
@@ -14684,9 +14810,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * 8;
 				poffset += static_cast<size_t>(index) * 256;
 			}
-			if constexpr(ismultithreadcapable) if(old < usemultithread) do{
-				spinpause();
-			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			if constexpr(ismultithreadcapable){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(!old) do{
+						spinpause();
+					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				}else{// detect exceptions
+					if(!old) do{
+						spinpause();
+						old = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(~static_cast<uintptr_t>(0) == old);
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+				}
+			}
 		}
 		// handle the top part for floating-point differently
 		if(!isabsvalue && isfltpmode && CHAR_BIT * sizeof(T) - 8 == shifter)
@@ -14756,7 +14892,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti2threadmtc(size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortcopynoallocmulti2threadmtc(size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
@@ -14764,16 +14900,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(buffer);
 	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V>(count, input, output, buffer, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -14786,6 +14936,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 		uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + 1};
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -14838,7 +14989,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -14858,6 +15009,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -16133,12 +16292,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -16152,6 +16319,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 			uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + static_cast<uintptr_t>(usemultithread)};
@@ -16201,23 +16369,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadmtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti2threadmtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -16230,6 +16412,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 		uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + 1};
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -16282,7 +16465,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -16301,6 +16484,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -17698,12 +17889,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -17717,6 +17916,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
 			uintptr_t compound{static_cast<uintptr_t>(runsteps) * 2 + static_cast<uintptr_t>(paritybool) + static_cast<uintptr_t>(usemultithread)};
@@ -18492,7 +18692,7 @@ template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, p
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsingleinitmtc(size_t count, V *const input[], V *pout[], size_t offsetscompanion[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocsingleinitmtc(size_t count, V *const input[], V *pout[], size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
@@ -18598,7 +18798,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglemainmtc(size_t count, V *const psrclo[], V *pdst[], size_t offsetscompanion[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocsinglemainmtc(size_t count, V *const psrclo[], V *pdst[], size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
@@ -18648,23 +18848,37 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortcopynoallocsinglemtc(size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, output, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -18677,6 +18891,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and allareidentical value exchange with the main thread
+		// no exception detection required here
 		++allareidentical;// send over a 1 or a 2
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
 			spinpause();// catch up
@@ -18716,7 +18931,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -18735,6 +18950,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -18906,12 +19129,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -18925,6 +19156,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and allareidentical value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			allareidentical += usemultithread;// send over a 1 or a 2 when multithreading
 			while(reinterpret_cast<uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -18961,23 +19193,37 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept{
+	void> radixsortnoallocsinglemtc(size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	static size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
 	size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, buffer, offsetscompanion, varparameters...);
 
 	size_t *offsets;
 	{// barrier and pointer exchange with the main thread
 		uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
 		if(!other){
 			do{
 				spinpause();
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
 			reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -18990,6 +19236,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
 
 	{// barrier and allareidentical value exchange with the main thread
+		// no exception detection required here
 		++allareidentical;// send over a 1 or a 2
 		while(reinterpret_cast<uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
 			spinpause();// catch up
@@ -19029,7 +19276,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #ifdef RSBD8_DISABLE_MULTITHREADING
 		false
 #else
-		std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>
+		true
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -19048,6 +19295,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable,
+			std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				atomicvarwrapper>,// may throw, so set up the guard
+			std::nullptr_t> atomicguard{atomiclightbarrier};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -19219,12 +19474,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, size_t *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<uintptr_t>(offsets) & -static_cast<intptr_t>(usemultithread))};
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+			}
 			// simply do not spin if usemultithread is zero
 			if(usemultithread > other){
 				do{
 					spinpause();
 					other = atomiclightbarrier.load(std::memory_order_relaxed);
 				}while(reinterpret_cast<uintptr_t>(offsets) == other);
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
 				// reset the barrier after use, only one thread will do this
 				// no busy-wait dependency on this store, hence relaxed memory order is fine
 				reinterpret_cast<uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
@@ -19238,6 +19501,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and allareidentical value exchange with the companion thread
+		// no exception detection required here
 		if constexpr(ismultithreadcapable){
 			allareidentical += usemultithread;// send over a 1 or a 2 when multithreading
 			while(reinterpret_cast<uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
@@ -20598,35 +20862,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
-// non-multithreading variant of radixsortcopynoallocmulti() because of a potentially throwing getter function
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){
-	radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
-}
-
-// non-multithreading variant of radixsortnoallocmulti() because of a potentially throwing getter function
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters){
-	radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-}
-
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocmultimtc(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -20803,10 +21044,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimain(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
+	void> radixsortnoallocmultimain(size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -20907,10 +21147,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoallocmulti(size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -20957,10 +21196,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
+	void> radixsortnoallocmulti(size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
