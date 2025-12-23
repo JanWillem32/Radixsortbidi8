@@ -8094,6 +8094,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsetscompanion + static_cast<size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -8283,6 +8286,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -9876,6 +9882,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsetscompanion + static_cast<size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -9989,6 +9998,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -11935,6 +11947,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsetscompanion + static_cast<size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -12134,6 +12149,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -14591,6 +14609,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsetscompanion + static_cast<size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
@@ -14727,6 +14748,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	size_t *poffset{offsets + static_cast<size_t>(shifter) * 256};
+	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
