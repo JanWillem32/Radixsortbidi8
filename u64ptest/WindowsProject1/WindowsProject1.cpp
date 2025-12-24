@@ -2189,16 +2189,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2288,16 +2279,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2387,16 +2369,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2486,16 +2459,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2585,16 +2549,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2684,16 +2639,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2783,16 +2729,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2882,16 +2819,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -2981,16 +2909,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3080,16 +2999,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3179,16 +3089,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3278,16 +3179,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3377,16 +3269,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -3478,16 +3361,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -5437,16 +5311,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
@@ -5538,16 +5403,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		uint64_t u64start{__rdtsc()};
 
-		uint32_t *pSource{reinterpret_cast<uint32_t *>(in)};
-		uint32_t *pDest{reinterpret_cast<uint32_t *>(out)};
-		uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
-		do{
-			uint32_t arx{pSource[0]}, ary{pSource[1]};
-			pSource += 2;
-			pDest[0] = arx;
-			pDest[1] = ary;
-			pDest += 2;
-		}while(--i);
+		std::memcpy(out, in, 1073741824);// dummy copy
 
 		// stop measuring
 		uint64_t u64stop;
