@@ -34,12 +34,12 @@ InnerRadixSortBidi@@32 proc
 	; rax: counts is object 15, which isnt part of the inner loops, but it's used early in the outer loops
 	; the last two gprs are special purpose: rsp and rip
 
-	;uint64_t *psrclo{arr}, *pdst0lo{buffer};// just named aliases
+	;std::uint64_t *psrclo{arr}, *pdst0lo{buffer};// just named aliases
 	; rdx contains psrclo
 	; r8 contains pdst0lo
-	;size_t initcount{counts[0]};
-	;uint32_t bitselect{};// least significant bit first
-	;uint64_t *pdst1hi{pdst0lo + countm1};
+	;std::size_t initcount{counts[0]};
+	;std::uint32_t bitselect{};// least significant bit first
+	;std::uint64_t *pdst1hi{pdst0lo + countm1};
 	;while(!initcount){// skip a step if all bits for the index are zero
 	mov r10, [rcx]; initcount
 	mov rax, rcx; counts
@@ -73,13 +73,13 @@ initcountloop:
 align 16; This is a common jump target, and nops will very rarely be executed here. Put at least the first 3 instructions (12 bytes of bytecode in this case) in the instruction buffer at this point.
 initcountdone:
 	;{
-	;uint64_t *psrchi{psrclo + countm1};
-	;size_t i{count >> 1};// will set the carry bit for the next condition
-	;uint64_t *pdst0hi{pdst1hi - initcount};
-	;uint64_t *pdst0nextlo{psrclo}, *psrcnextlo{pdst0lo};// for the next iteration
-	;uint64_t *psrcnexthi{pdst1hi}, *pdst1nexthi{psrchi};// for the next iteration
-	;size_t halfcount{i};// for the internal counter
-	;uint64_t *pdst1lo{pdst0hi + 1};
+	;std::uint64_t *psrchi{psrclo + countm1};
+	;std::size_t i{count >> 1};// will set the carry bit for the next condition
+	;std::uint64_t *pdst0hi{pdst1hi - initcount};
+	;std::uint64_t *pdst0nextlo{psrclo}, *psrcnextlo{pdst0lo};// for the next iteration
+	;std::uint64_t *psrcnexthi{pdst1hi}, *pdst1nexthi{psrchi};// for the next iteration
+	;std::size_t halfcount{i};// for the internal counter
+	;std::uint64_t *pdst1lo{pdst0hi + 1};
 	;if(!(count & 1)) for(;;){// main loop for even counts
 	;do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 	shl r10, 3
@@ -105,8 +105,8 @@ initcountdone:
 
 align 32; Using instruction buffer block size-aligned innermost loop jump targets is a common optimization. The alignment here is this high because the entire loop is definitely more than 16 bytes of bytecode.
 mainloopeven:
-	;uint64_t curlo{*psrclo++};
-	;uint64_t curhi{*psrchi--};
+	;std::uint64_t curlo{*psrclo++};
+	;std::uint64_t curhi{*psrchi--};
 	mov rsi, [rdx]; curlo (temporary)
 	mov r13, [rbx]; curhi (temporary)
 	add rdx, 8
@@ -114,15 +114,15 @@ mainloopeven:
 	mov rdi, rbp; pdstlo
 	mov r14, r12; pdsthi
 
-	;uint64_t sello{curlo >> bitselect};
-	;uint64_t selhi{curhi >> bitselect};
+	;std::uint64_t sello{curlo >> bitselect};
+	;std::uint64_t selhi{curhi >> bitselect};
 	mov r15, rsi; curlo
 	shr rsi, cl; sello
 	mov r9, r13; curhi
 	shr r13, cl; selhi
 
-	;uint64_t *pdstlo{(sello &= 1)? pdst1lo : pdst0lo};
-	;uint64_t *pdsthi{(selhi &= 1)? pdst1hi : pdst0hi};
+	;std::uint64_t *pdstlo{(sello &= 1)? pdst1lo : pdst0lo};
+	;std::uint64_t *pdsthi{(selhi &= 1)? pdst1hi : pdst0hi};
 	;pdst1lo += sello;// lea can shift and add
 	;selhi *= 8;// lea cannot subtract
 	;sello ^= 1;
@@ -137,7 +137,7 @@ mainloopeven:
 	xor esi, 1
 
 	;*pdstlo = curlo;
-	;pdst1hi = reinterpret_cast<uint64_t *>(reinterpret_cast<uint8_t *>(pdst1hi) - selhi);
+	;pdst1hi = reinterpret_cast<std::uint64_t *>(reinterpret_cast<std::uint8_t *>(pdst1hi) - selhi);
 	;selhi ^= 8;
 	;*pdsthi = curhi;
 	;pdst0lo += sello;
@@ -147,14 +147,14 @@ mainloopeven:
 	mov [r14], r9
 	lea r8, [r8+rsi*8]
 
-	;pdst0hi = reinterpret_cast<uint64_t *>(reinterpret_cast<uint8_t *>(pdst0hi) - selhi);
+	;pdst0hi = reinterpret_cast<std::uint64_t *>(reinterpret_cast<std::uint8_t *>(pdst0hi) - selhi);
 	;}while(psrclo < psrchi);
 	sub r11, r13
 	cmp rdx, rbx; possible macro-op fusion of cmp r, r and jb
 
 	jb mainloopeven
 
-	;size_t curcount;// skip a step if all bits for the index are zero
+	;std::size_t curcount;// skip a step if all bits for the index are zero
 	;do{// the version with all ones is much rarer unless working with already sorted array sections and hence not tested here
 	;if(64 <= ++bitselect) goto exit;
 curcountloopeven:; This is a rare jump target, and nops would often be executed here. Hence there's no realignent here.
@@ -202,8 +202,8 @@ curcountloopeven:; This is a rare jump target, and nops would often be executed 
 	;else for(;;){// main loop for odd counts
 align 32; Using instruction buffer block size-aligned innermost loop jump targets is a common optimization. The alignment here is this high because the entire loop is definitely more than 16 bytes of bytecode.
 mainloopodd:
-	;uint64_t curlo{*psrclo++};
-	;uint64_t curhi{*psrchi--};
+	;std::uint64_t curlo{*psrclo++};
+	;std::uint64_t curhi{*psrchi--};
 	mov rsi, [rdx]; curlo (temporary)
 	mov r13, [rbx]; curhi (temporary)
 	add rdx, 8
@@ -211,15 +211,15 @@ mainloopodd:
 	mov rdi, rbp; pdstlo
 	mov r14, r12; pdsthi
 
-	;uint64_t sello{curlo >> bitselect};
-	;uint64_t selhi{curhi >> bitselect};
+	;std::uint64_t sello{curlo >> bitselect};
+	;std::uint64_t selhi{curhi >> bitselect};
 	mov r15, rsi; curlo
 	shr rsi, cl; sello
 	mov r9, r13; curhi
 	shr r13, cl; selhi
 
-	;uint64_t *pdstlo{(sello &= 1)? pdst1lo : pdst0lo};
-	;uint64_t *pdsthi{(selhi &= 1)? pdst1hi : pdst0hi};
+	;std::uint64_t *pdstlo{(sello &= 1)? pdst1lo : pdst0lo};
+	;std::uint64_t *pdsthi{(selhi &= 1)? pdst1hi : pdst0hi};
 	;pdst1lo += sello;// lea can shift and add
 	;selhi *= 8;// lea cannot subtract
 	;sello ^= 1;
@@ -234,7 +234,7 @@ mainloopodd:
 	xor esi, 1
 
 	;*pdstlo = curlo;
-	;pdst1hi = reinterpret_cast<uint64_t *>(reinterpret_cast<uint8_t *>(pdst1hi) - selhi);
+	;pdst1hi = reinterpret_cast<std::uint64_t *>(reinterpret_cast<std::uint8_t *>(pdst1hi) - selhi);
 	;selhi ^= 8;
 	;*pdsthi = curhi;
 	;pdst0lo += sello;
@@ -244,7 +244,7 @@ mainloopodd:
 	mov [r14], r9
 	lea r8, [r8+rsi*8]
 
-	;pdst0hi = reinterpret_cast<uint64_t *>(reinterpret_cast<uint8_t *>(pdst0hi) - selhi);
+	;pdst0hi = reinterpret_cast<std::uint64_t *>(reinterpret_cast<std::uint8_t *>(pdst0hi) - selhi);
 	;}while(psrclo < psrchi);
 	sub r11, r13
 	cmp rdx, rbx; possible macro-op fusion of cmp r, r and jne
@@ -252,8 +252,8 @@ mainloopodd:
 	jne mainloopodd
 
 	;// fill in the final item
-	;uint64_t curlo{*psrclo};
-	;uint64_t currentbit{1ui64 << bitselect};
+	;std::uint64_t curlo{*psrclo};
+	;std::uint64_t currentbit{1ui64 << bitselect};
 	mov rsi, [rdx]; curlo (temporary)
 	mov edi, 1; currentbit
 
@@ -266,7 +266,7 @@ mainloopodd:
 	cmovz rbp, r8
 
 	mov [rbp], rsi
-	;size_t curcount;// skip a step if all bits for the index are zero
+	;std::size_t curcount;// skip a step if all bits for the index are zero
 	;do{// the version with all ones is much rarer unless working with already sorted array sections and hence not tested here
 	;if(64 <= ++bitselect) goto exit;
 curcountloopodd:; This is a rare jump target, and nops would often be executed here. Hence there's no realignent here.
@@ -345,7 +345,7 @@ InnerRadixSortBidi8@@32 proc
 	mov [rsp+24], rsi
 	mov [rsp+32], rdi
 	;// the next part requires the previous check for at least 3 elements
-	;size_t offsetslo[8][256]{}, offsetshi[8][256];// 32 kibibytes of indices on a 64-bit system, but it's worth it
+	;std::size_t offsetslo[8][256]{}, offsetshi[8][256];// 32 kibibytes of indices on a 64-bit system, but it's worth it
 	; [rsp+8000h, rsp+8018h) is useful padding to provide 16-byte alignment here
 	mov eax, 3 * 8 + 2 * 8 * 8 * 256; set up the rather large stack, give offsetslo (low memory at rsp) and offsetshi (high memory at rsp+4000h) at least 16-byte alignment
 	call __chkstk
@@ -354,11 +354,11 @@ InnerRadixSortBidi8@@32 proc
 	mov [rsp+8000h], r12
 	mov [rsp+8008h], r13
 	mov [rsp+8010h], r14
-	;size_t countm1{count - 1};
+	;std::size_t countm1{count - 1};
 	;bool paritybool;// for when the swap count is odd
-	;uint8_t runsteps;// 0 to 8
+	;std::uint8_t runsteps;// 0 to 8
 	;{// count the 256 configurations, all in one go
-	;ptrdiff_t i{static_cast<ptrdiff_t>(countm1)};
+	;std::ptrdiff_t i{static_cast<std::ptrdiff_t>(countm1)};
 	xorps xmm0, xmm0
 	mov rbx, rsp
 	mov ebp, 8 * 8 * 256 / 32
@@ -377,16 +377,16 @@ clearingloop:
 align 32; Using instruction buffer block size-aligned innermost loop jump targets is a common optimization. The alignment here is this high because the entire loop is definitely more than 16 bytes of bytecode.
 countingloop:
 	;do{// the lower half of offsets is zeroed out for the subsequent increments here
-	;uint64_t cur{arr[i]};
+	;std::uint64_t cur{arr[i]};
 	mov rax, [rcx+8*r10]
 
-	;size_t cur0{cur & 0xFF};
-	;uint64_t cur1{cur};
-	;uint64_t cur2{cur};
-	;uint64_t cur3{cur};
-	;uint64_t cur4{cur};
-	;uint64_t cur5{cur};
-	;uint64_t cur6{cur};
+	;std::size_t cur0{cur & 0xFF};
+	;std::uint64_t cur1{cur};
+	;std::uint64_t cur2{cur};
+	;std::uint64_t cur3{cur};
+	;std::uint64_t cur4{cur};
+	;std::uint64_t cur5{cur};
+	;std::uint64_t cur6{cur};
 	;buffer[i] = cur;// better to handle it from the start than to do an extra copy at the end, for when the swap count is odd
 	;cur >>= 56;
 	movzx esi, al
@@ -400,14 +400,14 @@ countingloop:
 	shr rax, 56
 
 	;++offsets[cur0];
-	;size_t constexpr log2ptrs{static_cast<unsigned int>(std::bit_width(sizeof(void *) - 1))};
+	;std::size_t constexpr log2ptrs{static_cast<unsigned int>(std::bit_width(sizeof(void *) - 1))};
 	;cur1 >>= 8 - log2ptrs;
 	;cur2 >>= 16 - log2ptrs;
 	;cur3 >>= 24 - log2ptrs;
 	;cur4 >>= 32 - log2ptrs;
 	;cur5 >>= 40 - log2ptrs;
 	;cur6 >>= 48 - log2ptrs;
-	;++offsets[7 * 256 + static_cast<size_t>(cur)];
+	;++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 	inc qword ptr [rsp+8*rsi]
 	shr ebp, 8 - 3
 	shr ebx, 16 - 3
@@ -430,12 +430,12 @@ countingloop:
 	and r13d, edi
 	and r14d, edi
 
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 256) + static_cast<size_t>(cur1));
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 2 * 256) + static_cast<size_t>(cur2));
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 3 * 256) + static_cast<size_t>(cur3));
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 4 * 256) + static_cast<size_t>(cur4));
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 5 * 256) + static_cast<size_t>(cur5));
-	;++*reinterpret_cast<size_t *>(reinterpret_cast<uint8_t *>(offsets + 6 * 256) + static_cast<size_t>(cur6));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 256) + static_cast<std::size_t>(cur1));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 2 * 256) + static_cast<std::size_t>(cur2));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 3 * 256) + static_cast<std::size_t>(cur3));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 4 * 256) + static_cast<std::size_t>(cur4));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 5 * 256) + static_cast<std::size_t>(cur5));
+	;++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::uint8_t *>(offsets + 6 * 256) + static_cast<std::size_t>(cur6));
 	;}while(0 <= --i);
 	inc qword ptr [rsp+rbp+8*256]
 	inc qword ptr [rsp+rbx+2*8*256]
@@ -448,10 +448,10 @@ countingloop:
 	jns countingloop
 
 	;// transform counts into base offsets for each set of 256 items
-	;size_t *t{offsets};
+	;std::size_t *t{offsets};
 	;paritybool = false;// for when the swap count is odd
-	;runsteps = (1 << sizeof(uint64_t)) - 1;
-	;uint32_t k{};
+	;runsteps = (1 << sizeof(std::uint64_t)) - 1;
+	;std::uint32_t k{};
 	; paritybool is already assigned here: it's in r9b and can be false or true
 	mov rdi, rsp; t
 	mov ebp, 0FFh; runsteps
@@ -464,14 +464,14 @@ countingloop:
 align 16; This is a reasonably rare jump target, but nops will only be executed once here. Put at least the first 3 instructions (14 bytes of bytecode in this case) in the instruction buffer at this point.
 offsetloop:
 	;do{
-	;size_t offset{*t};
+	;std::size_t offset{*t};
 	;*t++ = 0;// the first offset always starts at zero
 	mov r12, [rdi]; offset
 	mov qword ptr [rdi], 0
 	add rdi, 8
 
 	;bool b{offset == count};
-	;uint32_t j{256 - 2};
+	;std::uint32_t j{256 - 2};
 	cmp r12, r8
 	mov esi, 256-2; j
 
@@ -479,7 +479,7 @@ offsetloop:
 align 16; This is a reasonably common jump target, and nops will only be executed 8 times here. Put at least the first 3 instructions (11 bytes of bytecode in this case) in the instruction buffer at this point.
 offsetloopinner:
 	;do{
-	;size_t addend{*t};
+	;std::size_t addend{*t};
 	;*t = offset;
 	;t[8 * 256 - 1] = offset - 1;// high half
 	mov r13, [rdi]; addend
@@ -519,7 +519,7 @@ offsetloopinner:
 	add rdi, 8
 
 	;paritybool ^= b;
-	;runsteps ^= static_cast<uint8_t>(b) << k;
+	;runsteps ^= static_cast<std::uint8_t>(b) << k;
 	;}while(8 > ++k);
 	;}
 	xor r9d, eax
@@ -536,15 +536,15 @@ offsetloopinner:
 
 	jz exit
 
-	;uint64_t *psrclo{arr}, *pdst{buffer};
+	;std::uint64_t *psrclo{arr}, *pdst{buffer};
 	;if(paritybool){// swap if the count of sorting actions to do is odd
 	;pdst = arr;
 	;psrclo = buffer;
 	;}
 	; psrclo is already assigned here: it's in r11
 	; pdst is already assigned here: it's in rdx
-	;size_t *poffset{offsets};
-	;uint32_t initialindex{
+	;std::size_t *poffset{offsets};
+	;std::uint32_t initialindex{
 	;_tzcnt_u32(runsteps)// will run bsf (bit scan forward) on older architectures, which is fine
 	;};// at least 1 bit is set inside runsteps as by previous check
 	tzcnt ecx, ebp; initialindex
@@ -555,10 +555,10 @@ offsetloopinner:
 	cmovnz r11, rdx
 	cmovnz rdx, r14
 	;runsteps >>= initialindex;// skip a step if possible
-	;uint32_t bitselect{initialindex * 8};
-	;poffset += static_cast<size_t>(initialindex) * 256;
-	;uint64_t *psrchi{psrclo + countm1};
-	;uint64_t *pdstnext{psrclo};// for the next iteration
+	;std::uint32_t bitselect{initialindex * 8};
+	;poffset += static_cast<std::size_t>(initialindex) * 256;
+	;std::uint64_t *psrchi{psrclo + countm1};
+	;std::uint64_t *pdstnext{psrclo};// for the next iteration
 	mov eax, ecx
 	shr ebp, cl
 	shl ecx, 3
@@ -592,15 +592,15 @@ offsetloopinner:
 align 32; Using instruction buffer block size-aligned innermost loop jump targets is a common optimization. The alignment here is this high because the entire loop is definitely more than 16 bytes of bytecode.
 mainloopeven:
 	;do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-	;uint64_t curlo{*psrclo++};
-	;uint64_t curhi{*psrchi--};
+	;std::uint64_t curlo{*psrclo++};
+	;std::uint64_t curhi{*psrchi--};
 	mov rax, [r11]; sello
 	mov rbx, [r12]; selhi
 	mov edi, 1
 	or r9, -1; set all bits, shorter opcode than the direct move
 
-	;size_t sello{curlo >> bitselect & 0xFF};
-	;size_t selhi{curhi >> bitselect & 0xFF};
+	;std::size_t sello{curlo >> bitselect & 0xFF};
+	;std::size_t selhi{curhi >> bitselect & 0xFF};
 	mov r13, rax; curlo
 	shr rax, cl
 	mov r14, rbx; curhi
@@ -610,8 +610,8 @@ mainloopeven:
 	movzx ebx, bl
 	add r11, 8
 
-	;size_t offsetlo{poffset[sello]++};// the next item will be placed one higher
-	;size_t offsethi{poffset[8 * 256 + selhi]--};// the next item will be placed one lower
+	;std::size_t offsetlo{poffset[sello]++};// the next item will be placed one higher
+	;std::size_t offsethi{poffset[8 * 256 + selhi]--};// the next item will be placed one lower
 	xadd [rsi+rax*8], rdi; offsetlo
 	xadd [rsi+rbx*8+4000h], r9; offsethi
 	sub r12, 8
@@ -631,7 +631,7 @@ mainloopeven:
 	;if(!runsteps) break;
 	jz exit
 
-	;uint32_t index{
+	;std::uint32_t index{
 	;_tzcnt_u32(runsteps)// will run bsf (bit scan forward) on older architectures, which is fine
 	;};// at least 1 bit is set inside runsteps as by previous check
 	;bitselect += 8;
@@ -646,7 +646,7 @@ mainloopeven:
 	shr ebp, cl
 	lea ecx, [rax+8*rcx]
 
-	;poffset += static_cast<size_t>(index) * 256;
+	;poffset += static_cast<std::size_t>(index) * 256;
 	;// swap the pointers for the next round, data is moved on each iteration
 	;psrclo = pdst;
 	;psrchi = pdst + countm1;
@@ -665,15 +665,15 @@ mainloopeven:
 align 32; Using instruction buffer block size-aligned innermost loop jump targets is a common optimization. The alignment here is this high because the entire loop is definitely more than 16 bytes of bytecode.
 mainloopodd:
 	;do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-	;uint64_t curlo{*psrclo++};
-	;uint64_t curhi{*psrchi--};
+	;std::uint64_t curlo{*psrclo++};
+	;std::uint64_t curhi{*psrchi--};
 	mov rax, [r11]; sello
 	mov rbx, [r12]; selhi
 	mov edi, 1
 	or r9, -1; set all bits, shorter opcode than the direct move
 
-	;size_t sello{curlo >> bitselect & 0xFF};
-	;size_t selhi{curhi >> bitselect & 0xFF};
+	;std::size_t sello{curlo >> bitselect & 0xFF};
+	;std::size_t selhi{curhi >> bitselect & 0xFF};
 	mov r13, rax; curlo
 	shr rax, cl
 	mov r14, rbx; curhi
@@ -683,8 +683,8 @@ mainloopodd:
 	movzx ebx, bl
 	add r11, 8
 
-	;size_t offsetlo{poffset[sello]++};// the next item will be placed one higher
-	;size_t offsethi{poffset[8 * 256 + selhi]--};// the next item will be placed one lower
+	;std::size_t offsetlo{poffset[sello]++};// the next item will be placed one higher
+	;std::size_t offsethi{poffset[8 * 256 + selhi]--};// the next item will be placed one lower
 	xadd [rsi+rax*8], rdi; offsetlo
 	xadd [rsi+rbx*8+4000h], r9; offsethi
 	sub r12, 8
@@ -699,11 +699,11 @@ mainloopodd:
 	jne mainloopodd
 
 	;// fill in the final item
-	;uint64_t curlo{*psrclo};
+	;std::uint64_t curlo{*psrclo};
 	mov rax, [r11]; sello
 
-	;size_t sello{curlo >> bitselect & 0xFF};
-	;size_t offsetlo{poffset[sello]};
+	;std::size_t sello{curlo >> bitselect & 0xFF};
+	;std::size_t offsetlo{poffset[sello]};
 	;pdst[offsetlo] = curlo;
 	;runsteps >>= 1;
 	mov r13, rax; curlo
@@ -718,7 +718,7 @@ mainloopodd:
 	;if(!runsteps) break;
 	jz exit
 
-	;uint32_t index{
+	;std::uint32_t index{
 	;_tzcnt_u32(runsteps)// will run bsf (bit scan forward) on older architectures, which is fine
 	;};// at least 1 bit is set inside runsteps as by previous check
 	;bitselect += 8;
@@ -733,7 +733,7 @@ mainloopodd:
 	shr ebp, cl
 	lea ecx, [rax+8*rcx]
 
-	;poffset += static_cast<size_t>(index) * 256;
+	;poffset += static_cast<std::size_t>(index) * 256;
 	;// swap the pointers for the next round, data is moved on each iteration
 	;psrclo = pdst;
 	;psrchi = pdst + countm1;

@@ -2,6 +2,7 @@
 
 #include <intrin.h>
 #include <profileapi.h>
+#include <cstddef>
 #ifdef _DEBUG
 #define _CRTDBG_MAP_ALLOC// include Microsoft memory leak detection procedures
 #endif
@@ -22,20 +23,20 @@
 // 11 bits required per table entry
 // 352 bytes required if packed
 // sampler:
-////uint32_t v_0{((1ui32 << 19) - 3ui32 * (1ui32 << 8)) / d_9}; use a table lookup for this:
+////std::uint32_t v_0{((1ui32 << 19) - 3ui32 * (1ui32 << 8)) / d_9}; use a table lookup for this:
 //// the input is a 9-bit normalized divisor, so there are 256 table entries (the high bit is always set, so there are not 512 table entries)
-//uint32_t bitoffset{d_9 * 11ui32};
-//uint32_t twobyteoffset{bitoffset >> 4}; bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
-//uint32_t v_0{*reinterpret_cast<uint32_t UNALIGNED const*>(reinterpret_cast<uint16_t const*>(gk_packedlookuptablev64) - (1 << (9 - 1)) * 11 / 16 + static_cast<size_t>(twobyteoffset))}; table lookup with a compile-time base offset, note: (1 << (9 - 1)) * 11 / 16 only shifts out zeroes at / 16
-//uint32_t residualbitoffset{bitoffset & 15ui32}; formally (bitoffset - (1ui32 << (9 - 1)) * 11ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (9 - 1)) * 11ui32 are all zero
+//std::uint32_t bitoffset{d_9 * 11ui32};
+//std::uint32_t twobyteoffset{bitoffset >> 4}; bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
+//std::uint32_t v_0{*reinterpret_cast<std::uint32_t UNALIGNED const*>(reinterpret_cast<std::uint16_t const*>(gk_packedlookuptablev64) - (1 << (9 - 1)) * 11 / 16 + static_cast<std::size_t>(twobyteoffset))}; table lookup with a compile-time base offset, note: (1 << (9 - 1)) * 11 / 16 only shifts out zeroes at / 16
+//std::uint32_t residualbitoffset{bitoffset & 15ui32}; formally (bitoffset - (1ui32 << (9 - 1)) * 11ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (9 - 1)) * 11ui32 are all zero
 //v_0 >>= residualbitoffset;
 //v_0 &= 0x7FFui32;
 struct packedlookuptablev64segment{// note that the compiler refuses to pack bitfields across multiple words, hence this approach
-	uint32_t elements[11];
-	constexpr packedlookuptablev64segment(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7,
-		uint32_t v8, uint32_t v9, uint32_t v10, uint32_t v11, uint32_t v12, uint32_t v13, uint32_t v14, uint32_t v15,
-		uint32_t v16, uint32_t v17, uint32_t v18, uint32_t v19, uint32_t v20, uint32_t v21, uint32_t v22, uint32_t v23,
-		uint32_t v24, uint32_t v25, uint32_t v26, uint32_t v27, uint32_t v28, uint32_t v29, uint32_t v30, uint32_t v31)
+	std::uint32_t elements[11];
+	constexpr packedlookuptablev64segment(std::uint32_t v0, std::uint32_t v1, std::uint32_t v2, std::uint32_t v3, std::uint32_t v4, std::uint32_t v5, std::uint32_t v6, std::uint32_t v7,
+		std::uint32_t v8, std::uint32_t v9, std::uint32_t v10, std::uint32_t v11, std::uint32_t v12, std::uint32_t v13, std::uint32_t v14, std::uint32_t v15,
+		std::uint32_t v16, std::uint32_t v17, std::uint32_t v18, std::uint32_t v19, std::uint32_t v20, std::uint32_t v21, std::uint32_t v22, std::uint32_t v23,
+		std::uint32_t v24, std::uint32_t v25, std::uint32_t v26, std::uint32_t v27, std::uint32_t v28, std::uint32_t v29, std::uint32_t v30, std::uint32_t v31)
 		: elements{v0 | v1 << 11 | v2 << 22,
 			v2 >> 10 | v3 << 1 | v4 << 12 | v5 << 23,
 			v5 >> 9 | v6 << 2 | v7 << 13 | v8 << 24,
@@ -90,21 +91,21 @@ static_assert(sizeof gk_packedlookuptablev64 == 11 * 256 / 8, L"array gk_packedl
 // 15 bits required per table entry
 // 960 bytes required if packed
 // sampler:
-////uint32_t v_0{((1ui32 << 24) - (1ui32 << 14) + (1ui32 << 9)) / d_10}; use a table lookup for this:
+////std::uint32_t v_0{((1ui32 << 24) - (1ui32 << 14) + (1ui32 << 9)) / d_10}; use a table lookup for this:
 //// the input is a 10-bit normalized divisor, so there are 512 table entries (the high bit is always set, so there are not 1024 table entries)
-//uint32_t bitoffset{d_10 << 4}; bitoffset = d_10 * 15ui32
+//std::uint32_t bitoffset{d_10 << 4}; bitoffset = d_10 * 15ui32
 //bitoffset -= d_10;
-//uint32_t twobyteoffset{bitoffset >> 4}; bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
-//uint32_t residualbitoffset{bitoffset & 15ui32}; formally (bitoffset - (1ui32 << (10 - 1)) * 15ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (10 - 1)) * 15ui32 are all zero
-//uint32_t v_0{*reinterpret_cast<uint32_t UNALIGNED const*>(reinterpret_cast<uint16_t const*>(gk_packedlookuptablev32) - (1 << (10 - 1)) * 15 / 16 + static_cast<size_t>(twobyteoffset))}; single-instruction table lookup with a compile-time base offset, note: (1 << (10 - 1)) * 15 / 16 only shifts out zeroes at / 16
+//std::uint32_t twobyteoffset{bitoffset >> 4}; bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
+//std::uint32_t residualbitoffset{bitoffset & 15ui32}; formally (bitoffset - (1ui32 << (10 - 1)) * 15ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (10 - 1)) * 15ui32 are all zero
+//std::uint32_t v_0{*reinterpret_cast<std::uint32_t UNALIGNED const*>(reinterpret_cast<std::uint16_t const*>(gk_packedlookuptablev32) - (1 << (10 - 1)) * 15 / 16 + static_cast<std::size_t>(twobyteoffset))}; single-instruction table lookup with a compile-time base offset, note: (1 << (10 - 1)) * 15 / 16 only shifts out zeroes at / 16
 //v_0 >>= residualbitoffset;
 //v_0 &= 0x7FFFui32;
 struct packedlookuptablev32segment{// note that the compiler refuses to pack bitfields across multiple words, hence this approach
-	uint32_t elements[15];
-	constexpr packedlookuptablev32segment(uint32_t v0, uint32_t v1, uint32_t v2, uint32_t v3, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7,
-		uint32_t v8, uint32_t v9, uint32_t v10, uint32_t v11, uint32_t v12, uint32_t v13, uint32_t v14, uint32_t v15,
-		uint32_t v16, uint32_t v17, uint32_t v18, uint32_t v19, uint32_t v20, uint32_t v21, uint32_t v22, uint32_t v23,
-		uint32_t v24, uint32_t v25, uint32_t v26, uint32_t v27, uint32_t v28, uint32_t v29, uint32_t v30, uint32_t v31)
+	std::uint32_t elements[15];
+	constexpr packedlookuptablev32segment(std::uint32_t v0, std::uint32_t v1, std::uint32_t v2, std::uint32_t v3, std::uint32_t v4, std::uint32_t v5, std::uint32_t v6, std::uint32_t v7,
+		std::uint32_t v8, std::uint32_t v9, std::uint32_t v10, std::uint32_t v11, std::uint32_t v12, std::uint32_t v13, std::uint32_t v14, std::uint32_t v15,
+		std::uint32_t v16, std::uint32_t v17, std::uint32_t v18, std::uint32_t v19, std::uint32_t v20, std::uint32_t v21, std::uint32_t v22, std::uint32_t v23,
+		std::uint32_t v24, std::uint32_t v25, std::uint32_t v26, std::uint32_t v27, std::uint32_t v28, std::uint32_t v29, std::uint32_t v30, std::uint32_t v31)
 		: elements{v0 | v1 << 15 | v2 << 30,
 			v2 >> 2 | v3 << 13 | v4 << 28,
 			v4 >> 4 | v5 << 11 | v6 << 26,
@@ -191,17 +192,17 @@ static_assert(sizeof gk_packedlookuptablev32 == 15 * 512 / 8, L"array gk_packedl
 
 struct QPFDivisorConstants{
 #ifdef _WIN64
-	uint64_t m_d_norm, m_mprime;
+	std::uint64_t m_d_norm, m_mprime;
 #else
-	uint32_t m_d_normlo, m_d_normhi, m_v;
+	std::uint32_t m_d_normlo, m_d_normhi, m_v;
 #endif
-	uint8_t m_Nml;
+	std::uint8_t m_Nml;
 	__declspec(noalias safebuffers) __forceinline QPFDivisorConstants(){
 		LARGE_INTEGER pf;
 		BOOL bos{QueryPerformanceFrequency(&pf)};
 		static_cast<void>(bos);
 		assert(bos);// guaranteed since Windows XP
-		uint64_t d{static_cast<uint64_t>(pf.QuadPart)};// non-zero, positive divisor
+		std::uint64_t d{static_cast<std::uint64_t>(pf.QuadPart)};// non-zero, positive divisor
 		assert(d);
 
 		// set up the run-time invariant values for the 128-to-64-bit unsigned division by invariant integers using multiplication routine
@@ -218,99 +219,99 @@ struct QPFDivisorConstants{
 		_BitScanReverse64(&lm1, d);
 		assert(lm1 < 64ul);
 		unsigned long Nml{64 - 1 - lm1};
-		m_Nml = static_cast<uint8_t>(Nml);
+		m_Nml = static_cast<std::uint8_t>(Nml);
 		//unsigned long l{lm1 + 1}; this will cause failed shifts for the case of l = 64
-		uint64_t d_norm{d << Nml};
+		std::uint64_t d_norm{d << Nml};
 		m_d_norm = d_norm;
-		//uint64_t mprime{static_cast<uint64_t>(((((1ui128 << l) - static_cast<uint128_t>(d)) << 64) - 1ui128) / static_cast<uint128_t>(d))};
+		//std::uint64_t mprime{static_cast<std::uint64_t>(((((1ui128 << l) - static_cast<std::uint128_t>(d)) << 64) - 1ui128) / static_cast<std::uint128_t>(d))};
 		// create the normalized reciprocal divisor mprime
-		uint32_t d_9{static_cast<uint32_t>(d_norm >> 55)};
-		uint64_t d_40{d_norm >> 24};
-		//uint32_t v_0{((1ui32 << 19) - 3ui32 * (1ui32 << 8)) / d_9}; use a table lookup for this:
+		std::uint32_t d_9{static_cast<std::uint32_t>(d_norm >> 55)};
+		std::uint64_t d_40{d_norm >> 24};
+		//std::uint32_t v_0{((1ui32 << 19) - 3ui32 * (1ui32 << 8)) / d_9}; use a table lookup for this:
 		// the input is a 9-bit normalized divisor, so there are 256 table entries (the high bit is always set, so there are not 512 table entries)
-		uint32_t bitoffset{d_9 * 11ui32};
-		uint64_t d_0{d_norm & 1ui64};
-		uint64_t d_63{d_norm >> 1};
-		uint32_t twobyteoffset{bitoffset >> 4};// bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
-		uint32_t residualbitoffset{bitoffset & 15ui32};// formally (bitoffset - (1ui32 << (9 - 1)) * 11ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (9 - 1)) * 11ui32 are all zero
-		uint32_t v_0{*reinterpret_cast<uint32_t UNALIGNED const*>(reinterpret_cast<uint16_t const*>(gk_packedlookuptablev64) - (1 << (9 - 1)) * 11 / 16 + static_cast<size_t>(twobyteoffset))};// table lookup with a compile-time base offset, note: (1 << (9 - 1)) * 11 / 16 only shifts out zeroes at / 16
+		std::uint32_t bitoffset{d_9 * 11ui32};
+		std::uint64_t d_0{d_norm & 1ui64};
+		std::uint64_t d_63{d_norm >> 1};
+		std::uint32_t twobyteoffset{bitoffset >> 4};// bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
+		std::uint32_t residualbitoffset{bitoffset & 15ui32};// formally (bitoffset - (1ui32 << (9 - 1)) * 11ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (9 - 1)) * 11ui32 are all zero
+		std::uint32_t v_0{*reinterpret_cast<std::uint32_t UNALIGNED const*>(reinterpret_cast<std::uint16_t const*>(gk_packedlookuptablev64) - (1 << (9 - 1)) * 11 / 16 + static_cast<std::size_t>(twobyteoffset))};// table lookup with a compile-time base offset, note: (1 << (9 - 1)) * 11 / 16 only shifts out zeroes at / 16
 		++d_40;// unconditional increment
 		v_0 >>= residualbitoffset;
 		d_63 += d_0;// rounded up
 		v_0 &= 0x7FFui32;
-		uint64_t d_0mask{static_cast<uint64_t>(-static_cast<int64_t>(d_0))};// this will either clear or set all bits in the mask
-		uint64_t v_1{static_cast<uint64_t>((v_0 << 11) - 1ui32) - (static_cast<uint64_t>(v_0 * v_0) * d_40 >> 40)};// v_0 * v_0 is allowed because the maximum product does not require a representation of more than 32 bits: 0x7FDui32 * 0x7FDui32 = 0x3FD009ui32
-		uint64_t v_2{(v_1 << 13) + (((1ui64 << 60) - v_1 * d_40) * v_1 >> 47)};
-		uint64_t e{(v_2 >> 1 & d_0mask) - v_2 * d_63};
-		uint64_t v_3{(v_2 << 31) + (__umulh(v_2, e) >> 1)};
-		uint64_t v_4ihi, v_4ilo{_umul128(v_3, d_norm, &v_4ihi)};
+		std::uint64_t d_0mask{static_cast<std::uint64_t>(-static_cast<std::int64_t>(d_0))};// this will either clear or set all bits in the mask
+		std::uint64_t v_1{static_cast<std::uint64_t>((v_0 << 11) - 1ui32) - (static_cast<std::uint64_t>(v_0 * v_0) * d_40 >> 40)};// v_0 * v_0 is allowed because the maximum product does not require a representation of more than 32 bits: 0x7FDui32 * 0x7FDui32 = 0x3FD009ui32
+		std::uint64_t v_2{(v_1 << 13) + (((1ui64 << 60) - v_1 * d_40) * v_1 >> 47)};
+		std::uint64_t e{(v_2 >> 1 & d_0mask) - v_2 * d_63};
+		std::uint64_t v_3{(v_2 << 31) + (__umulh(v_2, e) >> 1)};
+		std::uint64_t v_4ihi, v_4ilo{_umul128(v_3, d_norm, &v_4ihi)};
 		_addcarry_u64(_addcarry_u64(0, v_4ilo, d_norm, nullptr), v_4ihi, d_norm, &v_4ihi);// ignore the resulting carry out, assembly checked: the compiler allows nullptr on this parameter without faulting at compile- or run-time
-		uint64_t v_4{v_3 - v_4ihi};
+		std::uint64_t v_4{v_3 - v_4ihi};
 		m_mprime = v_4;
 #else
 		// l = 1 + floor(log2(d))
 		//_BitScanReverse64(&lm1, d);
 		//unsigned long Nml{64 - 1 - lm1};
 		//unsigned long l{lm1 + 1}; this will cause failed shifts for the case of l = 64
-		//uint64_t d_norm{d << Nml};
+		//std::uint64_t d_norm{d << Nml};
 		unsigned long lm1, Nml;
-		uint32_t d_normlo, d_normhi;
-		if(_BitScanReverse(&lm1, static_cast<uint32_t>(d >> 32))){
+		std::uint32_t d_normlo, d_normhi;
+		if(_BitScanReverse(&lm1, static_cast<std::uint32_t>(d >> 32))){
 			assert(lm1 < 32ul);
 			Nml = 64 - 1 - 32 - lm1;
 			// __ll_lshift(), __ull_rshift() and __ll_rshift() on x86-32 cannot shift more than 31 bits, exactly the same way as the underlying shld (top left), shl/sal (bottom left), shrd (bottom right), shr (top right, unsigned only), sar (top right, signed only) instructions work, so do not replace these with the generic <<=, <<, >>= or >> operands for the next statements, as these use heuristics for multi-instruction variable amount shifts of up to 64 bits
-			uint64_t d_norm{__ll_lshift(d, static_cast<int>(Nml))};
-			d_normlo = static_cast<uint32_t>(d_norm), d_normhi = static_cast<uint32_t>(d_norm >> 32);
+			std::uint64_t d_norm{__ll_lshift(d, static_cast<int>(Nml))};
+			d_normlo = static_cast<std::uint32_t>(d_norm), d_normhi = static_cast<std::uint32_t>(d_norm >> 32);
 		}else{
-			uint32_t dlo{static_cast<uint32_t>(d)};
+			std::uint32_t dlo{static_cast<std::uint32_t>(d)};
 			_BitScanReverse(&lm1, dlo);
 			assert(lm1 < 32ul);
 			Nml = 64 - 1 - lm1;
 			d_normlo = 0ui32, d_normhi = dlo << Nml;
 		}
-		m_Nml = static_cast<uint8_t>(Nml);
+		m_Nml = static_cast<std::uint8_t>(Nml);
 		m_d_normlo = d_normlo, m_d_normhi = d_normhi;
 		// create the normalized reciprocal divisor v
-		uint32_t d_10{d_normhi >> 22};
-		uint32_t d_21{d_normhi >> 11};
-		//uint32_t v_0{((1ui32 << 24) - (1ui32 << 14) + (1ui32 << 9)) / d_10}; use a table lookup for this:
+		std::uint32_t d_10{d_normhi >> 22};
+		std::uint32_t d_21{d_normhi >> 11};
+		//std::uint32_t v_0{((1ui32 << 24) - (1ui32 << 14) + (1ui32 << 9)) / d_10}; use a table lookup for this:
 		// the input is a 10-bit normalized divisor, so there are 512 table entries (the high bit is always set, so there are not 1024 table entries)
-		uint32_t bitoffset{d_10 << 4};// bitoffset = d_10 * 15ui32
-		uint32_t d_0{d_normhi & 1ui32};
+		std::uint32_t bitoffset{d_10 << 4};// bitoffset = d_10 * 15ui32
+		std::uint32_t d_0{d_normhi & 1ui32};
 		bitoffset -= d_10;
-		uint32_t d_31{d_normhi >> 1};
-		uint32_t twobyteoffset{bitoffset >> 4};// bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
-		uint32_t residualbitoffset{bitoffset & 15ui32};// formally (bitoffset - (1ui32 << (10 - 1)) * 15ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (10 - 1)) * 15ui32 are all zero
-		uint32_t v_0{*reinterpret_cast<uint32_t UNALIGNED const*>(reinterpret_cast<uint16_t const*>(gk_packedlookuptablev32) - (1 << (10 - 1)) * 15 / 16 + static_cast<size_t>(twobyteoffset))};// single-instruction table lookup with a compile-time base offset, note: (1 << (10 - 1)) * 15 / 16 only shifts out zeroes at / 16
+		std::uint32_t d_31{d_normhi >> 1};
+		std::uint32_t twobyteoffset{bitoffset >> 4};// bitoffset / 16, using bitoffset / 8 would issue the requirement of 2 bytes of padding at the end of the array because of the 4-byte dereferencing
+		std::uint32_t residualbitoffset{bitoffset & 15ui32};// formally (bitoffset - (1ui32 << (10 - 1)) * 15ui32) & 15ui32, but this can be simplified as the low bits of (1ui32 << (10 - 1)) * 15ui32 are all zero
+		std::uint32_t v_0{*reinterpret_cast<std::uint32_t UNALIGNED const*>(reinterpret_cast<std::uint16_t const*>(gk_packedlookuptablev32) - (1 << (10 - 1)) * 15 / 16 + static_cast<std::size_t>(twobyteoffset))};// single-instruction table lookup with a compile-time base offset, note: (1 << (10 - 1)) * 15 / 16 only shifts out zeroes at / 16
 		++d_21;// unconditional increment
 		v_0 >>= residualbitoffset;
 		d_31 += d_0;// rounded up
 		v_0 &= 0x7FFFui32;
-		uint32_t d_0mask{static_cast<uint32_t>(-static_cast<int32_t>(d_0))};// this will either clear or set all bits in the mask
-		uint32_t v_1{(v_0 << 4) - 1ui32 - static_cast<uint32_t>(__emulu(v_0 * v_0, d_21) >> 32)};// v_0 * v_0 is allowed because the maximum product does not require a representation of more than 32 bits: 0x7FE1ui32 * 0x7FE1ui32 = 0x3FE103C1ui32
-		uint32_t e{((d_0mask & v_1) >> 1) - v_1 * d_31};
-		uint32_t v_2{(v_1 << 15) + static_cast<uint32_t>(__emulu(v_1, e) >> 33)};
-		uint64_t v_3i{__emulu(v_2, d_normhi)};
-		uint32_t v_3ihi{static_cast<uint32_t>(v_3i >> 32)};
-		_addcarry_u32(_addcarry_u32(0, static_cast<uint32_t>(v_3i), d_normhi, nullptr), v_3ihi, d_normhi, &v_3ihi);// ignore the resulting carry out, assembly checked: the compiler allows nullptr on this parameter without faulting at compile- or run-time
-		uint32_t v_3{v_2 - v_3ihi};
-		uint32_t v{v_3};
+		std::uint32_t d_0mask{static_cast<std::uint32_t>(-static_cast<std::int32_t>(d_0))};// this will either clear or set all bits in the mask
+		std::uint32_t v_1{(v_0 << 4) - 1ui32 - static_cast<std::uint32_t>(__emulu(v_0 * v_0, d_21) >> 32)};// v_0 * v_0 is allowed because the maximum product does not require a representation of more than 32 bits: 0x7FE1ui32 * 0x7FE1ui32 = 0x3FE103C1ui32
+		std::uint32_t e{((d_0mask & v_1) >> 1) - v_1 * d_31};
+		std::uint32_t v_2{(v_1 << 15) + static_cast<std::uint32_t>(__emulu(v_1, e) >> 33)};
+		std::uint64_t v_3i{__emulu(v_2, d_normhi)};
+		std::uint32_t v_3ihi{static_cast<std::uint32_t>(v_3i >> 32)};
+		_addcarry_u32(_addcarry_u32(0, static_cast<std::uint32_t>(v_3i), d_normhi, nullptr), v_3ihi, d_normhi, &v_3ihi);// ignore the resulting carry out, assembly checked: the compiler allows nullptr on this parameter without faulting at compile- or run-time
+		std::uint32_t v_3{v_2 - v_3ihi};
+		std::uint32_t v{v_3};
 		// improve v for multi-word division, note that if d_normlo is zero, this will do nothing
-		uint32_t p{v * d_normhi};
-		uint32_t mask0;// carry of the addition in the mask
+		std::uint32_t p{v * d_normhi};
+		std::uint32_t mask0;// carry of the addition in the mask
 		_subborrow_u32(_addcarry_u32(0, p, d_normhi, &p), mask0, mask0, &mask0);
-		uint32_t pmasked{d_normhi & mask0};
+		std::uint32_t pmasked{d_normhi & mask0};
 		v += mask0;
 		// mask0 && p >= d_normhighest (implemented as !(p < d_normhighest)), set the mask if true
 		_addcarry_u32(_subborrow_u32(0, p, pmasked, &p), mask0, 0ui32, &mask0);// ignore the resulting carry out
 		v += mask0;
 		p -= pmasked & mask0;
-		uint64_t t{__emulu(v, d_normlo)};// v * d_normsecondhighest
-		uint32_t mask1;// carry of the addition in the mask
-		_subborrow_u32(_addcarry_u32(0, p, static_cast<uint32_t>(t >> 32), &p), mask1, mask1, &mask1);// add up the result
+		std::uint64_t t{__emulu(v, d_normlo)};// v * d_normsecondhighest
+		std::uint32_t mask1;// carry of the addition in the mask
+		_subborrow_u32(_addcarry_u32(0, p, static_cast<std::uint32_t>(t >> 32), &p), mask1, mask1, &mask1);// add up the result
 		v += mask1;
 		// mask1 && (p > d_normhighest || (p == d_normhighest && t0 >= d_normsecondhighest) (implemented as !(p < d_normhighest || (p == d_normhighest && t0 < d_normsecondhighest)))), decrement v by one if true
-		_addcarry_u32(_subborrow_u32(_subborrow_u32(0, static_cast<uint32_t>(t), d_normlo & mask1, nullptr), p, d_normhi & mask1, nullptr), v, mask1, &v);// ignore the resulting carry out, assembly checked: the compiler allows nullptr on this parameter without faulting at compile- or run-time
+		_addcarry_u32(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint32_t>(t), d_normlo & mask1, nullptr), p, d_normhi & mask1, nullptr), v, mask1, &v);// ignore the resulting carry out, assembly checked: the compiler allows nullptr on this parameter without faulting at compile- or run-time
 		m_v = v;
 #endif
 	}
@@ -319,15 +320,15 @@ struct QPFDivisorConstants{
 extern __declspec(selectany) QPFDivisorConstants const gk_QPFDivisorFactors;// This auto self-constructs at runtime during global initialization, without any external dependencies in software.
 
 // This function converts the elapsed time values obtained fom QueryPerformanceCounter() to 100 ns units.
-extern __declspec(noalias safebuffers noinline) uint64_t ConvertPerfCounterTo100ns(uint64_t timerunits);
+extern __declspec(noalias safebuffers noinline) std::uint64_t ConvertPerfCounterTo100ns(std::uint64_t timerunits);
 
 // This function returns the elapsed time since system boot in 100 ns units.
-extern __declspec(noalias safebuffers) __forceinline uint64_t PerfCounter100ns(){
+extern __declspec(noalias safebuffers) __forceinline std::uint64_t PerfCounter100ns(){
 	LARGE_INTEGER pc;
 	BOOL bos{QueryPerformanceCounter(&pc)};
 	static_cast<void>(bos);
 	assert(bos);// guaranteed since Windows XP
-	return{ConvertPerfCounterTo100ns(static_cast<uint64_t>(pc.QuadPart))};
+	return{ConvertPerfCounterTo100ns(static_cast<std::uint64_t>(pc.QuadPart))};
 }
 
 // re-enable warning messages for files including this header
