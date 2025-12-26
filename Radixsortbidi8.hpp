@@ -19568,9 +19568,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
-// 1, 2, or 4-way multithreading function reroutes
+// 1- to 16-way multithreading function reroutes
 #ifdef RSBD8_DISABLE_MULTITHREADING
-// simply re-route to the 1- or 2-way multithreading functions
+// simply re-route to the single-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -19611,7 +19611,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 }
-#else// up to 4-way multithreading
+#else// up to 16-way multithreading
 // helper functions for converting inputs to perform unsigned comparisons in a final merging phase
 // these are altered copies of the filterinput() functions to have an extra final filtering step
 // nothing will be processed when using these on unfiltered unsigned inputs
@@ -20374,6 +20374,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
+// standalone function, but may be inlined into the call of std::async operations (hence RSBD8_FUNC_INLINE) in the 4-, 8- and then 16-way multithreading parts
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
@@ -20647,8 +20648,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading main function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
+// not a standalone function, unlike the above, but it's reused in the same template form (hence RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -20795,13 +20797,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_NORMAL std::enable_if_t<
+RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoallocmulti4thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
@@ -20845,13 +20847,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_NORMAL std::enable_if_t<
+RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void> radixsortnoallocmulti4thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
@@ -20898,6 +20900,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
+// multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
+// standalone function, but may be inlined into the call of std::async operations (hence RSBD8_FUNC_INLINE) in the 4-, 8- and then 16-way multithreading parts
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -21077,8 +21081,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	*pout = phi;
 }
 
+// multithreading main function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
+// not a standalone function, unlike the above, but it's reused in the same template form (hence RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21181,11 +21187,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<
+RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmulti4thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21230,11 +21236,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<
+RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti4thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21281,7 +21287,507 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 	}
 }
-#endif// 1, 2, or 4-way multithreading function reroutes
+
+// up to 8-way multithreading functions
+
+// function to establish the initial treshold for 8-way multithreading
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	std::size_t> base8waythreshold()noexcept{// TODO: this is purely 1.5 on top of the 4-way factor, adjust this formula after more benchmarking
+	// TODO: refine this formula further with more benchmarking data
+	static std::size_t constexpr typebitsize{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
+	// 0xFFFFFFFFu is generated for the unfiltered 16-bit case, which is just under 8 GiB of input data
+	// for unfiltered 32-bit it's 2 GiB, and for unfiltered 64-bit it's .5 GiB
+	// 0xFFFFFFFFu disables 4-way multithreading on 32-bit systems, and this upper limit still fits into a std::size_t
+	static double constexpr base{1.5 * // inverse cubic exponential scaling
+		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
+		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
+		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
+		* ((isfltpmode && isabsvalue)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
+#if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
+		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
+#endif
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
+#endif
+	};
+	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
+	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
+	// signed intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		intermediate
+#else// apply clamping on 32-bit systems and smaller, this will effectively disable 8-way multithreading when the limit is reached
+		std::min(intermediate, 0x7FFFFFFFp0)
+#endif
+		)) + 0x80000000u};
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	void> radixsortcopynoallocmulti8thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+				usemultithread = 1;
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that output and buffer were swapped in the initial phase
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+		}
+		radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+	}
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	void> radixsortnoallocmulti8thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+				usemultithread = 1;
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that input and buffer were swapped in the initial phase
+		T *tmp{input};
+		if(movetobuffer){
+			input = buffer;
+			buffer = tmp;
+		}
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+		}
+		radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+	}
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortcopynoallocmulti8thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+				usemultithread = 1;
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that output and buffer were swapped in the initial phase
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+		}
+		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+	}
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortnoallocmulti8thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+				usemultithread = 1;
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that input and buffer were swapped in the initial phase
+		V **tmp{input};
+		if(movetobuffer){
+			input = buffer;
+			buffer = tmp;
+		}
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+		}
+		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+	}
+}
+
+// up to 16-way multithreading functions
+
+// function to establish the initial treshold for 16-way multithreading
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	std::size_t> base16waythreshold()noexcept{// TODO: this is purely 3 on top of the 4-way factor, adjust this formula after more benchmarking
+	// TODO: refine this formula further with more benchmarking data
+	static std::size_t constexpr typebitsize{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
+	// 0xFFFFFFFFu is generated for the unfiltered 16-bit case, which is just under 8 GiB of input data
+	// for unfiltered 32-bit it's 2 GiB, and for unfiltered 64-bit it's .5 GiB
+	// 0xFFFFFFFFu disables 4-way multithreading on 32-bit systems, and this upper limit still fits into a std::size_t
+	static double constexpr base{3. * // inverse cubic exponential scaling
+		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
+		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
+		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
+		* ((isfltpmode && isabsvalue)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
+#if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
+		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
+#endif
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
+#endif
+	};
+	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
+	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
+	// signed intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		intermediate
+#else// apply clamping on 32-bit systems and smaller, this will effectively disable 16-way multithreading when the limit is reached
+		std::min(intermediate, 0x7FFFFFFFp0)
+#endif
+		)) + 0x80000000u};
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+				usemultithread = 1;
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that output and buffer were swapped in the initial phase
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+		}
+		radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+	}
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+				usemultithread = 1;
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that input and buffer were swapped in the initial phase
+		T *tmp{input};
+		if(movetobuffer){
+			input = buffer;
+			buffer = tmp;
+		}
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+		}
+		radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+	}
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+				usemultithread = 1;
+				std::swap(output, buffer);// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that output and buffer were swapped in the initial phase
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+		}
+		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+	}
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+
+	// initial phase with regular sorting of both halves
+	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+	{
+		std::future<void> asynchandle;
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
+			std::size_t const halfcount{count >> 1};// rounded down
+			try{
+				// process the upper half (rounded up) separately if possible
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+				usemultithread = 1;
+				movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		// process the lower half (rounded down) here
+		radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+	}
+
+	// merging phase
+	if(usemultithread){// conditionally enable multi-threading here
+		// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
+		// note that input and buffer were swapped in the initial phase
+		V **tmp{input};
+		if(movetobuffer){
+			input = buffer;
+			buffer = tmp;
+		}
+		std::future<void> asynchandle;
+		try{
+			// process the upper half separately if possible
+			asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
+		}catch(...){// std::async may fail gracefully here
+			assert(false);
+			// given the absolute rarity of this case, simply process this part in the current thread
+			radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+		}
+		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+	}
+}
+#endif// 1- to 16-way multithreading function reroutes
 
 }// namespace helper
 
