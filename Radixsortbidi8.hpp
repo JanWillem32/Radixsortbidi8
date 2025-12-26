@@ -20375,9 +20375,9 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
-// standalone function, but may be inlined into the call of std::async operations (hence RSBD8_FUNC_INLINE) in the 4-, 8- and then 16-way multithreading parts
+// standalone function, reused in the same template form (hence the RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -20649,7 +20649,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading main function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
-// not a standalone function, unlike the above, but it's reused in the same template form (hence RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
+// standalone function, reused in the same template form (hence the RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
@@ -20798,7 +20798,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -20854,7 +20854,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -20914,9 +20914,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
-// standalone function, but may be inlined into the call of std::async operations (hence RSBD8_FUNC_INLINE) in the 4-, 8- and then 16-way multithreading parts
+// standalone function, reused in the same template form (hence the RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21095,7 +21095,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // multithreading main function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
-// not a standalone function, unlike the above, but it's reused in the same template form (hence RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
+// standalone function, reused in the same template form (hence the RSBD8_FUNC_NORMAL) in the 4-, 8- and then 16-way multithreading parts
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -21200,7 +21200,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21255,7 +21255,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21360,7 +21360,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -21416,7 +21416,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -21476,7 +21476,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21531,7 +21531,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21637,7 +21637,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -21687,7 +21687,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -21741,7 +21741,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -21790,7 +21790,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
