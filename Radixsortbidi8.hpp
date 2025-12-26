@@ -21292,27 +21292,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // Section start of all rights reserved for the respective author (Sulley, 2024-06-15):
 // https://sulley.cc/2024/06/15/16/18/
 
-#pragma pack(push, 1)
-template<typename M, std::size_t Offset>
-struct MemberAt
-{
-	char padding[Offset];
-	M member;
-};
-#pragma pack(pop)
-
-template<typename M>
-struct MemberAt<M, 0>
-{
-	M member;
-};
-
 template<typename B, typename M, std::size_t Offset>
 union PaddedUnion
 {
 	char c;
 	B base;
-	MemberAt<M, Offset> member;
+	helper::memberobjectgenerator<M, static_cast<std::ptrdiff_t>(Offset)> member;
 };
 
 // ~~~~~ Begin core modification ~~~~~
