@@ -21292,27 +21292,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // Section start of all rights reserved for the respective author (Sulley, 2024-06-15):
 // https://sulley.cc/2024/06/15/16/18/
 
-#pragma pack(push, 1)
-template<typename M, std::size_t Offset>
-struct MemberAt
-{
-	char padding[Offset];
-	M member;
-};
-#pragma pack(pop)
-
-template<typename M>
-struct MemberAt<M, 0>
-{
-	M member;
-};
-
 template<typename B, typename M, std::size_t Offset>
 union PaddedUnion
 {
 	char c;
 	B base;
-	MemberAt<M, Offset> member;
+	helper::memberobjectgenerator<M, static_cast<std::ptrdiff_t>(Offset)> member;
 };
 
 // ~~~~~ Begin core modification ~~~~~
@@ -21322,25 +21307,16 @@ template <
 	std::size_t Low,
 	std::size_t High,
 	std::size_t Mid = (Low + High) / 2>
-struct OffsetHelper
-{
+struct OffsetHelper{
 	using M = std::remove_reference_t<decltype(std::declval<B>().*MemberPtr)>;
 
-	constexpr static PaddedUnion<B, M, Mid> dummy{};
-	constexpr static std::size_t GetOffsetOf()noexcept
-	{
-		if constexpr (&(dummy.base.*MemberPtr) > &dummy.member.member)
-		{
-			return OffsetHelper<MemberPtr, B, Mid + 1, High>::GetOffsetOf();
-		}
-		else if constexpr (&(dummy.base.*MemberPtr) < &dummy.member.member)
-		{
-			return OffsetHelper<MemberPtr, B, Low, Mid>::GetOffsetOf();
-		}
-		else
-		{
-			return Mid;
-		}
+	static constexpr PaddedUnion<B, M, Mid> dummy{};
+	static constexpr std::size_t GetOffsetOf()noexcept{
+		if constexpr(&(dummy.base.*MemberPtr) > &dummy.member.object){
+			return{OffsetHelper<MemberPtr, B, Mid + 1, High>::GetOffsetOf()};
+		}else if constexpr(&(dummy.base.*MemberPtr) < &dummy.member.object){
+			return{OffsetHelper<MemberPtr, B, Low, Mid>::GetOffsetOf()};
+		}else return{Mid};
 	}
 };
 // ~~~~~ End core modification ~~~~~
