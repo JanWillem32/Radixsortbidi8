@@ -32,7 +32,7 @@
 // These index parameters are typically used in a more straightforward manner and use regular indexing.
 // The variant with a getter function allows any number of extra arguments to pass on to the getter function.
 // Using a getter function that can throw (meaning that it lacks "noexcept") will incur some extra processing overhead.
-// Multithreading can be disabled completely by setting the macro RSBD8_DISABLE_MULTITHREADING.
+// Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_LIMIT to 1, 2, 4, 8 or 16.
 //
 // bool succeeded{rsbd8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
 // bool succeeded{rsbd8::radixsort<&myclass::member>(count, inputarr, pagesizeoptional)};
@@ -8623,7 +8623,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -9085,7 +9085,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -10213,7 +10213,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortcopynoallocmulti2thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -10970,7 +10970,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocmulti2thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -12515,7 +12515,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -13004,7 +13004,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -15014,7 +15014,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -16492,7 +16492,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -18255,7 +18255,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -18497,7 +18497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -18960,7 +18960,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -19307,7 +19307,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
-#ifdef RSBD8_DISABLE_MULTITHREADING
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
 		true
@@ -19569,8 +19569,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // 1- to 16-way multithreading function reroutes
-#ifdef RSBD8_DISABLE_MULTITHREADING
-// simply re-route to the single-thread functions
+#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT)
+// simply re-route to the 1 or 2-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -20338,7 +20338,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // up to 4-way multithreading functions
 
 // function to establish the initial treshold for 4-way multithreading
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool indirection = false>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -20366,6 +20366,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
 		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
 #endif
+		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
 	};
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
@@ -20803,7 +20804,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti4thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti4thread
+#endif
+	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
@@ -20853,7 +20860,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti4thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti4thread
+#endif
+	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
@@ -21191,7 +21204,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti4thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti4thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21202,7 +21221,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(limit4way < count && 3 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
@@ -21240,7 +21259,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti4thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti4thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21250,7 +21275,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(limit4way < count && 3 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
@@ -21288,10 +21313,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
 // up to 8-way multithreading functions
 
 // function to establish the initial treshold for 8-way multithreading
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool indirection = false>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -21319,6 +21345,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
 		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
 #endif
+		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
 	};
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
@@ -21339,7 +21366,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti8thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti8thread
+#endif
+	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
@@ -21389,7 +21422,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti8thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti8thread
+#endif
+	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
@@ -21441,7 +21480,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti8thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti8thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21452,7 +21497,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
@@ -21490,7 +21535,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti8thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti8thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -21500,7 +21551,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(limit8way < count && 7 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
@@ -21537,11 +21588,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 	}
 }
+#endif// !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
 
+#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
 // up to 16-way multithreading functions
 
 // function to establish the initial treshold for 16-way multithreading
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool indirection = false>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -21569,6 +21622,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
 		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
 #endif
+		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
 	};
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
@@ -21702,7 +21756,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
@@ -21750,8 +21804,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 	{
 		std::future<void> asynchandle;
-		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>() >> 1};// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
-		if(limit16way < count && 15 < std::thread::hardware_concurrency()){
+		static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+		// lower the limit, as indirection requires extra processing and typically doubles the memory access overhead
+		if(limit16way >> 1 < count && 15 < std::thread::hardware_concurrency()){
 			std::size_t const halfcount{count >> 1};// rounded down
 			try{
 				// process the upper half (rounded up) separately if possible
@@ -21787,6 +21842,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 	}
 }
+#endif// !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
 #endif// 1- to 16-way multithreading function reroutes
 
 }// namespace helper
