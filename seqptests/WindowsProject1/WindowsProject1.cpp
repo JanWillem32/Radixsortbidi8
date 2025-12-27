@@ -738,7 +738,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(1073741824, reinterpret_cast<std::uint8_t *>(in), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t *>(in), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -826,7 +826,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::uint8_t *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		std::uint64_t u64stop;

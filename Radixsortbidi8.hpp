@@ -7282,21 +7282,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Helper functions to implement the offset transforms
 
 // version for the companion thread
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultistage = false>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[])noexcept{
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!ismultistage && !isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
 	std::size_t *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
-		- (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	std::size_t *u{offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
-		- (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
@@ -7306,7 +7306,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		u += isdescsort * 2 - 1;
 		t += isdescsort * 2 - 1;
-		unsigned j{256 / 2 - 1 - (!ismultistage && isfltpmode && isdescsort)};// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			std::size_t difference{*u + *t};
@@ -7384,7 +7384,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 	unsigned skipsteps{};
 	unsigned paritybool;// only the main thread may initialise at 0 or 1 for the parity
 	if constexpr(issignmode){// start off with signed handling on the top
-		paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase, ubase);
+		paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase);
 		tbase -= 256;
 		ubase -= 256;
 		skipsteps |= paritybool << (typebitsize / 8 - 1);
@@ -7392,7 +7392,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
 		signed k{typebitsize / 8 - 1 - issignmode};
 		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
+			unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false>(count, tbase, ubase)};
 			tbase -= 256;
 			ubase -= 256;
 			paritybool ^= b;
@@ -7400,7 +7400,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 			--k;
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
+		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false>(count, tbase, ubase)};
 		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 			ubase -= 256;
@@ -7414,7 +7414,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 		}
 	}
 	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase, ubase)};
+		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -7422,20 +7422,20 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 }
 
 // version for the main thread when multithreading is used
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultistage = false>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[])noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!ismultistage && !isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	std::size_t *t{offsets// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	std::size_t *u{offsetscompanion// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
@@ -7445,7 +7445,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		t += 1 - isdescsort * 2;
 		u += 1 - isdescsort * 2;
-		unsigned j{256 / 2 - 1 - (!ismultistage && isfltpmode && !isdescsort)};// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			std::size_t difference{*t + *u};
@@ -7507,13 +7507,13 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 }
 
 // version for the main thread when no multithreading is used
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultistage = false>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::size_t offsets[])noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!ismultistage && !isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	std::size_t *t{offsets// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
@@ -7525,7 +7525,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			std::size_t difference{t[1 - isdescsort * 2]};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			--offset;
-			unsigned j{256 / 2 - 1 - (!ismultistage && isfltpmode && !isdescsort)};// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+			unsigned j{256 / 2 - 1};
 			*t = offset;
 			t += 1 - isdescsort * 2;
 			do{
@@ -7538,7 +7538,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			offset += difference;
 			addcarryofless(b, count, difference);
 			difference = t[256 * (isdescsort * 2 - 1)];
-			j = 256 / 2 - 3 - (!ismultistage && isfltpmode && isdescsort);// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+			j = 256 / 2 - 3;
 			*t = offset;
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			do{
@@ -7601,7 +7601,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 		*t = 0;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			t += 1 - isdescsort * 2;
-			unsigned j{256 / 2 - 1 - (!ismultistage && isfltpmode && !isdescsort)};// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+			unsigned j{256 / 2 - 1};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			std::size_t difference;
 			do{
@@ -7614,7 +7614,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			difference = t[256 * (isdescsort * 2 - 1)];
 			t[256 * (isdescsort * 2 - 1)] = offset;
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
-			j = 256 / 2 - 2 - (!ismultistage && isfltpmode && isdescsort);// the regular floating-point mode has one less iteration on the signed half (-0. elimination)
+			j = 256 / 2 - 2;
 			offset += difference;
 			addcarryofless(b, count, difference);
 			do{
@@ -7697,7 +7697,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(ismultithreadcapable) if(usemultithread){
 		std::size_t *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
 		if constexpr(issignmode){// start off with signed handling on the top
-			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase, ubase)};
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
 			tbase -= 256;
 			ubase -= 256;
 			paritybool ^= b;
@@ -7706,7 +7706,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
 			signed k{typebitsize / 8 - 1 - issignmode - (isfltpmode && !issignmode && isabsvalue)};
 			do{// handle these sets like regular unsigned
-				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
+				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase, ubase)};
 				tbase -= 256;
 				ubase -= 256;
 				paritybool ^= b;
@@ -7714,7 +7714,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				--k;
 			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 		}else{// handle this set like regular unsigned
-			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase, ubase)};
+			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase, ubase)};
 			if constexpr(isfltpmode && !issignmode && isabsvalue){
 				tbase -= 256;
 				ubase -= 256;
@@ -7724,7 +7724,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			else skipsteps += b * 2;
 		}
 		if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase, ubase)};
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
 			paritybool ^= b;
 			skipsteps |= b;
 		}
@@ -7732,7 +7732,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// single-threaded cases, both compile-time and run-time
 	if constexpr(issignmode){// start off with signed handling on the top
-		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase)};
+		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
 		tbase -= 256;
 		paritybool ^= b;
 		skipsteps |= b << (typebitsize / 8 - 1);
@@ -7740,14 +7740,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
 		signed k{typebitsize / 8 - 1 - issignmode};
 		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase)};
+			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
 			tbase -= 256;
 			paritybool ^= b;
 			skipsteps |= b << k;
 			--k;
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false, true>(count, tbase)};
+		unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
 		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 		}
@@ -7756,7 +7756,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		else skipsteps += b * 2;
 	}
 	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, true>(count, tbase)};
+		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -18194,7 +18194,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, output, offsetscompanion);
 
@@ -18267,7 +18267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -18433,7 +18433,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
@@ -18509,7 +18509,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -18885,7 +18885,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -18972,7 +18972,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -19232,7 +19232,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -19319,7 +19319,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode) - (!isabsvalue && issignmode && isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
