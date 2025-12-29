@@ -8922,13 +8922,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -9391,12 +9395,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -10559,13 +10567,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -11323,12 +11335,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -12941,13 +12957,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -13437,12 +13457,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -15499,13 +15523,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -16984,12 +17012,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		ismultithreadallowed
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -18773,12 +18805,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		true
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -19015,12 +19051,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		true
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -19597,12 +19637,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		true
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(output);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -19944,12 +19988,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		true
 #endif
 	};
+	if (ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
-	if(0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is legal here
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multi-threading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
