@@ -571,8 +571,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		Testmeclass const *fout[_countof(cin)];
 		Testmeclass const *fbuf[_countof(cin)];
 
-		rsbd8::helper::radixsortcopynoallocmulti<&Testmeclass::get, false, false, false, false, false, 0, false, Testmeclass const>(_countof(fin), fin, fout, fbuf);
-
 		rsbd8::radixsortcopynoalloc<&Testmeclass::get>(_countof(fin), fin, fout, fbuf);
 		rsbd8::radixsortcopynoalloc<&Testmeclass::getwparam>(_countof(fin), fin, fout, fbuf, 8);
 		rsbd8::radixsortcopynoalloc<&Testmeclass::co>(_countof(fin), fin, fout, fbuf);

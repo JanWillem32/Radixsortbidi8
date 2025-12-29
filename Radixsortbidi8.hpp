@@ -7506,7 +7506,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 	return{b};
 }
 
-// version for the main thread when no multithreading is used
+// version for the main thread when no multithreading is used at run time
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::size_t offsets[])noexcept{
 	// do not pass a nullptr here
@@ -7518,9 +7518,9 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+	std::size_t offset{*t};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(isrevorder){
-		std::size_t offset{*t};
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			std::size_t difference{t[1 - isdescsort * 2]};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
@@ -7597,7 +7597,6 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			}
 		}
 	}else{// not reverse ordered
-		std::size_t offset{*t};
 		*t = 0;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			t += 1 - isdescsort * 2;
@@ -7660,41 +7659,246 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 	return{b};
 }
 
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable>
-RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t offsets[], std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion, unsigned usemultithread)noexcept{
+// version for the main thread when no multithreading is used at compile time
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T = std::nullptr_t>
+RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t offsets[], std::nullptr_t = nullptr, unsigned = 0)noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
-	if constexpr(ismultithreadcapable) if(usemultithread) assert(offsetscompanion);
+	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
+	// Determining the starting point depends on several factors here.
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr typebitsize{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T>)? 80 :
+		std::is_same_v<std::nullptr_t, T>? 8 : CHAR_BIT * sizeof(T)};
+	static std::size_t constexpr stride{offsetsstride + (typebitsize / 8 - 1) * 256};// offsetsstride, adapted for the multi-part types
+	std::size_t *t{offsets// low-to-high or high-to-low
+		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
+		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	if constexpr(ismultithreadcapable) if(usemultithread){
-		b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
-		goto exit;
+	std::size_t offset{*t};
+	if constexpr(isrevorder){
+		t[stride] = 0;// high half, the first offset always starts at zero
+		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			t -= isdescsort * 2 - 1;
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			unsigned j{256 / 2 - 1};
+			do{
+				std::size_t difference{*t};
+				t[stride] = offset;// high half
+				t[isdescsort * 2 - 1] = offset - 1;
+				t -= isdescsort * 2 - 1;
+				offset += difference;
+				addcarryofless(b, count, difference);
+			}while(--j);
+			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
+			t[stride + 256 * (isdescsort * 2 - 1)] = offset;// high half
+			t[isdescsort * 2 - 1] = offset - 1;
+			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+			offset += differencemid;
+			addcarryofless(b, count, differencemid);
+			j = 256 / 2 - 2;
+			do{
+				std::size_t difference{*t};
+				t[stride] = offset;// high half
+				t[isdescsort * 2 - 1] = offset - 1;
+				t -= isdescsort * 2 - 1;
+				offset -= difference * (isdescsort * 2 - 1);
+				addcarryofless(b, count, difference);
+			}while(--j);
+		}else{// unsigned
+			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+				t += isdescsort * 2 - 1;// step back
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				do{
+					std::size_t difference{*t};// even
+					t[stride] = offset;// high half
+					t[isdescsort * -2 + 1] = offset - 1;// odd
+					offset += difference;
+					addcarryofless(b, count, difference);
+					difference = t[isdescsort * -6 + 3];// odd
+					t[stride + isdescsort * -6 + 3] = offset;// high half
+					*t = offset - 1;// even
+					t += isdescsort * -4 + 2;// step forward twice
+					offset += difference;
+					addcarryofless(b, count, difference);
+				}while(--j);
+			}else{// all other modes
+				t -= isdescsort * 2 - 1;
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				unsigned j{256 - 2};
+				do{
+					std::size_t difference{*t};
+					t[stride] = offset;// high half
+					t[isdescsort * 2 - 1] = offset - 1;
+					t -= isdescsort * 2 - 1;
+					offset += difference;
+					addcarryofless(b, count, difference);
+				}while(--j);
+			}
+		}
+		addcarryofless(b, count, *t);
+		t[stride] = offset;// high half
+		*t = count;// the last offset always starts at the end
+		// again, adjust for the special mode
+		t[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = offset - 1;
+	}else{// not reversed order
+		*t = 0;// the first offset always starts at zero
+		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			t -= isdescsort * 2 - 1;
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			unsigned j{256 / 2 - 1};
+			do{
+				std::size_t difference{*t};
+				*t = offset;
+				t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+				t -= isdescsort * 2 - 1;
+				offset += difference;
+				addcarryofless(b, count, difference);
+			}while(--j);
+			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
+			t[256 * (isdescsort * 2 - 1)] = offset;
+			t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+			offset += differencemid;
+			addcarryofless(b, count, differencemid);
+			j = 256 / 2 - 2;
+			do{
+				std::size_t difference{*t};
+				*t = offset;
+				t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+				t -= isdescsort * 2 - 1;
+				offset -= difference * (isdescsort * 2 - 1);
+				addcarryofless(b, count, difference);
+			}while(--j);
+		}else{// unsigned
+			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+				t += isdescsort * 2 - 1;// step back
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				do{
+					std::size_t difference{*t};// even
+					*t = offset;
+					t[stride + isdescsort * -2 + 1] = offset - 1;// odd, high half
+					offset += difference;
+					addcarryofless(b, count, difference);
+					difference = t[isdescsort * -6 + 3];// odd
+					t[isdescsort * -6 + 3] = offset;
+					t[stride] = offset - 1;// even, high half
+					t += isdescsort * -4 + 2;// step forward twice
+					offset += difference;
+					addcarryofless(b, count, difference);
+				}while(--j);
+			}else{// all other modes
+				t -= isdescsort * 2 - 1;
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				unsigned j{256 - 2};
+				do{
+					std::size_t difference{*t};
+					*t = offset;
+					t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+					t -= isdescsort * 2 - 1;
+					offset += difference;
+					addcarryofless(b, count, difference);
+				}while(--j);
+			}
+		}
+		addcarryofless(b, count, *t);
+		*t = offset;
+		t[stride] = count;// high half, the last offset always starts at the end
+		// again, adjust for the special mode
+		t[stride + ((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = offset - 1;// high half
 	}
-	// single-threaded cases, both compile-time and run-time
-	b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets);
-exit:
 	return{b};
 }
 
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T>
+// version for the main thread when multithreading is used at compile time
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[], unsigned usemultithread)noexcept{
+	// do not pass a nullptr here
+	assert(offsets);
+	if(usemultithread) assert(offsetscompanion);
+	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
+	if(usemultithread) b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
+	else b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets);
+	return{b};
+}
+
+// version for the main thread when no multithreading is used at compile time
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, std::size_t offsets[], std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion, unsigned usemultithread, unsigned paritybool = 0)noexcept{
+	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, std::size_t offsets[], std::nullptr_t = nullptr, unsigned = 0, unsigned paritybool = 0)noexcept{
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
-	if constexpr(ismultithreadcapable) if(usemultithread) assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
 	std::size_t *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps{};
-	if constexpr(ismultithreadcapable) if(usemultithread){
+	if constexpr(issignmode){// start off with signed handling on the top
+		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T>(count, tbase)};
+		tbase -= 256;
+		paritybool ^= b;
+		skipsteps |= b << (typebitsize / 8 - 1);
+	}
+	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
+		signed k{typebitsize / 8 - 1 - issignmode};
+		do{// handle these sets like regular unsigned
+			unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T>(count, tbase)};
+			tbase -= 256;
+			paritybool ^= b;
+			skipsteps |= b << k;
+			--k;
+		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
+	}else{// handle this set like regular unsigned
+		unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T>(count, tbase)};
+		if constexpr(isfltpmode && !issignmode && isabsvalue){
+			tbase -= 256;
+		}
+		paritybool ^= b;
+		if constexpr(issignmode) skipsteps |= b;
+		else skipsteps += b * 2;
+	}
+	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
+		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T>(count, tbase)};
+		paritybool ^= b;
+		skipsteps |= b;
+	}
+	return{skipsteps, paritybool};// paritybool will be 1 for when the swap count is odd
+}
+
+// version for the main thread when multithreading is used at compile time
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	128 >= CHAR_BIT * sizeof(T) &&
+	8 < CHAR_BIT * sizeof(T),
+	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[], unsigned usemultithread, unsigned paritybool = 0)noexcept{
+	static std::size_t constexpr typebitsize{
+		(std::is_same_v<longdoubletest128, T> ||
+		std::is_same_v<longdoubletest96, T> ||
+		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
+	// do not pass a nullptr here
+	assert(offsets);
+	if(usemultithread) assert(offsetscompanion);
+	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
+	std::size_t *tbase{offsets + (typebitsize / 8 - 1) * 256};
+	unsigned skipsteps{};
+	if(usemultithread){
 		std::size_t *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
 		if constexpr(issignmode){// start off with signed handling on the top
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
@@ -7728,39 +7932,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			paritybool ^= b;
 			skipsteps |= b;
 		}
-		goto exit;
-	}
-	// single-threaded cases, both compile-time and run-time
-	if constexpr(issignmode){// start off with signed handling on the top
-		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
-		tbase -= 256;
-		paritybool ^= b;
-		skipsteps |= b << (typebitsize / 8 - 1);
-	}
-	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
-		signed k{typebitsize / 8 - 1 - issignmode};
-		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
+	}else{// single-threaded case
+		if constexpr(issignmode){// start off with signed handling on the top
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
 			tbase -= 256;
 			paritybool ^= b;
-			skipsteps |= b << k;
-			--k;
-		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
-	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
-		if constexpr(isfltpmode && !issignmode && isabsvalue){
-			tbase -= 256;
+			skipsteps |= b << (typebitsize / 8 - 1);
 		}
-		paritybool ^= b;
-		if constexpr(issignmode) skipsteps |= b;
-		else skipsteps += b * 2;
+		if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
+			signed k{typebitsize / 8 - 1 - issignmode};
+			do{// handle these sets like regular unsigned
+				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
+				tbase -= 256;
+				paritybool ^= b;
+				skipsteps |= b << k;
+				--k;
+			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
+		}else{// handle this set like regular unsigned
+			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
+			if constexpr(isfltpmode && !issignmode && isabsvalue){
+				tbase -= 256;
+			}
+			paritybool ^= b;
+			if constexpr(issignmode) skipsteps |= b;
+			else skipsteps += b * 2;
+		}
+		if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
+			paritybool ^= b;
+			skipsteps |= b;
+		}
 	}
-	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
-		paritybool ^= b;
-		skipsteps |= b;
-	}
-exit:
 	return{skipsteps, paritybool};// paritybool will be 1 for when the swap count is odd
 }
 
@@ -8269,6 +8471,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -8286,7 +8489,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
-	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
@@ -8301,10 +8504,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+		if constexpr(ismultithreadcapable){
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 			while(0 <= --j){// fill the array, four at a time
 				U outea{psrclo[0].signexponent};
 				std::uint_least64_t outma{psrclo[0].mantissa};
@@ -8333,31 +8534,59 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pwd[0].signexponent = static_cast<W>(outed);
 				pwd[0].mantissa = outmd;
 			}
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			U outea{psrclo[0].signexponent};
-			std::uint_least64_t outma{psrclo[0].mantissa};
-			U outeb{psrclo[1].signexponent};
-			std::uint_least64_t outmb{psrclo[1].mantissa};
-			psrclo += 2;
-			auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
-			std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-			std::size_t offsetb{poffset[curb]++};
-			T *pwa = pdst + offseta;
-			T *pwb = pdst + offsetb;
-			pwa[0].signexponent = static_cast<W>(outea);
-			pwa[0].mantissa = outma;
-			pwb[0].signexponent = static_cast<W>(outeb);
-			pwb[0].mantissa = outmb;
-		}
-		if(!(1 & count)){// fill in the final item for odd counts
-			U oute{psrclo[0].signexponent};
-			std::uint_least64_t outm{*reinterpret_cast<std::uint_least64_t const *>(psrclo)};
-			std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
-			std::size_t offset{poffset[cur]};
-			T *pw = pdst + offset;
-			pw[0].signexponent = static_cast<W>(oute);
-			pw[0].mantissa = outm;
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				U outea{psrclo[0].signexponent};
+				std::uint_least64_t outma{psrclo[0].mantissa};
+				U outeb{psrclo[1].signexponent};
+				std::uint_least64_t outmb{psrclo[1].mantissa};
+				psrclo += 2;
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				U oute{psrclo[0].signexponent};
+				std::uint_least64_t outm{psrclo[0].mantissa};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t offset{poffset[cur]};
+				T *pw = pdst + offset;
+				pw[0].signexponent = static_cast<W>(oute);
+				pw[0].mantissa = outm;
+			}
+		}else{// !ismultithreadcapable
+			T const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				U outelo{psrclo[0].signexponent};
+				std::uint_least64_t outmlo{psrclo[0].mantissa};
+				++psrclo;
+				U outehi{psrchi[0].signexponent};
+				std::uint_least64_t outmhi{psrchi[0].mantissa};
+				--psrchi;
+				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				T *pwlo = pdst + offsetlo;
+				T *pwhi = pdst + offsethi;
+				pwlo[0].signexponent = static_cast<W>(outelo);
+				pwlo[0].mantissa = outmlo;
+				pwhi[0].signexponent = static_cast<W>(outehi);
+				pwhi[0].mantissa = outmhi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				U oute{psrclo[0].signexponent};
+				std::uint_least64_t outm{psrclo[0].mantissa};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t offset{poffset[cur]};
+				T *pw = pdst + offset;
+				pw[0].signexponent = static_cast<W>(oute);
+				pw[0].mantissa = outm;
+			}
 		}
 		runsteps >>= 1;
 		if(!runsteps)
@@ -8397,11 +8626,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 			{
-				{
 handletop16:
-					std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-					if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-					else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+				if constexpr(ismultithreadcapable){
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, four at a time
 						U outea{psrclo[0].signexponent};
 						std::uint_least64_t outma{psrclo[0].mantissa};
@@ -8430,31 +8657,59 @@ handletop16:
 						pwd[0].signexponent = static_cast<W>(outed);
 						pwd[0].mantissa = outmd;
 					}
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					U outea{psrclo[0].signexponent};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{psrclo[1].signexponent};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					psrclo += 2;
-					auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-					std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-				}
-				if(!(1 & count)){// fill in the final item for odd counts
-					U oute{psrclo[0].signexponent};
-					std::uint_least64_t outm{*reinterpret_cast<std::uint_least64_t const *>(psrclo)};
-					std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-					std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
-					T *pw = pdst + offset;
-					pw[0].signexponent = static_cast<W>(oute);
-					pw[0].mantissa = outm;
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						U outea{psrclo[0].signexponent};
+						std::uint_least64_t outma{psrclo[0].mantissa};
+						U outeb{psrclo[1].signexponent};
+						std::uint_least64_t outmb{psrclo[1].mantissa};
+						psrclo += 2;
+						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+					}
+					if(!(1 & count)){// fill in the final item for odd counts
+						U oute{psrclo[0].signexponent};
+						std::uint_least64_t outm{psrclo[0].mantissa};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						T *pw = pdst + offset;
+						pw[0].signexponent = static_cast<W>(oute);
+						pw[0].mantissa = outm;
+					}
+				}else{// !ismultithreadcapable
+					T const *psrchi{psrclo + count};
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						U outelo{psrclo[0].signexponent};
+						std::uint_least64_t outmlo{psrclo[0].mantissa};
+						++psrclo;
+						U outehi{psrchi[0].signexponent};
+						std::uint_least64_t outmhi{psrchi[0].mantissa};
+						--psrchi;
+						auto[curlo, curhi]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi)};
+						std::size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						T *pwlo = pdst + offsetlo;
+						T *pwhi = pdst + offsethi;
+						pwlo[0].signexponent = static_cast<W>(outelo);
+						pwlo[0].mantissa = outmlo;
+						pwhi[0].signexponent = static_cast<W>(outehi);
+						pwhi[0].mantissa = outmhi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						U oute{psrclo[0].signexponent};
+						std::uint_least64_t outm{psrclo[0].mantissa};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						T *pw = pdst + offset;
+						pw[0].signexponent = static_cast<W>(oute);
+						pw[0].mantissa = outm;
+					}
 				}
 				runsteps >>= 1;
 				if(!runsteps)
@@ -8476,61 +8731,89 @@ handletop16:
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
 			}
 handletop8:
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
-			while(0 <= --j){// fill the array, four at a time
-				U outea{psrclo[0].signexponent};
-				std::uint_least64_t outma{psrclo[0].mantissa};
-				U outeb{psrclo[1].signexponent};
-				std::uint_least64_t outmb{psrclo[1].mantissa};
-				U outec{psrclo[2].signexponent};
-				std::uint_least64_t outmc{psrclo[2].mantissa};
-				U outed{psrclo[3].signexponent};
-				std::uint_least64_t outmd{psrclo[3].mantissa};
-				psrclo += 4;
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-				std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-				std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
-				std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				T *pwc = pdst + offsetc;
-				T *pwd = pdst + offsetd;
-				pwa[0].signexponent = static_cast<W>(outea);
-				pwa[0].mantissa = outma;
-				pwb[0].signexponent = static_cast<W>(outeb);
-				pwb[0].mantissa = outmb;
-				pwc[0].signexponent = static_cast<W>(outec);
-				pwc[0].mantissa = outmc;
-				pwd[0].signexponent = static_cast<W>(outed);
-				pwd[0].mantissa = outmd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				U outea{psrclo[0].signexponent};
-				std::uint_least64_t outma{psrclo[0].mantissa};
-				U outeb{psrclo[1].signexponent};
-				std::uint_least64_t outmb{psrclo[1].mantissa};
-				psrclo += 2;
-				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-				std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				pwa[0].signexponent = static_cast<W>(outea);
-				pwa[0].mantissa = outma;
-				pwb[0].signexponent = static_cast<W>(outeb);
-				pwb[0].mantissa = outmb;
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				U oute{psrclo[0].signexponent};
-				std::uint_least64_t outm{*reinterpret_cast<std::uint_least64_t const *>(psrclo)};
-				std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-				std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
-				T *pw = pdst + offset;
-				pw[0].signexponent = static_cast<W>(oute);
-				pw[0].mantissa = outm;
+			if constexpr(ismultithreadcapable){
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					U outea{psrclo[0].signexponent};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{psrclo[1].signexponent};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					U outec{psrclo[2].signexponent};
+					std::uint_least64_t outmc{psrclo[2].mantissa};
+					U outed{psrclo[3].signexponent};
+					std::uint_least64_t outmd{psrclo[3].mantissa};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					T *pwc = pdst + offsetc;
+					T *pwd = pdst + offsetd;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+					pwc[0].signexponent = static_cast<W>(outec);
+					pwc[0].mantissa = outmc;
+					pwd[0].signexponent = static_cast<W>(outed);
+					pwd[0].mantissa = outmd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					U outea{psrclo[0].signexponent};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{psrclo[1].signexponent};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					psrclo += 2;
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					U oute{psrclo[0].signexponent};
+					std::uint_least64_t outm{psrclo[0].mantissa};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					T *pw = pdst + offset;
+					pw[0].signexponent = static_cast<W>(oute);
+					pw[0].mantissa = outm;
+				}
+			}else{// !ismultithreadcapable
+				T const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					U outelo{psrclo[0].signexponent};
+					std::uint_least64_t outmlo{psrclo[0].mantissa};
+					++psrclo;
+					U outehi{psrchi[0].signexponent};
+					std::uint_least64_t outmhi{psrchi[0].mantissa};
+					--psrchi;
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi)};
+					std::size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					T *pwlo = pdst + offsetlo;
+					T *pwhi = pdst + offsethi;
+					pwlo[0].signexponent = static_cast<W>(outelo);
+					pwlo[0].mantissa = outmlo;
+					pwhi[0].signexponent = static_cast<W>(outehi);
+					pwhi[0].mantissa = outmhi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					U oute{psrclo[0].signexponent};
+					std::uint_least64_t outm{psrclo[0].mantissa};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					T *pw = pdst + offset;
+					pw[0].signexponent = static_cast<W>(oute);
+					pw[0].mantissa = outm;
+				}
 			}
 			break;// no further processing beyond the top part
 		}
@@ -8614,19 +8897,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
 	std::is_same_v<longdoubletest80, T>,
-	void> radixsortcopynoallocmulti2thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -8653,17 +8946,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
@@ -8955,7 +9245,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -9076,19 +9366,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
 	std::is_same_v<longdoubletest80, T>,
-	void> radixsortnoallocmulti2thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -9114,17 +9414,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -9134,7 +9431,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pbufferlo = buffer;
 				pbufferhi = buffer + count;
 			}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-				std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8};
+				std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 				pinputlo = input + stride;
 				pinputhi = input + (count - stride);
 				pbufferlo = buffer + stride;
@@ -9428,7 +9725,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -9981,6 +10278,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -9998,7 +10296,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
-	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
@@ -10008,10 +10306,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+		if constexpr(ismultithreadcapable){
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 			while(0 <= --j){// fill the array, four at a time
 				U outa{psrclo[0]};
 				U outb{psrclo[1]};
@@ -10028,22 +10324,39 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetc] = static_cast<T>(outc);
 				pdst[offsetd] = static_cast<T>(outd);
 			}
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			U outa{psrclo[0]};
-			U outb{psrclo[1]};
-			psrclo += 2;
-			auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-			std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-			std::size_t offsetb{poffset[curb]++};
-			pdst[offseta] = static_cast<T>(outa);
-			pdst[offsetb] = static_cast<T>(outb);
-		}
-		if(!(1 & count)){// fill in the final item for odd counts
-			U out{psrclo[0]};
-			std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
-			std::size_t offset{poffset[cur]};
-			pdst[offset] = static_cast<T>(out);
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				U outa{psrclo[0]};
+				U outb{psrclo[1]};
+				psrclo += 2;
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = static_cast<T>(outa);
+				pdst[offsetb] = static_cast<T>(outb);
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				U out{psrclo[0]};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = static_cast<T>(out);
+			}
+		}else{// !ismultithreadcapable
+			T const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				U outlo{*psrclo++};
+				U outhi{*psrchi--};
+				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = static_cast<T>(outlo);
+				pdst[offsethi] = static_cast<T>(outhi);
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				U out{*psrclo};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = static_cast<T>(out);
+			}
 		}
 		runsteps >>= 1;
 		if(!runsteps)
@@ -10085,40 +10398,57 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
-			while(0 <= --j){// fill the array, four at a time
-				U outa{psrclo[0]};
-				U outb{psrclo[1]};
-				U outc{psrclo[2]};
-				U outd{psrclo[3]};
-				psrclo += 4;
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-				std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				pdst[offseta] = static_cast<T>(outa);
-				pdst[offsetb] = static_cast<T>(outb);
-				pdst[offsetc] = static_cast<T>(outc);
-				pdst[offsetd] = static_cast<T>(outd);
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				U outa{psrclo[0]};
-				U outb{psrclo[1]};
-				psrclo += 2;
-				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode,T, U>(outa, outb)};
-				std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				pdst[offseta] = static_cast<T>(outa);
-				pdst[offsetb] = static_cast<T>(outb);
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				U out{psrclo[0]};
-				std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-				std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
-				pdst[offset] = static_cast<T>(out);
+			if constexpr(ismultithreadcapable){
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					U outa{psrclo[0]};
+					U outb{psrclo[1]};
+					U outc{psrclo[2]};
+					U outd{psrclo[3]};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+					pdst[offsetc] = static_cast<T>(outc);
+					pdst[offsetd] = static_cast<T>(outd);
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					U outa{psrclo[0]};
+					U outb{psrclo[1]};
+					psrclo += 2;
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode,T, U>(outa, outb)};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					U out{psrclo[0]};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = static_cast<T>(out);
+				}
+			}else{// !ismultithreadcapable
+				T const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					U outlo{*psrclo++};
+					U outhi{*psrchi--};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+					std::size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (CHAR_BIT * sizeof(T) - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = static_cast<T>(outlo);
+					pdst[offsethi] = static_cast<T>(outhi);
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					U out{*psrclo};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = static_cast<T>(out);
+				}
 			}
 			break;// no further processing beyond the top part
 		}
@@ -10203,20 +10533,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortcopynoalloc() function implementation template for multi-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti2thread(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -10243,17 +10583,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -10838,7 +11175,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -10960,20 +11297,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortnoalloc() function implementation template for multi-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti2thread(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -10999,17 +11346,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -11595,7 +11939,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -12132,6 +12476,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -12149,7 +12494,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
-	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if(80 / 8 - 2 == shifter)
@@ -12164,10 +12509,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+		if constexpr(ismultithreadcapable){
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 			while(0 <= --j){// fill the array, four at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
@@ -12192,28 +12535,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetc] = pc;
 				pdst[offsetd] = pd;
 			}
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			V *pa{psrclo[0]};
-			V *pb{psrclo[1]};
-			psrclo += 2;
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-			auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-			std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-			std::size_t offsetb{poffset[curb]++};
-			pdst[offseta] = pa;
-			pdst[offsetb] = pb;
-		}
-		if(!(1 & count)){// fill in the final item for odd counts
-			V *p{psrclo[0]};
-			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-			auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-			std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
-			std::size_t offset{poffset[cur]};
-			pdst[offset] = p;
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
 		}
 		runsteps >>= 1;
 		if(!runsteps)
@@ -12263,11 +12629,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 			{
-				{
 handletop16:
-					std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-					if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-					else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+				if constexpr(ismultithreadcapable){
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, four at a time
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
@@ -12292,29 +12656,52 @@ handletop16:
 						pdst[offsetc] = pc;
 						pdst[offsetd] = pd;
 					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
+					if(!(1 & count)){// fill in the final item for odd counts
+						V *p{psrclo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						pdst[offset] = p;
+					}
+				}else{// !ismultithreadcapable
+					V *const *psrchi{psrclo + count};
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto[curlo, curhi]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+						std::size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *p{*psrclo};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						pdst[offset] = p;
+					}
 				}
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-				std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-				std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
-				pdst[offset] = p;
 			}
 			if(1 == runsteps)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
@@ -12346,54 +12733,77 @@ handletop16:
 				}
 			}
 handletop8:
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
-			while(0 <= --j){// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
-				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-				std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-				std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
-				std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-				std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-				std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
-				pdst[offset] = p;
+			if constexpr(ismultithreadcapable){
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					V *p{psrclo[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}else{// !ismultithreadcapable
+				V *const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+					std::size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *p{*psrclo};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
 			}
 			break;// no further processing beyond the top part
 		}
@@ -12499,7 +12909,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12510,7 +12924,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortcopynoallocmulti2thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12518,7 +12938,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -12545,17 +12965,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -12843,7 +13260,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -12988,7 +13405,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12999,7 +13420,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -13007,7 +13434,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -13034,17 +13461,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		// conditionally enable multi-threading here if indirection1 allows noexcept
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -13326,7 +13750,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -14731,6 +15155,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -14748,7 +15173,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// skip a step if possible
 	runsteps >>= shifter;
 	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
-	while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
 	if constexpr(!isabsvalue && isfltpmode) if(CHAR_BIT * sizeof(T) / 8 - 1 == shifter)
@@ -14758,10 +15183,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
+		if constexpr(ismultithreadcapable){
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
 			while(0 <= --j){// fill the array, four at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
@@ -14786,28 +15209,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetc] = pc;
 				pdst[offsetd] = pd;
 			}
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			V *pa{psrclo[0]};
-			V *pb{psrclo[1]};
-			psrclo += 2;
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-			auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-			std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-			std::size_t offsetb{poffset[curb]++};
-			pdst[offseta] = pa;
-			pdst[offsetb] = pb;
-		}
-		if(!(1 & count)){// fill in the final item for odd counts
-			V *p{psrclo[0]};
-			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-			auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-			std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
-			std::size_t offset{poffset[cur]};
-			pdst[offset] = p;
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
 		}
 		runsteps >>= 1;
 		if(!runsteps)
@@ -14859,54 +15305,77 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
-			std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-			if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-			else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
-			while(0 <= --j){// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
-				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-				std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-				std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-				std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-				std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
-				pdst[offset] = p;
+			if constexpr(ismultithreadcapable){
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					V *p{psrclo[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}else{// !ismultithreadcapable
+				V *const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+					std::size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (CHAR_BIT * sizeof(T) - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *p{*psrclo};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
 			}
 			break;// no further processing beyond the top part
 		}
@@ -15005,19 +15474,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortcopynoalloc() function implementation template for multi-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti2thread(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocmulti
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -15044,17 +15523,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -16345,7 +16821,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -16483,19 +16959,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortnoalloc() function implementation template for multi-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2thread(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocmulti
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -16521,17 +17007,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 1 to 7, depending on the size of T)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -17944,7 +18427,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -18126,59 +18609,88 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(psrclo);
 	assert(pdst);
 	assert(offsets);
-	std::ptrdiff_t j;// rounded down in the bottom part, or no multithreading
-	if constexpr(!ismultithreadcapable) j = static_cast<std::ptrdiff_t>((count + 1) >> 2);
-	else j = static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread));
-	while(0 <= --j){// fill the array, four at a time
-		U outa{psrclo[0]};
-		U outb{psrclo[1]};
-		U outc{psrclo[2]};
-		U outd{psrclo[3]};
-		psrclo += 4;
-		auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-		std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-		if constexpr(false){// useless if not using indirection: isrevorder){
-			offseta = offsets[cura]--;// the next item will be placed one lower
-			offsetb = offsets[curb]--;
-			offsetc = offsets[curc]--;
-			offsetd = offsets[curd]--;
-		}else{
-			offseta = offsets[cura]++;// the next item will be placed one higher
-			offsetb = offsets[curb]++;
-			offsetc = offsets[curc]++;
-			offsetd = offsets[curd]++;
+	if constexpr(ismultithreadcapable){
+		std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+		while(0 <= --j){// fill the array, four at a time
+			U outa{psrclo[0]};
+			U outb{psrclo[1]};
+			U outc{psrclo[2]};
+			U outd{psrclo[3]};
+			psrclo += 4;
+			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offseta = offsets[cura]--;// the next item will be placed one lower
+				offsetb = offsets[curb]--;
+				offsetc = offsets[curc]--;
+				offsetd = offsets[curd]--;
+			}else{
+				offseta = offsets[cura]++;// the next item will be placed one higher
+				offsetb = offsets[curb]++;
+				offsetc = offsets[curc]++;
+				offsetd = offsets[curd]++;
+			}
+			pdst[offseta] = static_cast<T>(outa);
+			pdst[offsetb] = static_cast<T>(outb);
+			pdst[offsetc] = static_cast<T>(outc);
+			pdst[offsetd] = static_cast<T>(outd);
 		}
-		pdst[offseta] = static_cast<T>(outa);
-		pdst[offsetb] = static_cast<T>(outb);
-		pdst[offsetc] = static_cast<T>(outc);
-		pdst[offsetd] = static_cast<T>(outd);
-	}
-	if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-		U outa{psrclo[0]};
-		U outb{psrclo[1]};
-		psrclo += 2;
-		auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-		std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-		if constexpr(false){// useless if not using indirection: isrevorder){
-			offseta = offsets[cura]--;// the next item will be placed one lower
-			offsetb = offsets[curb]--;
-		}else{
-			offseta = offsets[cura]++;// the next item will be placed one higher
-			offsetb = offsets[curb]++;
+		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+			U outa{psrclo[0]};
+			U outb{psrclo[1]};
+			psrclo += 2;
+			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offseta = offsets[cura]--;// the next item will be placed one lower
+				offsetb = offsets[curb]--;
+			}else{
+				offseta = offsets[cura]++;// the next item will be placed one higher
+				offsetb = offsets[curb]++;
+			}
+			pdst[offseta] = static_cast<T>(outa);
+			pdst[offsetb] = static_cast<T>(outb);
 		}
-		pdst[offseta] = static_cast<T>(outa);
-		pdst[offsetb] = static_cast<T>(outb);
-	}
-	if(!(1 & count)){// fill in the final item for odd counts
-		U out{psrclo[0]};
-		std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-		std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
-		if constexpr(false){// useless if not using indirection: isrevorder){
-			offset = offsets[cur]--;// the next item will be placed one lower
-		}else{
-			offset = offsets[cur]++;// the next item will be placed one higher
+		if(!(1 & count)){// fill in the final item for odd counts
+			U out{psrclo[0]};
+			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offset = offsets[cur]--;// the next item will be placed one lower
+			}else{
+				offset = offsets[cur]++;// the next item will be placed one higher
+			}
+			pdst[offset] = static_cast<T>(out);
 		}
-		pdst[offset] = static_cast<T>(out);
+	}else{// !ismultithreadcapable
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		T const *psrchi{psrclo + count};
+		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+			U outlo{*psrclo++};
+			U outhi{*psrchi--};
+			auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
+				offsethi = offsets[curhi]++;// the next item will be placed one higher
+			}else{
+				offsetlo = offsets[curlo]++;// the next item will be placed one higher
+				offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
+			}
+			pdst[offsetlo] = static_cast<T>(outlo);
+			pdst[offsethi] = static_cast<T>(outhi);
+		}while(psrclo < psrchi);
+		if(psrclo == psrchi){// fill in the final item for odd counts
+			U out{*psrclo};
+			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offset = offsets[cur + offsetsstride];
+			}else{
+				offset = offsets[cur];
+			}
+			pdst[offset] = static_cast<T>(out);
+		}
 	}
 }
 
@@ -18294,7 +18806,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -18391,7 +18903,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -18536,7 +19048,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -18685,7 +19197,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -18874,6 +19386,125 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}while(--j);
 }
 
+// main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
+// Do not use this function directly.
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortnoallocsinglemain(std::size_t count, V *const psrclo[], V *pdst[], std::size_t offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(count && count != MAXSIZE_T);
+	// do not pass a nullptr here
+	assert(psrclo);
+	assert(pdst);
+	assert(offsets);
+	if constexpr(ismultithreadcapable){
+		std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+		while(0 <= --j){// fill the array, four at a time
+			V *pa{psrclo[0]};
+			V *pb{psrclo[1]};
+			V *pc{psrclo[2]};
+			V *pd{psrclo[3]};
+			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
+			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+			U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
+			U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
+			psrclo += 4;
+			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offseta = offsets[cura]--;// the next item will be placed one lower
+				offsetb = offsets[curb]--;
+				offsetc = offsets[curc]--;
+				offsetd = offsets[curd]--;
+			}else{
+				offseta = offsets[cura]++;// the next item will be placed one higher
+				offsetb = offsets[curb]++;
+				offsetc = offsets[curc]++;
+				offsetd = offsets[curd]++;
+			}
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+			pdst[offsetc] = pc;
+			pdst[offsetd] = pd;
+		}
+		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+			V *pa{psrclo[0]};
+			V *pb{psrclo[1]};
+			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
+			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+			psrclo += 2;
+			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offseta = offsets[cura]--;// the next item will be placed one lower
+				offsetb = offsets[curb]--;
+			}else{
+				offseta = offsets[cura]++;// the next item will be placed one higher
+				offsetb = offsets[curb]++;
+			}
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+		}
+		if(!(1 & count)){// fill in the final item for odd counts
+			V *p{psrclo[0]};
+			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+			U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offset = offsets[cur]--;// the next item will be placed one lower
+			}else{
+				offset = offsets[cur]++;// the next item will be placed one higher
+			}
+			pdst[offset] = p;
+		}
+	}else{// !ismultithreadcapable
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		V *const *psrchi{psrclo + count};
+		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+			V *plo{*psrclo++};
+			V *phi{*psrchi--};
+			auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+			auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+			U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+			U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+			auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
+				offsethi = offsets[curhi]++;// the next item will be placed one higher
+			}else{
+				offsetlo = offsets[curlo]++;// the next item will be placed one higher
+				offsethi = offsets[curhi + offsetsstride]--;// the next item will be placed one lower
+			}
+			pdst[offsetlo] = plo;
+			pdst[offsethi] = phi;
+		}while(psrclo < psrchi);
+		if(psrclo == psrchi){// fill in the final item for odd counts
+			V *p{*psrclo};
+			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+			U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offset = offsets[cur + offsetsstride];
+			}else{
+				offset = offsets[cur];
+			}
+			pdst[offset] = p;
+		}
+	}
+}
+
 // multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types with indirection
 // Do not use this function directly.
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -18999,7 +19630,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -19186,7 +19817,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};
+			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and allareidentical value exchange with the companion thread
 			// no exception detection required here
@@ -19346,7 +19977,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		std::size_t offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -19533,7 +20164,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable>(count, offsets, offsetscompanion, usemultithread)};
+			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and allareidentical value exchange with the companion thread
 			// no exception detection required here
@@ -19569,7 +20200,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // 1- to 16-way multithreading function reroutes
-#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT) && 2 <= (RSBD8_THREAD_LIMIT)
 // simply re-route to the 1 or 2-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -19580,7 +20211,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -19591,7 +20225,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -19600,7 +20237,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -19609,9 +20249,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 }
-#else// up to 16-way multithreading
+#elif !defined(RSBD8_THREAD_LIMIT) || 4 <= (RSBD8_THREAD_LIMIT)
+// up to 16-way multithreading
+
 // helper functions for converting inputs to perform unsigned comparisons in a final merging phase
 // these are altered copies of the filterinput() functions to have an extra final filtering step
 // nothing will be processed when using these on unfiltered unsigned inputs
@@ -20818,26 +21463,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
 			std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
+#endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
 					usemultithread = 1;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			}
+#endif
 			// process the lower half (rounded down) here
-			radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
+			radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count >> usemultithread, input, output, buffer);
 		}
 
 		// merging phase
@@ -20856,7 +21506,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
 #endif
 }
 
@@ -20880,26 +21530,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
 			std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
+#endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
 					usemultithread = 1;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			}
+#endif
 			// process the lower half (rounded down) here
-			radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
+			radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count >> usemultithread, input, buffer, movetobuffer);
 		}
 
 		// merging phase
@@ -20923,7 +21578,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
 #endif
 }
 
@@ -21233,26 +21888,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
 			std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
+#endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
 					usemultithread = 1;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			}
+#endif
 			// process the lower half (rounded down) here
-			radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+			radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
 		}
 
 		// merging phase
@@ -21271,7 +21931,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
 #endif
 }
 
@@ -21294,26 +21954,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
 			std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
+#endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
 					usemultithread = 1;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			}
+#endif
 			// process the lower half (rounded down) here
-			radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+			radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
 		}
 
 		// merging phase
@@ -21337,7 +22002,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
 
@@ -21408,6 +22073,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21416,8 +22082,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
 				std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
+#endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
@@ -21427,7 +22095,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				}
+#endif
 				// process the lower half (rounded down) here
 				radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
 			}
@@ -21448,8 +22118,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
+		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
 #endif
 }
 
@@ -21473,6 +22143,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21481,8 +22152,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
 				std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
+#endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
@@ -21492,7 +22165,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				}
+#endif
 				// process the lower half (rounded down) here
 				radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
 			}
@@ -21518,8 +22193,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
+		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
 #endif
 }
 
@@ -21543,6 +22218,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21551,8 +22227,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
 				std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
+#endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
@@ -21562,7 +22240,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				}
+#endif
 				// process the lower half (rounded down) here
 				radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
 			}
@@ -21583,8 +22263,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
+		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
 #endif
 }
 
@@ -21607,6 +22287,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21615,8 +22296,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
 				std::future<void> asynchandle;
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
+#endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
@@ -21626,7 +22309,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				}
+#endif
 				// process the lower half (rounded down) here
 				radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
 			}
@@ -21652,8 +22337,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
 #endif// !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
@@ -21718,6 +22403,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21759,8 +22445,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
 			}else radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
-		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
+		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -21776,6 +22462,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21822,8 +22509,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
 			}else radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
-		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
+		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -21839,6 +22526,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21880,8 +22568,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 				}
 			}else radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
-		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
+		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -21896,6 +22584,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
 	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
@@ -21942,8 +22631,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 				}
 			}else radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 }
 #endif// !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
 #endif// 1- to 16-way multithreading function reroutes
