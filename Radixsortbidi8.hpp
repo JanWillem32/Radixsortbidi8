@@ -18793,19 +18793,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocsingle
+#else
+	radixsortcopynoallocsingle2thread
+#endif
+	(std::size_t count, T const input[], T output[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	if (ismultithreadcapable){
@@ -19039,19 +19049,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortnoalloc() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocsingle
+#else
+	radixsortnoallocsingle2thread
+#endif
+	(std::size_t count, T input[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	if (ismultithreadcapable){
@@ -19626,18 +19646,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortcopynoallocsingle
+#else
+	radixsortcopynoallocsingle2thread
+#endif
+	(std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	if (ismultithreadcapable){
@@ -19977,18 +20007,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // radixsortnoalloc() function implementation template for single-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+	, bool ismultithreadallowed = true
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void>
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	radixsortnoallocsingle
+#else
+	radixsortnoallocsingle2thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
 		false
 #else
-		true
+		ismultithreadallowed
 #endif
 	};
 	if (ismultithreadcapable){
@@ -20251,8 +20291,60 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // 1- to 16-way multithreading function reroutes
+#if !defined(RSBD8_THREAD_LIMIT) || 2 <= (RSBD8_THREAD_LIMIT)
+// simply reroute to the 1 or 2-thread functions for single-part types
+// the single-part types do not benefit from more than two threads in practice
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T),
+	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output);
+	}else radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output);
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T),
+	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer);
+	}else radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer);
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, varparameters...);
+	}else radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, varparameters...);
+}
+
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
+	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
+		radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, varparameters...);
+	}else radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, varparameters...);
+}
+#endif
 #if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT) && 2 <= (RSBD8_THREAD_LIMIT)
-// simply re-route to the 1 or 2-thread functions
+// simply reroute to the 1 or 2-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
