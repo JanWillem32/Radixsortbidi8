@@ -688,21 +688,6 @@ gprfilesize constexpr defaultgprfilesize{
 #endif
 };
 
-// Integer binary logarithm of the pointer size constant
-unsigned char constexpr log2ptrs{
-#ifdef __cpp_lib_int_pow2// (C++20)
-	static_cast<unsigned char>(std::bit_width(sizeof(void *) - 1))
-#else
-	32 == sizeof(void *)? 5 :
-	16 == sizeof(void *)? 4 :
-	8 == sizeof(void *)? 3 :
-	4 == sizeof(void *)? 2 :
-	2 == sizeof(void *)? 1 :
-	1 == sizeof(void *)? 0 :
-	static_cast<unsigned char>(~0)
-#endif
-};
-
 // Utility structs to generate tests for the often padded 80-bit long double types
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
@@ -7285,8 +7270,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Helper functions to implement the offset transforms
 
 // version for the companion thread
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[])noexcept{
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetssinglemtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
@@ -7294,33 +7281,33 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
-	std::size_t *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
+	X *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
 		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	std::size_t *u{offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
+	X *u{offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
 		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	std::size_t offset{count - (*u + *t)};
-	*u = count;// high half, the last offset always starts at the end
+	std::size_t offset{count - (static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t))};
+	*u = static_cast<X>(count);// high half, the last offset always starts at the end
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		u += isdescsort * 2 - 1;
 		t += isdescsort * 2 - 1;
 		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
-			std::size_t difference{*u + *t};
-			*u = offset;// high half
-			t[1 - isdescsort * 2] = offset + 1;// low half
+			std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};
+			*u = static_cast<X>(offset);// high half
+			t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// low half
 			u += isdescsort * 2 - 1;
 			t += isdescsort * 2 - 1;
 			offset -= difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
-		t[1 - isdescsort * 2] = offset + 1;// low half
+		t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// low half
 	}else{// unsigned or signed absolute
 		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -7329,25 +7316,25 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size
 			unsigned j{256 / 4 - 1};// double the number of items per loop
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{*u + *t};// even
-				*u = offset;// even, high half
-				t[isdescsort * 2 - 1] = offset + 1;// odd, low half
+				std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};// even
+				*u = static_cast<X>(offset);// even, high half
+				t[isdescsort * 2 - 1] = static_cast<X>(offset + 1);// odd, low half
 				offset -= difference;
 				addcarryofless(b, count, difference);
-				difference = u[isdescsort * 6 - 3] + t[isdescsort * 6 - 3];// odd
-				u[isdescsort * 6 - 3] = offset;// odd, high half
-				*t = offset + 1;// even, low half
+				difference = static_cast<std::size_t>(u[isdescsort * 6 - 3]) + static_cast<std::size_t>(t[isdescsort * 6 - 3]);// odd
+				u[isdescsort * 6 - 3] = static_cast<X>(offset);// odd, high half
+				*t = static_cast<X>(offset + 1);// even, low half
 				u += isdescsort * 4 - 2;// step forward twice
 				t += isdescsort * 4 - 2;
 				offset -= difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
-			std::size_t difference{*u + *t};// even
-			*u = offset;// even, high half
-			t[isdescsort * 2 - 1] = offset + 1;// odd, low half
+			std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};// even
+			*u = static_cast<X>(offset);// even, high half
+			t[isdescsort * 2 - 1] = static_cast<X>(offset + 1);// odd, low half
 			offset -= difference;
 			addcarryofless(b, count, difference);
-			*t = offset + 1;// even, low half
+			*t = static_cast<X>(offset + 1);// even, low half
 		}else{// all other modes
 			u += isdescsort * 2 - 1;
 			t += isdescsort * 2 - 1;
@@ -7356,23 +7343,25 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemtc(std::size_t count, std::size
 			unsigned j{256 / 2 - 1 - 127 / 2 * (isabsvalue && issignmode) - isfltpmode};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{*u + *t};
-				*u = offset;// even, high half
-				t[1 - isdescsort * 2] = offset + 1;// odd, low half
+				std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};
+				*u = static_cast<X>(offset);// even, high half
+				t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// odd, low half
 				u += isdescsort * 2 - 1;
 				t += isdescsort * 2 - 1;
 				offset -= difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
-			t[1 - isdescsort * 2] = offset + 1;// odd, low half
+			t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// odd, low half
 		}
 	}
 	return{b};
 }
 
 // version for the companion thread
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[])noexcept{
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	std::pair<unsigned, unsigned>> generateoffsetsmultimtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -7382,12 +7371,12 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 	assert(offsets);
 	assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
-	std::size_t *tbase{offsets + (typebitsize / 8 - 1) * 256};
-	std::size_t *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
+	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
+	X *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps{};
 	unsigned paritybool;// only the main thread may initialise at 0 or 1 for the parity
 	if constexpr(issignmode){// start off with signed handling on the top
-		paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase);
+		paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase);
 		tbase -= 256;
 		ubase -= 256;
 		skipsteps |= paritybool << (typebitsize / 8 - 1);
@@ -7395,7 +7384,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
 		signed k{typebitsize / 8 - 1 - issignmode};
 		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false>(count, tbase, ubase)};
+			unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
 			tbase -= 256;
 			ubase -= 256;
 			paritybool ^= b;
@@ -7403,7 +7392,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 			--k;
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false>(count, tbase, ubase)};
+		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
 		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 			ubase -= 256;
@@ -7417,7 +7406,7 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 		}
 	}
 	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
+		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -7425,24 +7414,26 @@ RSBD8_FUNC_INLINE std::pair<unsigned, unsigned> generateoffsetsmultimtc(std::siz
 }
 
 // version for the main thread when multithreading is used
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[])noexcept{
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t *t{offsets// low-to-high or high-to-low
+	X *t{offsets// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	std::size_t *u{offsetscompanion// low-to-high or high-to-low
+	X *u{offsetscompanion// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
-	std::size_t offset{*t + *u};
+	std::size_t offset{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
 	*t = 0;// low half, the first offset always starts at zero
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
@@ -7451,15 +7442,15 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
-			std::size_t difference{*t + *u};
-			*t = offset;// low half
-			u[isdescsort * 2 - 1] = offset - 1;// high half
+			std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
+			*t = static_cast<X>(offset);// low half
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
 			offset += difference;
 			addcarryofless(b, count, difference);
 		}while(--j);
-		u[isdescsort * 2 - 1] = offset - 1;// high half
+		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 	}else{// unsigned or signed absolute
 		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -7468,25 +7459,25 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			unsigned j{256 / 4 - 1};// double the number of items per loop
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{*t + *u};// even
-				*t = offset;// even, low half
-				u[1 - isdescsort * 2] = offset - 1;// odd, high half
+				std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};// even
+				*t = static_cast<X>(offset);// even, low half
+				u[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 				offset += difference;
 				addcarryofless(b, count, difference);
-				difference = t[3 - isdescsort * 6] + u[3 - isdescsort * 6];// odd
-				t[3 - isdescsort * 6] = offset;// odd, low half
-				*u = offset - 1;// even, high half
+				difference = static_cast<std::size_t>(t[3 - isdescsort * 6]) + static_cast<std::size_t>(u[3 - isdescsort * 6]);// odd
+				t[3 - isdescsort * 6] = static_cast<X>(offset);// odd, low half
+				*u = static_cast<X>(offset - 1);// even, high half
 				t += 2 - isdescsort * 4;// step forward twice
 				u += 2 - isdescsort * 4;
 				offset += difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
-			std::size_t difference{*t + *u};// even
-			*t = offset;// even, low half
-			u[1 - isdescsort * 2] = offset - 1;// odd, high half
+			std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};// even
+			*t = static_cast<X>(offset);// even, low half
+			u[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 			offset += difference;
 			addcarryofless(b, count, difference);
-			*u = offset - 1;// even, high half
+			*u = static_cast<X>(offset - 1);// even, high half
 		}else{// all other modes
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
@@ -7495,29 +7486,31 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			unsigned j{256 / 2 - 1 - (127 + 1) / 2 * (isabsvalue && issignmode)};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{*t + *u};
-				*t = offset;// even, low half
-				u[isdescsort * 2 - 1] = offset - 1;// odd, high half
+				std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
+				*t = static_cast<X>(offset);// even, low half
+				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// odd, high half
 				t += 1 - isdescsort * 2;
 				u += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
-			u[isdescsort * 2 - 1] = offset - 1;// odd, high half
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// odd, high half
 		}
 	}
 	return{b};
 }
 
 // version for the main thread when no multithreading is used at run time
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::size_t offsets[])noexcept{
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[])noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t *t{offsets// low-to-high or high-to-low
+	X *t{offsets// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
@@ -7529,33 +7522,33 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			--offset;
 			unsigned j{256 / 2 - 1};
-			*t = offset;
+			*t = static_cast<X>(offset);
 			t += 1 - isdescsort * 2;
 			do{
 				offset += difference;
 				addcarryofless(b, count, difference);
 				std::size_t difference{t[1 - isdescsort * 2]};
-				*t = offset;
+				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 			}while(--j);
 			offset += difference;
 			addcarryofless(b, count, difference);
 			difference = t[256 * (isdescsort * 2 - 1)];
 			j = 256 / 2 - 3;
-			*t = offset;
+			*t = static_cast<X>(offset);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			do{
 				offset += difference;
 				addcarryofless(b, count, difference);
 				difference = *t;
-				*t = offset;
+				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 			}while(--j);
 			offset += difference;
 			addcarryofless(b, count, difference);
-			*t = offset;
+			*t = static_cast<X>(offset);
 			addcarryofless(b, count, t[1 - isdescsort * 2]);
-			t[1 - isdescsort * 2] = count;// the last offset always starts at the end
+			t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 		}else{// unsigned or signed absolute
 			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -7565,11 +7558,11 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 				--offset;
 				unsigned j{256 / 2 - 1};// double the number of items per loop
 				do{
-					t[1 - isdescsort * 2] = offset;
+					t[1 - isdescsort * 2] = static_cast<X>(offset);
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[3 - isdescsort * 6];// odd
-					*t = offset;
+					*t = static_cast<X>(offset);
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[isdescsort * 2 - 1];// even
@@ -7577,9 +7570,9 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 				}while(--j);
 				offset += difference;
 				addcarryofless(b, count, difference);
-				t[1 - isdescsort * 2] = offset;
+				t[1 - isdescsort * 2] = static_cast<X>(offset);
 				addcarryofless(b, count, *t);
-				*t = count;// the last offset always starts at the end
+				*t = static_cast<X>(count);// the last offset always starts at the end
 			}else{// all other modes
 				std::size_t difference{t[1 - isdescsort * 2]};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
@@ -7589,14 +7582,14 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[2 - isdescsort * 4];
-					*t = offset;
+					*t = static_cast<X>(offset);
 					t += 1 - isdescsort * 2;
 				}while(--j);
 				offset += difference;
 				addcarryofless(b, count, difference);
-				*t = offset;
+				*t = static_cast<X>(offset);
 				addcarryofless(b, count, t[1 - isdescsort * 2]);
-				t[1 - isdescsort * 2] = count;// the last offset always starts at the end
+				t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 			}
 		}
 	}else{// not reverse ordered
@@ -7608,20 +7601,20 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			std::size_t difference;
 			do{
 				difference = *t;
-				*t = offset;
+				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
 			difference = t[256 * (isdescsort * 2 - 1)];
-			t[256 * (isdescsort * 2 - 1)] = offset;
+			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 2;
 			offset += difference;
 			addcarryofless(b, count, difference);
 			do{
 				difference = *t;
-				*t = offset;
+				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, count, difference);
@@ -7634,11 +7627,11 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					std::size_t difference{*t};// even
-					*t = offset;
+					*t = static_cast<X>(offset);
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[3 - isdescsort * 6];// odd
-					t[3 - isdescsort * 6] = offset;
+					t[3 - isdescsort * 6] = static_cast<X>(offset);
 					t += 2 - isdescsort * 4;// step forward twice
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7649,7 +7642,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					std::size_t difference{*t};
-					*t = offset;
+					*t = static_cast<X>(offset);
 					t += 1 - isdescsort * 2;
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7657,14 +7650,16 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssinglemain(std::size_t count, std::siz
 			}
 		}
 		addcarryofless(b, count, *t);
-		*t = offset;
+		*t = static_cast<X>(offset);
 	}
 	return{b};
 }
 
 // version for the main thread when no multithreading is used at compile time
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T = std::nullptr_t>
-RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t offsets[], std::nullptr_t = nullptr, unsigned = 0)noexcept{
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetssingle(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0)noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
@@ -7676,7 +7671,7 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 		std::is_same_v<longdoubletest80, T>)? 80 :
 		std::is_same_v<std::nullptr_t, T>? 8 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr stride{offsetsstride + (typebitsize / 8 - 1) * 256};// offsetsstride, adapted for the multi-part types
-	std::size_t *t{offsets// low-to-high or high-to-low
+	X *t{offsets// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
@@ -7690,23 +7685,23 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 			unsigned j{256 / 2 - 1};
 			do{
 				std::size_t difference{*t};
-				t[stride] = offset;// high half
-				t[isdescsort * 2 - 1] = offset - 1;
+				t[stride] = static_cast<X>(offset);// high half
+				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 				t -= isdescsort * 2 - 1;
 				offset += difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
 			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
-			t[stride + 256 * (isdescsort * 2 - 1)] = offset;// high half
-			t[isdescsort * 2 - 1] = offset - 1;
+			t[stride + 256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);// high half
+			t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			offset += differencemid;
 			addcarryofless(b, count, differencemid);
 			j = 256 / 2 - 2;
 			do{
 				std::size_t difference{*t};
-				t[stride] = offset;// high half
-				t[isdescsort * 2 - 1] = offset - 1;
+				t[stride] = static_cast<X>(offset);// high half
+				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 				t -= isdescsort * 2 - 1;
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, count, difference);
@@ -7719,13 +7714,13 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				do{
 					std::size_t difference{*t};// even
-					t[stride] = offset;// high half
-					t[isdescsort * -2 + 1] = offset - 1;// odd
+					t[stride] = static_cast<X>(offset);// high half
+					t[isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[isdescsort * -6 + 3];// odd
-					t[stride + isdescsort * -6 + 3] = offset;// high half
-					*t = offset - 1;// even
+					t[stride + isdescsort * -6 + 3] = static_cast<X>(offset);// high half
+					*t = static_cast<X>(offset - 1);// even
 					t += isdescsort * -4 + 2;// step forward twice
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7736,8 +7731,8 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 				unsigned j{256 - 2};
 				do{
 					std::size_t difference{*t};
-					t[stride] = offset;// high half
-					t[isdescsort * 2 - 1] = offset - 1;
+					t[stride] = static_cast<X>(static_cast<X>(offset));// high half
+					t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 					t -= isdescsort * 2 - 1;
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7745,10 +7740,10 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 			}
 		}
 		addcarryofless(b, count, *t);
-		t[stride] = offset;// high half
-		*t = count;// the last offset always starts at the end
+		t[stride] = static_cast<X>(offset);// high half
+		*t = static_cast<X>(count);// the last offset always starts at the end
 		// again, adjust for the special mode
-		t[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = offset - 1;
+		t[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);
 	}else{// not reversed order
 		*t = 0;// the first offset always starts at zero
 		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
@@ -7757,23 +7752,23 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 			unsigned j{256 / 2 - 1};
 			do{
 				std::size_t difference{*t};
-				*t = offset;
-				t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+				*t = static_cast<X>(offset);
+				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 				t -= isdescsort * 2 - 1;
 				offset += difference;
 				addcarryofless(b, count, difference);
 			}while(--j);
 			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
-			t[256 * (isdescsort * 2 - 1)] = offset;
-			t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
+			t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			offset += differencemid;
 			addcarryofless(b, count, differencemid);
 			j = 256 / 2 - 2;
 			do{
 				std::size_t difference{*t};
-				*t = offset;
-				t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+				*t = static_cast<X>(offset);
+				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 				t -= isdescsort * 2 - 1;
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, count, difference);
@@ -7786,13 +7781,13 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				do{
 					std::size_t difference{*t};// even
-					*t = offset;
-					t[stride + isdescsort * -2 + 1] = offset - 1;// odd, high half
+					*t = static_cast<X>(offset);
+					t[stride + isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd, high half
 					offset += difference;
 					addcarryofless(b, count, difference);
 					difference = t[isdescsort * -6 + 3];// odd
-					t[isdescsort * -6 + 3] = offset;
-					t[stride] = offset - 1;// even, high half
+					t[isdescsort * -6 + 3] = static_cast<X>(offset);
+					t[stride] = static_cast<X>(offset - 1);// even, high half
 					t += isdescsort * -4 + 2;// step forward twice
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7803,8 +7798,8 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 				unsigned j{256 - 2};
 				do{
 					std::size_t difference{*t};
-					*t = offset;
-					t[stride + isdescsort * 2 - 1] = offset - 1;// high half
+					*t = static_cast<X>(offset);
+					t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 					t -= isdescsort * 2 - 1;
 					offset += difference;
 					addcarryofless(b, count, difference);
@@ -7812,35 +7807,38 @@ RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t 
 			}
 		}
 		addcarryofless(b, count, *t);
-		*t = offset;
-		t[stride] = count;// high half, the last offset always starts at the end
+		*t = static_cast<X>(offset);
+		t[stride] = static_cast<X>(count);// high half, the last offset always starts at the end
 		// again, adjust for the special mode
-		t[stride + ((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = offset - 1;// high half
+		t[stride + ((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
 	}
 	return{b};
 }
 
 // version for the main thread when multithreading is used at compile time
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE unsigned generateoffsetssingle(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[], unsigned usemultithread)noexcept{
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetssingle(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread)noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	if(usemultithread) b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
-	else b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets);
+	if(usemultithread) b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion);
+	else b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets);
 	return{b};
 }
 
 // version for the main thread when no multithreading is used at compile time
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, std::size_t offsets[], std::nullptr_t = nullptr, unsigned = 0, unsigned paritybool = 0)noexcept{
+	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0, unsigned paritybool = 0)noexcept{
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
@@ -7848,10 +7846,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
-	std::size_t *tbase{offsets + (typebitsize / 8 - 1) * 256};
+	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps{};
 	if constexpr(issignmode){// start off with signed handling on the top
-		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T>(count, tbase)};
+		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, tbase)};
 		tbase -= 256;
 		paritybool ^= b;
 		skipsteps |= b << (typebitsize / 8 - 1);
@@ -7859,14 +7857,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
 		signed k{typebitsize / 8 - 1 - issignmode};
 		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T>(count, tbase)};
+			unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
 			tbase -= 256;
 			paritybool ^= b;
 			skipsteps |= b << k;
 			--k;
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T>(count, tbase)};
+		unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
 		if constexpr(isfltpmode && !issignmode && isabsvalue){
 			tbase -= 256;
 		}
@@ -7875,7 +7873,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		else skipsteps += b * 2;
 	}
 	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T>(count, tbase)};
+		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, tbase)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -7883,14 +7881,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // version for the main thread when multithreading is used at compile time
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, std::size_t offsets[], std::size_t offsetscompanion[], unsigned usemultithread, unsigned paritybool = 0)noexcept{
+	std::pair<unsigned, unsigned>> generateoffsetsmulti(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread, unsigned paritybool = 0)noexcept{
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
@@ -7899,10 +7898,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
-	std::size_t *tbase{offsets + (typebitsize / 8 - 1) * 256};
+	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps{};
 	if(usemultithread){
-		std::size_t *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
+		X *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
 		if constexpr(issignmode){// start off with signed handling on the top
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
 			tbase -= 256;
@@ -7974,12 +7973,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 // Do not use this function directly.
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
-	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst, std::size_t offsetscompanion[])noexcept{
+	std::is_same_v<longdoubletest80, T>),
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst, X offsetscompanion[])noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
@@ -8015,12 +8015,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pout[0].mantissa = curmlo;
 					pdst[0].mantissa = curmlo;
@@ -8030,20 +8030,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsetscompanion[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -8052,12 +8052,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pout[-1].mantissa = curmhi;
 					pout -= 2;
@@ -8069,20 +8069,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsetscompanion[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				i -= 2;
 			}while(0 <= i);
 		}else{// !isinputconst
@@ -8111,12 +8111,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
 					--pinputhi;
@@ -8128,20 +8128,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsetscompanion[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -8150,12 +8150,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmhi;
 					++pinputlo;
@@ -8167,20 +8167,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsetscompanion[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			}while(--i);
 		}
 	}else{// not in reverse order
@@ -8205,12 +8205,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			curehi >>= 8;
 			unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-			unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-			unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-			unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-			unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-			unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-			unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+			unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+			unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+			unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+			unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+			unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+			unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 				pout[0].mantissa = curmhi;
 			}
@@ -8218,20 +8218,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
 			curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 			++offsetscompanion[curmhi0];
-			curmhi1 &= sizeof(void *) * 0xFFu;
-			curmhi2 &= sizeof(void *) * 0xFFu;
-			curmhi3 &= sizeof(void *) * 0xFFu;
-			curmhi4 &= sizeof(void *) * 0xFFu;
-			curmhi5 &= sizeof(void *) * 0xFFu;
-			curmhi6 &= sizeof(void *) * 0xFFu;
+			curmhi1 &= 0xFFu;
+			curmhi2 &= 0xFFu;
+			curmhi3 &= 0xFFu;
+			curmhi4 &= 0xFFu;
+			curmhi5 &= 0xFFu;
+			curmhi6 &= 0xFFu;
 			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
 			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+			++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			// register pressure performance issue on several platforms: do the low half here second
 			unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -8239,12 +8239,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			curelo >>= 8;
 			unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-			unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-			unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-			unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-			unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-			unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-			unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+			unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+			unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+			unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+			unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+			unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+			unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 				pout[-1].mantissa = curmlo;
 				pout -= 2;
@@ -8253,20 +8253,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
 			curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 			++offsetscompanion[curmlo0];
-			curmlo1 &= sizeof(void *) * 0xFFu;
-			curmlo2 &= sizeof(void *) * 0xFFu;
-			curmlo3 &= sizeof(void *) * 0xFFu;
-			curmlo4 &= sizeof(void *) * 0xFFu;
-			curmlo5 &= sizeof(void *) * 0xFFu;
-			curmlo6 &= sizeof(void *) * 0xFFu;
+			curmlo1 &= 0xFFu;
+			curmlo2 &= 0xFFu;
+			curmlo3 &= 0xFFu;
+			curmlo4 &= 0xFFu;
+			curmlo5 &= 0xFFu;
+			curmlo6 &= 0xFFu;
 			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+			++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 		}while(--i);
 	}
 }
@@ -8274,12 +8274,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 // Do not use this function directly.
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
-	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	std::is_same_v<longdoubletest80, T>),
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
@@ -8298,7 +8299,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
 	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -8466,12 +8467,13 @@ handletop8:
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types without indirection
 // Do not use this function directly.
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
-	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	std::is_same_v<longdoubletest80, T>),
+	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
@@ -8491,7 +8493,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
 	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -8825,21 +8827,22 @@ handletop8:
 
 // multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
+	std::is_same_v<longdoubletest80, T>),
 	void> radixsortcopynoallocmulti2threadmtc(std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, true, T>(count, input, output, buffer, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -8852,11 +8855,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -8894,40 +8897,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmulti2threadmainmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier);
+		radixsortnoallocmulti2threadmainmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
+	std::is_same_v<longdoubletest80, T>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocmulti
+	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -8954,13 +8954,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, count, input, output, buffer, std::ref(atomiclightbarrier));
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
@@ -8989,12 +8989,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curmhi;
 					pbuffer[0].mantissa = curmhi;
@@ -9004,20 +9004,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsets[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+				++offsets[256 + static_cast<std::size_t>(curmhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -9026,12 +9026,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[1].mantissa = curmlo;
 					poutput += 2;
@@ -9043,20 +9043,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsets[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
 				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+				++offsets[256 + static_cast<std::size_t>(curmlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				i -= 2;
 			}while(0 < i);
 			if(!(1 & i)){// fill in the final item for odd counts
@@ -9072,12 +9072,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				cure >>= 8;
 				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curm;
 					pbuffer[0].mantissa = curm;
@@ -9087,20 +9087,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
 				else cure &= 0xFFu;
 				++offsets[curm0];
-				curm1 &= sizeof(void *) * 0xFFu;
-				curm2 &= sizeof(void *) * 0xFFu;
-				curm3 &= sizeof(void *) * 0xFFu;
-				curm4 &= sizeof(void *) * 0xFFu;
-				curm5 &= sizeof(void *) * 0xFFu;
-				curm6 &= sizeof(void *) * 0xFFu;
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+				++offsets[256 + static_cast<std::size_t>(curm1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}else{// not in reverse order
 			T const *pinput{input};
@@ -9123,12 +9123,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curmlo;
 				}
@@ -9136,20 +9136,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
 				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+				++offsets[256 + static_cast<std::size_t>(curmlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -9157,12 +9157,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[1].mantissa = curmhi;
 					poutput += 2;
@@ -9171,20 +9171,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
 				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+				++offsets[256 + static_cast<std::size_t>(curmhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				i -= 2;
 			}while(0 < i);
 			if(!(1 & i)){// fill in the final item for odd counts
@@ -9199,12 +9199,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				cure >>= 8;
 				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curm;
 				}
@@ -9212,20 +9212,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curm0];
-				curm1 &= sizeof(void *) * 0xFFu;
-				curm2 &= sizeof(void *) * 0xFFu;
-				curm3 &= sizeof(void *) * 0xFFu;
-				curm4 &= sizeof(void *) * 0xFFu;
-				curm5 &= sizeof(void *) * 0xFFu;
-				curm6 &= sizeof(void *) * 0xFFu;
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+				++offsets[256 + static_cast<std::size_t>(curm1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}
 
@@ -9233,7 +9233,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -9248,11 +9248,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -9292,27 +9292,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst = output;
 				pdstnext = buffer;
 			}
-			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
+	std::is_same_v<longdoubletest80, T>),
 	void> radixsortnoallocmulti2threadmtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, false, T>(count, input, buffer, nullptr, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -9325,11 +9326,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -9367,40 +9368,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmulti2threadmainmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier);
+		radixsortnoallocmulti2threadmainmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier);
 	}
 }
 
 // radixsortnoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
-	std::is_same_v<longdoubletest128, T> ||
+	std::is_unsigned_v<X> &&
+	(std::is_same_v<longdoubletest128, T> ||
 	std::is_same_v<longdoubletest96, T> ||
-	std::is_same_v<longdoubletest80, T>,
+	std::is_same_v<longdoubletest80, T>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocmulti
+	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -9426,13 +9424,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, count, input, buffer, std::ref(atomiclightbarrier));
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -9470,12 +9468,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
 					--pinputhi;
@@ -9487,20 +9485,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsets[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+				++offsets[256 + static_cast<std::size_t>(curmlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -9509,12 +9507,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmlo;
 					++pinputlo;
@@ -9526,20 +9524,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsets[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+				++offsets[256 + static_cast<std::size_t>(curmhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			}while(pinputlo < pinputhi);
 			if(pinputlo == pinputhi){// fill in the final item for odd counts
 				U cure{pinputlo[0].signexponent};
@@ -9554,12 +9552,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				cure >>= 8;
 				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pbufferhi[0].mantissa = curm;
 				}
@@ -9567,20 +9565,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curm0];
-				curm1 &= sizeof(void *) * 0xFFu;
-				curm2 &= sizeof(void *) * 0xFFu;
-				curm3 &= sizeof(void *) * 0xFFu;
-				curm4 &= sizeof(void *) * 0xFFu;
-				curm5 &= sizeof(void *) * 0xFFu;
-				curm6 &= sizeof(void *) * 0xFFu;
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+				++offsets[256 + static_cast<std::size_t>(curm1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}else{// not in reverse order
 			T *pinput{input};
@@ -9606,12 +9604,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pbuffer[0].mantissa = curmlo;
 				}
@@ -9619,20 +9617,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
 				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+				++offsets[256 + static_cast<std::size_t>(curmlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
@@ -9640,12 +9638,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pbuffer[1].signexponent = static_cast<W>(curmhi);
 					pbuffer += 2;
@@ -9654,20 +9652,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
 				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+				++offsets[256 + static_cast<std::size_t>(curmhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				i -= 2;
 			}while(0 < i);
 			if(!(1 & i)){// fill in the final item for odd counts
@@ -9682,12 +9680,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				cure >>= 8;
 				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-				unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-				unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-				unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-				unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-				unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
 					pbuffer[0].mantissa = curm;
 					++pbuffer;
@@ -9696,20 +9694,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsets[curm0];
-				curm1 &= sizeof(void *) * 0xFFu;
-				curm2 &= sizeof(void *) * 0xFFu;
-				curm3 &= sizeof(void *) * 0xFFu;
-				curm4 &= sizeof(void *) * 0xFFu;
-				curm5 &= sizeof(void *) * 0xFFu;
-				curm6 &= sizeof(void *) * 0xFFu;
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
 				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+				++offsets[256 + static_cast<std::size_t>(curm1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}
 
@@ -9717,7 +9715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -9732,11 +9730,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -9776,21 +9774,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = buffer;
 				pdst = input;
 			}
-			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}
 }
 
 // initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, T const input[], T pout[], std::size_t offsetscompanion[])noexcept{
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, T const input[], T pout[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
 	// do not pass a nullptr here
@@ -9814,53 +9813,53 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
-				U curhi5{curhi >> (40 - log2ptrs)};
-				U curhi6{curhi >> (48 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
+				U curhi5{curhi >> 40};
+				U curhi6{curhi >> 48};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 56;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
-				curhi5 &= sizeof(void *) * 0xFFu;
-				curhi6 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
-				U curlo5{curlo >> (40 - log2ptrs)};
-				U curlo6{curlo >> (48 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
+				U curlo5{curlo >> 40};
+				U curlo6{curlo >> 48};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 56;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
-				curlo5 &= sizeof(void *) * 0xFFu;
-				curlo6 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -9881,47 +9880,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
-				U curhi5{curhi >> (40 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
+				U curhi5{curhi >> 40};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 48;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
-				curhi5 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
-				U curlo5{curlo >> (40 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
+				U curlo5{curlo >> 40};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 48;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
-				curlo5 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -9942,41 +9941,41 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 40;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
 				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 40;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -9996,34 +9995,34 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						curlo, pout + i - 1);
 				}
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 32;
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
 				curlo >>= 32;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
 				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -10043,28 +10042,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						curb, pout + i - 1);
 				}
 				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> (8 - log2ptrs)};
-				U cur2a{cura >> (16 - log2ptrs)};
+				U cur1a{cura >> 8};
+				U cur2a{cura >> 16};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
 				cura >>= 24;
 				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> (8 - log2ptrs)};
-				U cur2b{curb >> (16 - log2ptrs)};
+				U cur1b{curb >> 8};
+				U cur2b{curb >> 16};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
 				curb >>= 24;
 				++offsetscompanion[cur0a];
-				cur1a &= sizeof(void *) * 0xFFu;
-				cur2a &= sizeof(void *) * 0xFFu;
+				cur1a &= 0xFFu;
+				cur2a &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 				++offsetscompanion[cur0b];
-				cur1b &= sizeof(void *) * 0xFFu;
-				cur2b &= sizeof(void *) * 0xFFu;
+				cur1b &= 0xFFu;
+				cur2b &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2a);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
 				++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2b);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
 				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
 			}while(i -= 2);
 		}
@@ -10086,31 +10085,31 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						curc, pout + i - 2);
 				}
 				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> (8 - log2ptrs)};
+				U cur1a{cura >> 8};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
 				cura >>= 16;
 				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> (8 - log2ptrs)};
+				U cur1b{curb >> 8};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
 				curb >>= 16;
 				U cur0c{curc & 0xFFu};
-				U cur1c{curc >> (8 - log2ptrs)};
+				U cur1c{curc >> 8};
 				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
 				curc >>= 16;
 				++offsetscompanion[cur0a];
-				cur1a &= sizeof(void *) * 0xFFu;
+				cur1a &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 				++offsetscompanion[cur0b];
-				cur1b &= sizeof(void *) * 0xFFu;
+				cur1b &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 				++offsetscompanion[cur0c];
-				cur1c &= sizeof(void *) * 0xFFu;
+				cur1c &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1c);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 			}while(i -= 3);
 		}
@@ -10164,14 +10163,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
 	// do not pass a nullptr here
@@ -10189,7 +10189,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
 	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -10280,14 +10280,15 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for multi-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
@@ -10306,7 +10307,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
 	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -10468,8 +10469,9 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 
 // multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -10481,10 +10483,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, output, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -10497,11 +10499,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -10539,17 +10541,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier);
+		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for multi-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -10557,22 +10560,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocmulti
+	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -10599,13 +10598,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, output, buffer, std::ref(atomiclightbarrier));
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, output, buffer, std::ref(atomiclightbarrier));
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -10621,53 +10620,53 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
-					U curhi6{curhi >> (48 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					U curhi6{curhi >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
-					curhi6 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
-					U curlo6{curlo >> (48 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					U curlo6{curlo >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
-					curlo6 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -10677,28 +10676,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
-					U cur5{cur >> (40 - log2ptrs)};
-					U cur6{cur >> (48 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					U cur6{cur >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
-					cur5 &= sizeof(void *) * 0xFFu;
-					cur6 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -10717,47 +10716,47 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -10767,25 +10766,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
-					U cur5{cur >> (40 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
-					cur5 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -10804,41 +10803,41 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -10848,22 +10847,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -10881,34 +10880,34 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curlo, output + i - 1);
 					}
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -10918,19 +10917,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -10948,28 +10947,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb, output + i - 1);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
-					U cur2a{cura >> (16 - log2ptrs)};
+					U cur1a{cura >> 8};
+					U cur2a{cura >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
-					U cur2b{curb >> (16 - log2ptrs)};
+					U cur1b{curb >> 8};
+					U cur2b{curb >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
-					cur2a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
+					cur2a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
-					cur2b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
+					cur2b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 					++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 					++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
@@ -10979,16 +10978,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+					U cur1{static_cast<unsigned>(cur) >> 8};
+					U cur2{static_cast<unsigned>(cur) >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 					++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11013,31 +11012,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curc, output + i);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> (8 - log2ptrs)};
+					U cur1c{curc >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 					++offsets[cur0c];
-					cur1c &= sizeof(void *) * 0xFFu;
+					cur1c &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[256 + static_cast<std::size_t>(cur1c)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
@@ -11050,22 +11049,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb, output + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 				}else if(1 & i){// fill in the final item for odd counts
 					U cur{input[0]};
@@ -11073,13 +11072,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+					U cur1{static_cast<unsigned>(cur) >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11171,7 +11170,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -11186,11 +11185,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -11230,15 +11229,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst = output;
 				pdstnext = buffer;
 			}
-			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -11249,10 +11249,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -11265,11 +11265,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
@@ -11307,17 +11307,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier);
+		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier);
 	}
 }
 
 // radixsortnoalloc() function implementation template for multi-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -11325,22 +11326,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocmulti
+	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -11366,13 +11363,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, buffer, std::ref(atomiclightbarrier));
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -11388,53 +11385,53 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
-					U curhi6{curhi >> (48 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					U curhi6{curhi >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
-					curhi6 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
-					U curlo6{curlo >> (48 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					U curlo6{curlo >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
-					curlo6 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -11444,28 +11441,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
-					U cur5{cur >> (40 - log2ptrs)};
-					U cur6{cur >> (48 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					U cur6{cur >> 48};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
-					cur5 &= sizeof(void *) * 0xFFu;
-					cur6 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 					++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11484,47 +11481,47 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -11534,25 +11531,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
-					U cur5{cur >> (40 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
-					cur5 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 					++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11571,41 +11568,41 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -11615,22 +11612,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
-					U cur4{cur >> (32 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
-					cur4 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 					++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11648,34 +11645,34 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curlo, buffer + i - 1);
 					}
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 					++offsets[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 					i -= 2;
 				}while(0 < i);
@@ -11685,19 +11682,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{cur >> (8 - log2ptrs)};
-					U cur2{cur >> (16 - log2ptrs)};
-					U cur3{cur >> (24 - log2ptrs)};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
-					cur3 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 					++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11715,28 +11712,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb, buffer + i - 1);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
-					U cur2a{cura >> (16 - log2ptrs)};
+					U cur1a{cura >> 8};
+					U cur2a{cura >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
-					U cur2b{curb >> (16 - log2ptrs)};
+					U cur1b{curb >> 8};
+					U cur2b{curb >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
-					cur2a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
+					cur2a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
-					cur2b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
+					cur2b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 					++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 					++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 					i -= 2;
 				}while(0 < i);
@@ -11746,16 +11743,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-					U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+					U cur1{static_cast<unsigned>(cur) >> 8};
+					U cur2{static_cast<unsigned>(cur) >> 16};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
-					cur2 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 					++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11780,31 +11777,31 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curc, buffer + i);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> (8 - log2ptrs)};
+					U cur1c{curc >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 					++offsets[cur0c];
-					cur1c &= sizeof(void *) * 0xFFu;
+					cur1c &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+					++offsets[256 + static_cast<std::size_t>(cur1c)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 					i -= 3;
 				}while(0 <= i);
@@ -11817,22 +11814,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb, buffer + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsets[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+					++offsets[256 + static_cast<std::size_t>(cur1a)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+					++offsets[256 + static_cast<std::size_t>(cur1b)];
 					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 				}
 				if(1 & i){// fill in the final item for odd counts
@@ -11841,13 +11838,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+					U cur1{static_cast<unsigned>(cur) >> 8};
 					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
-					cur1 &= sizeof(void *) * 0xFFu;
+					cur1 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+					++offsets[256 + static_cast<std::size_t>(cur1)];
 					++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
@@ -11939,7 +11936,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -11954,11 +11951,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -11998,7 +11995,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = buffer;
 				pdst = input;
 			}
-			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}
 }
@@ -12006,8 +12003,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // initialisation part, multi-threading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12017,7 +12015,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, std::size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12056,60 +12054,60 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				curmlo >>= 56;
 				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsetscompanion[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				curmhi >>= 56;
 				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsetscompanion[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				i -= 2;
 			}while(0 <= i);
 		}else{// !isinputconst
@@ -12138,60 +12136,60 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				curmlo >>= 56;
 				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
 				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 				else curelo &= 0xFFu;
 				++offsetscompanion[curmlo0];
-				curmlo1 &= sizeof(void *) * 0xFFu;
-				curmlo2 &= sizeof(void *) * 0xFFu;
-				curmlo3 &= sizeof(void *) * 0xFFu;
-				curmlo4 &= sizeof(void *) * 0xFFu;
-				curmlo5 &= sizeof(void *) * 0xFFu;
-				curmlo6 &= sizeof(void *) * 0xFFu;
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 				curehi >>= 8;
 				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 				curmhi >>= 56;
 				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
 				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 				else curehi &= 0xFFu;
 				++offsetscompanion[curmhi0];
-				curmhi1 &= sizeof(void *) * 0xFFu;
-				curmhi2 &= sizeof(void *) * 0xFFu;
-				curmhi3 &= sizeof(void *) * 0xFFu;
-				curmhi4 &= sizeof(void *) * 0xFFu;
-				curmhi5 &= sizeof(void *) * 0xFFu;
-				curmhi6 &= sizeof(void *) * 0xFFu;
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
 				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			}while(--i);
 		}
 	}else{// not in reverse order
@@ -12219,58 +12217,58 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 			curehi >>= 8;
 			unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-			unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-			unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-			unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-			unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-			unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-			unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+			unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+			unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+			unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+			unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+			unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+			unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 			curmhi >>= 56;
 			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
 			curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 			++offsetscompanion[curmhi0];
-			curmhi1 &= sizeof(void *) * 0xFFu;
-			curmhi2 &= sizeof(void *) * 0xFFu;
-			curmhi3 &= sizeof(void *) * 0xFFu;
-			curmhi4 &= sizeof(void *) * 0xFFu;
-			curmhi5 &= sizeof(void *) * 0xFFu;
-			curmhi6 &= sizeof(void *) * 0xFFu;
+			curmhi1 &= 0xFFu;
+			curmhi2 &= 0xFFu;
+			curmhi3 &= 0xFFu;
+			curmhi4 &= 0xFFu;
+			curmhi5 &= 0xFFu;
+			curmhi6 &= 0xFFu;
 			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
 			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmhi1);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmhi2);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmhi3);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmhi4);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmhi5);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmhi6);
+			++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			// register pressure performance issue on several platforms: do the low half here second
 			unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 			curelo >>= 8;
 			unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-			unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-			unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-			unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-			unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-			unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-			unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+			unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+			unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+			unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+			unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+			unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+			unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 			curmlo >>= 56;
 			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
 			curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 			++offsetscompanion[curmlo0];
-			curmlo1 &= sizeof(void *) * 0xFFu;
-			curmlo2 &= sizeof(void *) * 0xFFu;
-			curmlo3 &= sizeof(void *) * 0xFFu;
-			curmlo4 &= sizeof(void *) * 0xFFu;
-			curmlo5 &= sizeof(void *) * 0xFFu;
-			curmlo6 &= sizeof(void *) * 0xFFu;
+			curmlo1 &= 0xFFu;
+			curmlo2 &= 0xFFu;
+			curmlo3 &= 0xFFu;
+			curmlo4 &= 0xFFu;
+			curmlo5 &= 0xFFu;
+			curmlo6 &= 0xFFu;
 			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
 			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curmlo1);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curmlo2);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curmlo3);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curmlo4);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curmlo5);
-			++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curmlo6);
+			++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 		}while(i -= 2);
 	}
 }
@@ -12278,8 +12276,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // main part, multi-threading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12289,7 +12288,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -12309,7 +12308,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
 	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -12481,8 +12480,9 @@ handletop8:
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12492,7 +12492,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
@@ -12512,7 +12512,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
 	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -12831,8 +12831,9 @@ handletop8:
 
 // multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12849,16 +12850,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V>(count, input, output, buffer, offsetscompanion, varparameters...);
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X>(count, input, output, buffer, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -12879,11 +12880,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// no exception detection required here
@@ -12922,18 +12923,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -12945,7 +12947,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 < CHAR_BIT * sizeof(long double)),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocmulti
+	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
 #endif
@@ -12953,16 +12955,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -12989,13 +12987,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -13040,60 +13038,60 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 					curelo >>= 8;
 					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 					curmlo >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 					else curelo &= 0xFFu;
 					++offsets[curmlo0];
-					curmlo1 &= sizeof(void *) * 0xFFu;
-					curmlo2 &= sizeof(void *) * 0xFFu;
-					curmlo3 &= sizeof(void *) * 0xFFu;
-					curmlo4 &= sizeof(void *) * 0xFFu;
-					curmlo5 &= sizeof(void *) * 0xFFu;
-					curmlo6 &= sizeof(void *) * 0xFFu;
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 					// register pressure performance issue on several platforms: do the high half here second
 					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 					curehi >>= 8;
 					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 					curmhi >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 					else curehi &= 0xFFu;
 					++offsets[curmhi0];
-					curmhi1 &= sizeof(void *) * 0xFFu;
-					curmhi2 &= sizeof(void *) * 0xFFu;
-					curmhi3 &= sizeof(void *) * 0xFFu;
-					curmhi4 &= sizeof(void *) * 0xFFu;
-					curmhi5 &= sizeof(void *) * 0xFFu;
-					curmhi6 &= sizeof(void *) * 0xFFu;
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
 					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
 					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
@@ -13110,30 +13108,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}else{// not in reverse order
 				do{
@@ -13156,60 +13154,60 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 					curelo >>= 8;
 					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 					curmlo >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 					else curelo &= 0xFFu;
 					++offsets[curmlo0];
-					curmlo1 &= sizeof(void *) * 0xFFu;
-					curmlo2 &= sizeof(void *) * 0xFFu;
-					curmlo3 &= sizeof(void *) * 0xFFu;
-					curmlo4 &= sizeof(void *) * 0xFFu;
-					curmlo5 &= sizeof(void *) * 0xFFu;
-					curmlo6 &= sizeof(void *) * 0xFFu;
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 					// register pressure performance issue on several platforms: do the high half here second
 					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 					curehi >>= 8;
 					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 					curmhi >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 					else curehi &= 0xFFu;
 					++offsets[curmhi0];
-					curmhi1 &= sizeof(void *) * 0xFFu;
-					curmhi2 &= sizeof(void *) * 0xFFu;
-					curmhi3 &= sizeof(void *) * 0xFFu;
-					curmhi4 &= sizeof(void *) * 0xFFu;
-					curmhi5 &= sizeof(void *) * 0xFFu;
-					curmhi6 &= sizeof(void *) * 0xFFu;
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
 					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
 					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
@@ -13225,30 +13223,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}
 
@@ -13256,7 +13254,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -13279,11 +13277,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -13324,7 +13322,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst = output;
 					pdstnext = buffer;
 				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
 	}
@@ -13332,8 +13330,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -13349,16 +13348,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -13379,11 +13378,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// no exception detection required here
@@ -13422,18 +13421,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
 // radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
 	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
@@ -13445,7 +13445,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 < CHAR_BIT * sizeof(long double)),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocmulti
+	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
 #endif
@@ -13453,16 +13453,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -13486,16 +13482,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
-		// conditionally enable multi-threading here if indirection1 allows noexcept
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -13541,60 +13536,60 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 					curelo >>= 8;
 					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> (8 - log2ptrs))};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> (16 - log2ptrs))};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> (24 - log2ptrs))};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> (32 - log2ptrs))};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> (40 - log2ptrs))};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> (48 - log2ptrs))};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 					curmlo >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
 					else curelo &= 0xFFu;
 					++offsets[curmlo0];
-					curmlo1 &= sizeof(void *) * 0xFFu;
-					curmlo2 &= sizeof(void *) * 0xFFu;
-					curmlo3 &= sizeof(void *) * 0xFFu;
-					curmlo4 &= sizeof(void *) * 0xFFu;
-					curmlo5 &= sizeof(void *) * 0xFFu;
-					curmlo6 &= sizeof(void *) * 0xFFu;
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmlo6);
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 					// register pressure performance issue on several platforms: do the high half here second
 					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
 					curehi >>= 8;
 					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> (8 - log2ptrs))};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> (16 - log2ptrs))};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> (24 - log2ptrs))};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> (32 - log2ptrs))};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> (40 - log2ptrs))};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> (48 - log2ptrs))};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
 					curmhi >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
 					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
 					else curehi &= 0xFFu;
 					++offsets[curmhi0];
-					curmhi1 &= sizeof(void *) * 0xFFu;
-					curmhi2 &= sizeof(void *) * 0xFFu;
-					curmhi3 &= sizeof(void *) * 0xFFu;
-					curmhi4 &= sizeof(void *) * 0xFFu;
-					curmhi5 &= sizeof(void *) * 0xFFu;
-					curmhi6 &= sizeof(void *) * 0xFFu;
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
 					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
 					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curmhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curmhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curmhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curmhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curmhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curmhi6);
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
 					V *p{pinputlo[0]};
@@ -13610,30 +13605,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}else{// not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
@@ -13652,58 +13647,58 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 					// register pressure performance issue on several platforms: do the high half here second
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
@@ -13719,30 +13714,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
 					cure >>= 8;
 					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> (8 - log2ptrs))};
-					unsigned curm2{static_cast<unsigned>(curm >> (16 - log2ptrs))};
-					unsigned curm3{static_cast<unsigned>(curm >> (24 - log2ptrs))};
-					unsigned curm4{static_cast<unsigned>(curm >> (32 - log2ptrs))};
-					unsigned curm5{static_cast<unsigned>(curm >> (40 - log2ptrs))};
-					unsigned curm6{static_cast<unsigned>(curm >> (48 - log2ptrs))};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
 					curm >>= 56;
 					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
 					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= sizeof(void *) * 0xFFu;
-					curm2 &= sizeof(void *) * 0xFFu;
-					curm3 &= sizeof(void *) * 0xFFu;
-					curm4 &= sizeof(void *) * 0xFFu;
-					curm5 &= sizeof(void *) * 0xFFu;
-					curm6 &= sizeof(void *) * 0xFFu;
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
 					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
 					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curm1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curm2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curm3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curm4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curm5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curm6);
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}
 
@@ -13750,7 +13745,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -13773,11 +13768,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -13818,7 +13813,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					psrclo = buffer;
 					pdst = input;
 				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
 	}
@@ -13826,12 +13821,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, std::size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
@@ -13864,51 +13860,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
-					U curhi6{curhi >> (48 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					U curhi6{curhi >> 48};
 					curhi >>= 56;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
-					curhi6 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curhi6);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
-					U curlo6{curlo >> (48 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					U curlo6{curlo >> 48};
 					curlo >>= 56;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
-					curlo6 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curlo6);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
 			}else{// !isinputconst
@@ -13931,51 +13927,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the low half here
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
-					U curlo6{curlo >> (48 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					U curlo6{curlo >> 48};
 					curlo >>= 56;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
-					curlo6 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curlo6);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
-					U curhi6{curhi >> (48 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					U curhi6{curhi >> 48};
 					curhi >>= 56;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
-					curhi6 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curhi6);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
 				}while(--i);
 			}
@@ -13998,51 +13994,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
-				U curhi5{curhi >> (40 - log2ptrs)};
-				U curhi6{curhi >> (48 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
+				U curhi5{curhi >> 40};
+				U curhi6{curhi >> 48};
 				curhi >>= 56;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
-				curhi5 &= sizeof(void *) * 0xFFu;
-				curhi6 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curhi6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
-				U curlo5{curlo >> (40 - log2ptrs)};
-				U curlo6{curlo >> (48 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
+				U curlo5{curlo >> 40};
+				U curlo6{curlo >> 48};
 				curlo >>= 56;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
-				curlo5 &= sizeof(void *) * 0xFFu;
-				curlo6 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 6 * 256) + curlo6);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -14070,45 +14066,45 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
 					curhi >>= 48;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
 					curlo >>= 48;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
 			}else{// !isinputconst
@@ -14131,45 +14127,45 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the low half here
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
-					U curlo5{curlo >> (40 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
 					curlo >>= 48;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
-					curlo5 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
-					U curhi5{curhi >> (40 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
 					curhi >>= 48;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
-					curhi5 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
 				}while(--i);
 			}
@@ -14192,45 +14188,45 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
-				U curhi5{curhi >> (40 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
+				U curhi5{curhi >> 40};
 				curhi >>= 48;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
-				curhi5 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curhi5);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
-				U curlo5{curlo >> (40 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
+				U curlo5{curlo >> 40};
 				curlo >>= 48;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
-				curlo5 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 5 * 256) + curlo5);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -14258,39 +14254,39 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
 					curhi >>= 40;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
 					curlo >>= 40;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
 			}else{// !isinputconst
@@ -14313,39 +14309,39 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the low half here
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
-					U curlo4{curlo >> (32 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
 					curlo >>= 40;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
-					curlo4 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 					// register pressure performance issue on several platforms: do the high half here second
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
-					U curhi4{curhi >> (32 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
 					curhi >>= 40;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
-					curhi4 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
 				}while(--i);
 			}
@@ -14368,39 +14364,39 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
-				U curhi4{curhi >> (32 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
+				U curhi4{curhi >> 32};
 				curhi >>= 40;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
-				curhi4 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curhi4);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
 				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
 				// register pressure performance issue on several platforms: do the low half here second
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
-				U curlo4{curlo >> (32 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
+				U curlo4{curlo >> 32};
 				curlo >>= 40;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
-				curlo4 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 4 * 256) + curlo4);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -14428,33 +14424,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
 					curhi >>= 32;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
 					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
 					curlo >>= 32;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
 			}else{// !isinputconst
@@ -14476,32 +14472,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 					}
 					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> (8 - log2ptrs)};
-					U curlo2{curlo >> (16 - log2ptrs)};
-					U curlo3{curlo >> (24 - log2ptrs)};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
 					curlo >>= 32;
 					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> (8 - log2ptrs)};
-					U curhi2{curhi >> (16 - log2ptrs)};
-					U curhi3{curhi >> (24 - log2ptrs)};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
 					curhi >>= 32;
 					++offsetscompanion[curlo0];
-					curlo1 &= sizeof(void *) * 0xFFu;
-					curlo2 &= sizeof(void *) * 0xFFu;
-					curlo3 &= sizeof(void *) * 0xFFu;
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
 					++offsetscompanion[curhi0];
-					curhi1 &= sizeof(void *) * 0xFFu;
-					curhi2 &= sizeof(void *) * 0xFFu;
-					curhi3 &= sizeof(void *) * 0xFFu;
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
 				}while(--i);
 			}
@@ -14523,32 +14519,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 				}
 				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> (8 - log2ptrs)};
-				U curhi2{curhi >> (16 - log2ptrs)};
-				U curhi3{curhi >> (24 - log2ptrs)};
+				U curhi1{curhi >> 8};
+				U curhi2{curhi >> 16};
+				U curhi3{curhi >> 24};
 				curhi >>= 32;
 				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> (8 - log2ptrs)};
-				U curlo2{curlo >> (16 - log2ptrs)};
-				U curlo3{curlo >> (24 - log2ptrs)};
+				U curlo1{curlo >> 8};
+				U curlo2{curlo >> 16};
+				U curlo3{curlo >> 24};
 				curlo >>= 32;
 				++offsetscompanion[curhi0];
-				curhi1 &= sizeof(void *) * 0xFFu;
-				curhi2 &= sizeof(void *) * 0xFFu;
-				curhi3 &= sizeof(void *) * 0xFFu;
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 				++offsetscompanion[curlo0];
-				curlo1 &= sizeof(void *) * 0xFFu;
-				curlo2 &= sizeof(void *) * 0xFFu;
-				curlo3 &= sizeof(void *) * 0xFFu;
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curhi1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curhi2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curhi3);
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
 				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + curlo1);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + curlo2);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 3 * 256) + curlo3);
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
 			}while(i -= 2);
 		}
@@ -14575,26 +14571,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
-					U cur2a{cura >> (16 - log2ptrs)};
+					U cur1a{cura >> 8};
+					U cur2a{cura >> 16};
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
-					U cur2b{curb >> (16 - log2ptrs)};
+					U cur1b{curb >> 8};
+					U cur2b{curb >> 16};
 					curb >>= 24;
 					++offsetscompanion[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
-					cur2a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
+					cur2a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsetscompanion[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
-					cur2b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
+					cur2b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2a);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2b);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
 				}while(i -= 2);
 			}else{// !isinputconst
@@ -14616,26 +14612,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
-					U cur2a{cura >> (16 - log2ptrs)};
+					U cur1a{cura >> 8};
+					U cur2a{cura >> 16};
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
-					U cur2b{curb >> (16 - log2ptrs)};
+					U cur1b{curb >> 8};
+					U cur2b{curb >> 16};
 					curb >>= 24;
 					++offsetscompanion[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
-					cur2a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
+					cur2a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsetscompanion[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
-					cur2b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
+					cur2b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2a);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2b);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
 				}while(--i);
 			}
@@ -14657,26 +14653,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 				}
 				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> (8 - log2ptrs)};
-				U cur2a{cura >> (16 - log2ptrs)};
+				U cur1a{cura >> 8};
+				U cur2a{cura >> 16};
 				cura >>= 24;
 				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> (8 - log2ptrs)};
-				U cur2b{curb >> (16 - log2ptrs)};
+				U cur1b{curb >> 8};
+				U cur2b{curb >> 16};
 				curb >>= 24;
 				++offsetscompanion[cur0a];
-				cur1a &= sizeof(void *) * 0xFFu;
-				cur2a &= sizeof(void *) * 0xFFu;
+				cur1a &= 0xFFu;
+				cur2a &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 				++offsetscompanion[cur0b];
-				cur1b &= sizeof(void *) * 0xFFu;
-				cur2b &= sizeof(void *) * 0xFFu;
+				cur1b &= 0xFFu;
+				cur2b &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2a);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
 				++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 2 * 256) + cur2b);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
 				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
 			}while(i -= 2);
 		}
@@ -14708,28 +14704,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> (8 - log2ptrs)};
+					U cur1c{curc >> 8};
 					curc >>= 16;
 					++offsetscompanion[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsetscompanion[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 					++offsetscompanion[cur0c];
-					cur1c &= sizeof(void *) * 0xFFu;
+					cur1c &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1c);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 				}while(i -= 3);
 			}else{// !isinputconst
@@ -14758,28 +14754,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> (8 - log2ptrs)};
+					U cur1a{cura >> 8};
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> (8 - log2ptrs)};
+					U cur1b{curb >> 8};
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> (8 - log2ptrs)};
+					U cur1c{curc >> 8};
 					curc >>= 16;
 					++offsetscompanion[cur0a];
-					cur1a &= sizeof(void *) * 0xFFu;
+					cur1a &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 					++offsetscompanion[cur0b];
-					cur1b &= sizeof(void *) * 0xFFu;
+					cur1b &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 					++offsetscompanion[cur0c];
-					cur1c &= sizeof(void *) * 0xFFu;
+					cur1c &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1c);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 					V *pe{pinputlo[2]};
 					V *pf{pinputhi[-2]};
@@ -14804,28 +14800,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 					}
 					U cur0d{curd & 0xFFu};
-					U cur1d{curd >> (8 - log2ptrs)};
+					U cur1d{curd >> 8};
 					curd >>= 16;
 					U cur0e{cure & 0xFFu};
-					U cur1e{cure >> (8 - log2ptrs)};
+					U cur1e{cure >> 8};
 					cure >>= 16;
 					U cur0f{curf & 0xFFu};
-					U cur1f{curf >> (8 - log2ptrs)};
+					U cur1f{curf >> 8};
 					curf >>= 16;
 					++offsetscompanion[cur0d];
-					cur1d &= sizeof(void *) * 0xFFu;
+					cur1d &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
 					++offsetscompanion[cur0e];
-					cur1e &= sizeof(void *) * 0xFFu;
+					cur1e &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
 					++offsetscompanion[cur0f];
-					cur1f &= sizeof(void *) * 0xFFu;
+					cur1f &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1d);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1d)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curd)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1e);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1e)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cure)];
-					++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1f);
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1f)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curf)];
 				}while(--i);
 			}
@@ -14851,28 +14847,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 				}
 				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> (8 - log2ptrs)};
+				U cur1a{cura >> 8};
 				cura >>= 16;
 				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> (8 - log2ptrs)};
+				U cur1b{curb >> 8};
 				curb >>= 16;
 				U cur0c{curc & 0xFFu};
-				U cur1c{curc >> (8 - log2ptrs)};
+				U cur1c{curc >> 8};
 				curc >>= 16;
 				++offsetscompanion[cur0a];
-				cur1a &= sizeof(void *) * 0xFFu;
+				cur1a &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 				++offsetscompanion[cur0b];
-				cur1b &= sizeof(void *) * 0xFFu;
+				cur1b &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 				++offsetscompanion[cur0c];
-				cur1c &= sizeof(void *) * 0xFFu;
+				cur1c &= 0xFFu;
 				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1a);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1b);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-				++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsetscompanion + 256) + cur1c);
+				++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
 				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 			}while(i -= 3);
 		}
@@ -15035,12 +15031,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
@@ -15059,7 +15056,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
 	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -15174,12 +15171,13 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], std::size_t offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
@@ -15199,7 +15197,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// skip a step if possible
 	runsteps >>= shifter;
-	std::size_t *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
 	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -15411,8 +15409,9 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 
 // multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for multi-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -15423,16 +15422,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V>(count, input, output, buffer, offsetscompanion, varparameters...);
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X>(count, input, output, buffer, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -15453,11 +15452,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// no exception detection required here
@@ -15496,39 +15495,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for multi-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocmulti
+	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -15555,13 +15551,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -15601,51 +15597,51 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
-						U curhi6{curhi >> (48 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
 						curhi >>= 56;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
-						curhi6 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
-						U curlo6{curlo >> (48 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
 						curlo >>= 56;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
-						curlo6 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -15659,27 +15655,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
-						U cur6{cur >> (48 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
 						cur >>= 56;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
-						cur6 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 64-bit, not in reverse order
@@ -15697,51 +15693,51 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
-						U curhi6{curhi >> (48 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
 						curhi >>= 56;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
-						curhi6 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
-						U curlo6{curlo >> (48 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
 						curlo >>= 56;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
-						curlo6 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -15754,27 +15750,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
-						U cur6{cur >> (48 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
 						cur >>= 56;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
-						cur6 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -15808,45 +15804,45 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
 						curhi >>= 48;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
 						curlo >>= 48;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -15860,24 +15856,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
 						cur >>= 48;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 56-bit, not in reverse order
@@ -15895,45 +15891,45 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
 						curhi >>= 48;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
 						curlo >>= 48;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -15946,24 +15942,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
 						cur >>= 48;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -15997,39 +15993,39 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
 						curhi >>= 40;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
 						curlo >>= 40;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -16043,21 +16039,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
 						cur >>= 40;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 48-bit, not in reverse order
@@ -16075,39 +16071,39 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
 						curhi >>= 40;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
 						curlo >>= 40;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -16120,21 +16116,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
 						cur >>= 40;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -16167,32 +16163,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
 						curhi >>= 32;
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
 						curlo >>= 32;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -16206,18 +16202,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
 						cur >>= 32;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 40-bit, not in reverse order
@@ -16234,32 +16230,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
 						curhi >>= 32;
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
 						curlo >>= 32;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -16272,18 +16268,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
 						cur >>= 32;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -16316,26 +16312,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
-						U cur2a{cura >> (16 - log2ptrs)};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
 						cura >>= 24;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
-						U cur2b{curb >> (16 - log2ptrs)};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
 						curb >>= 24;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
-						cur2a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
-						cur2b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 						i -= 2;
 					}while(0 < i);
@@ -16349,15 +16345,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-						U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
 						cur >>= 24;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 32-bit, not in reverse order
@@ -16374,26 +16370,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
-						U cur2a{cura >> (16 - log2ptrs)};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
 						cura >>= 24;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
-						U cur2b{curb >> (16 - log2ptrs)};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
 						curb >>= 24;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
-						cur2a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
-						cur2b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 						i -= 2;
 					}while(0 < i);
@@ -16406,15 +16402,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-						U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
 						cur >>= 24;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -16457,28 +16453,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> (8 - log2ptrs)};
+						U cur1c{curc >> 8};
 						curc >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 						++offsets[cur0c];
-						cur1c &= sizeof(void *) * 0xFFu;
+						cur1c &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 						i -= 3;
 					}while(0 <= i);
@@ -16498,20 +16494,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 					}
 					if(1 & i){// fill in the final item for odd counts
@@ -16524,12 +16520,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
 						cur >>= 16;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 24-bit, not in reverse order
@@ -16555,28 +16551,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> (8 - log2ptrs)};
+						U cur1c{curc >> 8};
 						curc >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 						++offsets[cur0c];
-						cur1c &= sizeof(void *) * 0xFFu;
+						cur1c &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 						i -= 3;
 					}while(0 <= i);
@@ -16593,20 +16589,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 					}
 					if(1 & i){// fill in the final item for odd counts
@@ -16618,12 +16614,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
 						cur >>= 16;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -16825,7 +16821,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -16848,11 +16844,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -16893,7 +16889,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst = output;
 					pdstnext = buffer;
 				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
 	}
@@ -16901,8 +16897,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
@@ -16912,16 +16909,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -16942,11 +16939,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
 		// no exception detection required here
@@ -16985,39 +16982,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
 	}
 }
 
 // radixsortnoalloc() function implementation template for multi-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocmulti
+	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -17043,13 +17037,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
 			try{
-				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
 				usemultithread = 1;
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -17090,51 +17084,51 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the low half here
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
-						U curlo6{curlo >> (48 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
 						curlo >>= 56;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
-						curlo6 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
-						U curhi6{curhi >> (48 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
 						curhi >>= 56;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
-						curhi6 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -17147,27 +17141,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
-						U cur6{cur >> (48 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
 						cur >>= 56;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
-						cur6 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 64-bit, not in reverse order
@@ -17187,51 +17181,51 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
-						U curhi6{curhi >> (48 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
 						curhi >>= 56;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
-						curhi6 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curhi6);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
-						U curlo6{curlo >> (48 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
 						curlo >>= 56;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
-						curlo6 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + curlo6);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -17244,27 +17238,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
-						U cur6{cur >> (48 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
 						cur >>= 56;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
-						cur6 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 6 * 256) + cur6);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
 						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -17299,45 +17293,45 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the low half here
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
 						curlo >>= 48;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
 						curhi >>= 48;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -17350,24 +17344,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
 						cur >>= 48;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 56-bit, not in reverse order
@@ -17387,45 +17381,45 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
-						U curhi5{curhi >> (40 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
 						curhi >>= 48;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
-						curhi5 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curhi5);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
-						U curlo5{curlo >> (40 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
 						curlo >>= 48;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
-						curlo5 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + curlo5);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -17438,24 +17432,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
-						U cur5{cur >> (40 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
 						cur >>= 48;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
-						cur5 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 5 * 256) + cur5);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
 						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -17490,39 +17484,39 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the low half here
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
 						curlo >>= 40;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
 						curhi >>= 40;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -17532,21 +17526,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
 						cur >>= 40;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 48-bit, not in reverse order
@@ -17566,39 +17560,39 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
-						U curhi4{curhi >> (32 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
 						curhi >>= 40;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
-						curhi4 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curhi4);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
 						// register pressure performance issue on several platforms: do the low half here second
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
-						U curlo4{curlo >> (32 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
 						curlo >>= 40;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
-						curlo4 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + curlo4);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -17611,21 +17605,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
-						U cur4{cur >> (32 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
 						cur >>= 40;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
-						cur4 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 4 * 256) + cur4);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
 						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -17659,32 +17653,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
 						curlo >>= 32;
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
 						curhi >>= 32;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -17697,18 +17691,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
 						cur >>= 32;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 40-bit, not in reverse order
@@ -17727,32 +17721,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> (8 - log2ptrs)};
-						U curhi2{curhi >> (16 - log2ptrs)};
-						U curhi3{curhi >> (24 - log2ptrs)};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
 						curhi >>= 32;
 						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> (8 - log2ptrs)};
-						U curlo2{curlo >> (16 - log2ptrs)};
-						U curlo3{curlo >> (24 - log2ptrs)};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
 						curlo >>= 32;
 						++offsets[curhi0];
-						curhi1 &= sizeof(void *) * 0xFFu;
-						curhi2 &= sizeof(void *) * 0xFFu;
-						curhi3 &= sizeof(void *) * 0xFFu;
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 						++offsets[curlo0];
-						curlo1 &= sizeof(void *) * 0xFFu;
-						curlo2 &= sizeof(void *) * 0xFFu;
-						curlo3 &= sizeof(void *) * 0xFFu;
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curhi1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curhi2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curhi3);
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + curlo1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + curlo2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + curlo3);
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 						i -= 2;
 					}while(0 < i);
@@ -17765,18 +17759,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{cur >> (8 - log2ptrs)};
-						U cur2{cur >> (16 - log2ptrs)};
-						U cur3{cur >> (24 - log2ptrs)};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
 						cur >>= 32;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
-						cur3 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 3 * 256) + cur3);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
 						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -17810,26 +17804,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
-						U cur2a{cura >> (16 - log2ptrs)};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
 						cura >>= 24;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
-						U cur2b{curb >> (16 - log2ptrs)};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
 						curb >>= 24;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
-						cur2a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
-						cur2b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -17842,15 +17836,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-						U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
 						cur >>= 24;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 32-bit, not in reverse order
@@ -17869,26 +17863,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
-						U cur2a{cura >> (16 - log2ptrs)};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
 						cura >>= 24;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
-						U cur2b{curb >> (16 - log2ptrs)};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
 						curb >>= 24;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
-						cur2a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
-						cur2b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
 						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
 						i -= 2;
 					}while(0 < i);
@@ -17901,15 +17895,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
-						U cur2{static_cast<unsigned>(cur) >> (16 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
 						cur >>= 24;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
-						cur2 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 2 * 256) + cur2);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
 						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -17961,36 +17955,36 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> (8 - log2ptrs)};
+						U cur1c{curc >> 8};
 						curc >>= 16;
 						U cur0d{curd & 0xFFu};
-						U cur1d{curd >> (8 - log2ptrs)};
+						U cur1d{curd >> 8};
 						curd >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 						++offsets[cur0c];
-						cur1c &= sizeof(void *) * 0xFFu;
+						cur1c &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
 						++offsets[cur0d];
-						cur1d &= sizeof(void *) * 0xFFu;
+						cur1d &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+						++offsets[256 + static_cast<std::size_t>(cur1d)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curd)];
 					}else if(2 & initialcount){// possibly initialise with 2 entries before the loop below
 						V *pa{pinputlo[0]};
@@ -18007,20 +18001,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 					}
 					if(5 <= count)
@@ -18049,28 +18043,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> (8 - log2ptrs)};
+						U cur1c{curc >> 8};
 						curc >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 						++offsets[cur0c];
-						cur1c &= sizeof(void *) * 0xFFu;
+						cur1c &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 						V *pe{pinputlo[2]};
 						V *pf{pinputhi[-2]};
@@ -18095,28 +18089,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 						}
 						U cur0d{curd & 0xFFu};
-						U cur1d{curd >> (8 - log2ptrs)};
+						U cur1d{curd >> 8};
 						curd >>= 16;
 						U cur0e{cure & 0xFFu};
-						U cur1e{cure >> (8 - log2ptrs)};
+						U cur1e{cure >> 8};
 						cure >>= 16;
 						U cur0f{curf & 0xFFu};
-						U cur1f{curf >> (8 - log2ptrs)};
+						U cur1f{curf >> 8};
 						curf >>= 16;
 						++offsets[cur0d];
-						cur1d &= sizeof(void *) * 0xFFu;
+						cur1d &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
 						++offsets[cur0e];
-						cur1e &= sizeof(void *) * 0xFFu;
+						cur1e &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
 						++offsets[cur0f];
-						cur1f &= sizeof(void *) * 0xFFu;
+						cur1f &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1d);
+						++offsets[256 + static_cast<std::size_t>(cur1d)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curd)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1e);
+						++offsets[256 + static_cast<std::size_t>(cur1e)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cure)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1f);
+						++offsets[256 + static_cast<std::size_t>(cur1f)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curf)];
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
@@ -18129,12 +18123,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
 						cur >>= 16;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 24-bit, not in reverse order
@@ -18162,28 +18156,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> (8 - log2ptrs)};
+						U cur1c{curc >> 8};
 						curc >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
 						++offsets[cur0c];
-						cur1c &= sizeof(void *) * 0xFFu;
+						cur1c &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1c);
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 						i -= 3;
 					}while(0 <= i);
@@ -18200,20 +18194,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> (8 - log2ptrs)};
+						U cur1a{cura >> 8};
 						cura >>= 16;
 						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> (8 - log2ptrs)};
+						U cur1b{curb >> 8};
 						curb >>= 16;
 						++offsets[cur0a];
-						cur1a &= sizeof(void *) * 0xFFu;
+						cur1a &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
 						++offsets[cur0b];
-						cur1b &= sizeof(void *) * 0xFFu;
+						cur1b &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1a);
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1b);
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
 						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 					}
 					if(1 & i){// fill in the final item for odd counts
@@ -18225,12 +18219,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> (8 - log2ptrs)};
+						U cur1{static_cast<unsigned>(cur) >> 8};
 						cur >>= 16;
 						++offsets[cur0];
-						cur1 &= sizeof(void *) * 0xFFu;
+						cur1 &= 0xFFu;
 						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++*reinterpret_cast<std::size_t *>(reinterpret_cast<std::byte *>(offsets + 256) + cur1);
+						++offsets[256 + static_cast<std::size_t>(cur1)];
 						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
@@ -18435,7 +18429,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -18458,11 +18452,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
 
 			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
 			// no exception detection required here
@@ -18503,7 +18497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					psrclo = buffer;
 					pdst = input;
 				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
 	}
@@ -18513,13 +18507,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortnoallocsingleinitmtc(std::size_t count, T const input[], T pout[], std::size_t offsetscompanion[])noexcept{
+	void> radixsortnoallocsingleinitmtc(std::size_t count, T const input[], T pout[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
 	// do not pass a nullptr here
@@ -18588,13 +18583,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortnoallocsinglemainmtc(std::size_t count, T const psrclo[], T pdst[], std::size_t offsetscompanion[])noexcept{
+	void> radixsortnoallocsinglemainmtc(std::size_t count, T const psrclo[], T pdst[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
 	// do not pass a nullptr here
@@ -18631,13 +18627,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 // Do not use this function directly.
-template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
-	void> radixsortnoallocsinglemain(std::size_t count, T const psrclo[], T pdst[], std::size_t offsets[], unsigned usemultithread)noexcept{
+	void> radixsortnoallocsinglemain(std::size_t count, T const psrclo[], T pdst[], X offsets[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
@@ -18731,8 +18728,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part, multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -18742,10 +18740,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, output, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -18758,11 +18756,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion)};// isrevorder is set to false because it's useless when not using indirection
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion)};// isrevorder is set to false because it's useless when not using indirection
 
 	{// barrier and allareidentical value exchange with the main thread
 		++allareidentical;// send over a 1 or a 2
@@ -18788,39 +18786,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglemainmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, output, offsetscompanion);
+		radixsortnoallocsinglemainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocsingle
+	radixsortcopynoallocsingle1thread
 #else
 	radixsortcopynoallocsingle2thread
 #endif
 	(std::size_t count, T const input[], T output[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -18845,17 +18840,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, output, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, output, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -18933,7 +18925,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -18948,11 +18940,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -18980,15 +18972,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{// perform the bidirectional 8-bit sorting sequence
-			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, input, output, offsets, usemultithread);
+			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets, usemultithread);
 		}
 	}
 }
 
 // main part, multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
 // Do not use this function directly.
-template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
@@ -18998,10 +18991,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
 	assert(buffer);
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, offsetscompanion);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		if(!other){
@@ -19014,11 +19007,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion)};// isrevorder is set to false because it's useless when not using indirection
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion)};// isrevorder is set to false because it's useless when not using indirection
 
 	{// barrier and allareidentical value exchange with the main thread
 		++allareidentical;// send over a 1 or a 2
@@ -19044,39 +19037,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglemainmtc<isabsvalue, issignmode, isfltpmode, T>(count, buffer, input, offsetscompanion);
+		radixsortnoallocsinglemainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, offsetscompanion);
 	}
 }
 
 // radixsortnoalloc() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocsingle
+	radixsortnoallocsingle1thread
 #else
 	radixsortnoallocsingle2thread
 #endif
 	(std::size_t count, T input[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -19101,17 +19091,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer, std::ref(atomiclightbarrier));
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -19241,7 +19228,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -19256,11 +19243,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 			}
 			// this will just be zero if usemultithread is zero
-			offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -19288,18 +19275,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{// perform the bidirectional 8-bit sorting sequence
-			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T>(count, buffer, input, offsets, usemultithread);
+			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, buffer, input, offsets, usemultithread);
 		}
 	}
 }
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsingleinitmtc(std::size_t count, V *const input[], V *pout[], std::size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsingleinitmtc(std::size_t count, V *const input[], V *pout[], X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
@@ -19401,11 +19389,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglemainmtc(std::size_t count, V *const psrclo[], V *pdst[], std::size_t offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemainmtc(std::size_t count, V *const psrclo[], V *pdst[], X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
@@ -19451,11 +19440,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename... vararguments>
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglemain(std::size_t count, V *const psrclo[], V *pdst[], std::size_t offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemain(std::size_t count, V *const psrclo[], V *pdst[], X offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != MAXSIZE_T);
@@ -19570,8 +19560,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocsinglemtc(std::size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
@@ -19580,16 +19571,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, output, offsetscompanion, varparameters...);
+	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, output, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -19610,11 +19601,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and allareidentical value exchange with the main thread
 		// no exception detection required here
@@ -19641,38 +19632,35 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglemainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, output, offsetscompanion, varparameters...);
+		radixsortnoallocsinglemainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, output, offsetscompanion, varparameters...);
 	}
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortcopynoallocsingle
+	radixsortcopynoallocsingle1thread
 #else
 	radixsortcopynoallocsingle2thread
 #endif
 	(std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -19697,17 +19685,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, output, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -19867,7 +19852,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -19890,11 +19875,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};
+			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and allareidentical value exchange with the companion thread
 			// no exception detection required here
@@ -19923,7 +19908,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 			{// perform the bidirectional 8-bit sorting sequence
-				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, input, output, offsets, usemultithread, varparameters...);
+				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, output, offsets, usemultithread, varparameters...);
 			}
 		}
 	}
@@ -19931,8 +19916,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types with indirection
 // Do not use this function directly.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocsinglemtc(std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
@@ -19941,16 +19927,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	std::size_t offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, buffer, offsetscompanion, varparameters...);
+	radixsortnoallocsingleinitmtc<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, buffer, offsetscompanion, varparameters...);
 
-	std::size_t *offsets;
+	X *offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
 		// detect exceptions
@@ -19971,11 +19957,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
-		offsets = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, offsets, offsetscompanion)};
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion)};
 
 	{// barrier and allareidentical value exchange with the main thread
 		// no exception detection required here
@@ -20002,38 +19988,35 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglemainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, buffer, input, offsetscompanion, varparameters...);
+		radixsortnoallocsinglemainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, buffer, input, offsetscompanion, varparameters...);
 	}
 }
 
 // radixsortnoalloc() function implementation template for single-part types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
 #if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
-	, bool ismultithreadallowed = true
+	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-	radixsortnoallocsingle
+	radixsortnoallocsingle1thread
 #else
 	radixsortnoallocsingle2thread
 #endif
 	(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static bool constexpr ismultithreadcapable{
 #if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
-		false
-#else
-		ismultithreadallowed
+	static bool constexpr ismultithreadcapable{false};
 #endif
-	};
 	if (ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
-		assert(1 < count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -20058,17 +20041,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
-			// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-			if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-					usemultithread = 1;
-				}catch(...){// std::async may fail gracefully here
-					assert(false);
-				}
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
 			}
 		}
-		std::size_t offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -20228,7 +20208,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, std::size_t *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
@@ -20251,11 +20231,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<std::size_t *>(other);// retrieve the pointer
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 			}else offsetscompanion = nullptr;
 
 			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion, usemultithread)};
+			unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};
 
 			// barrier and allareidentical value exchange with the companion thread
 			// no exception detection required here
@@ -20284,15 +20264,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 			{// perform the bidirectional 8-bit sorting sequence
-				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V>(count, buffer, input, offsets, usemultithread, varparameters...);
+				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, buffer, input, offsets, usemultithread, varparameters...);
 			}
 		}
 	}
 }
 
 // 1- to 16-way multithreading function reroutes
-#if !defined(RSBD8_THREAD_LIMIT) || 2 <= (RSBD8_THREAD_LIMIT)
-// simply reroute to the 1 or 2-thread functions for single-part types
+
+// simply reroute to the 1- or 2-thread functions for single-part types
 // the single-part types do not benefit from more than two threads in practice
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -20302,10 +20282,48 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output);
-	}else radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, T const input[], T output[]){radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, T const input[], T output[]){radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+		}
+	}
+#endif
+	pcall(count, input, output);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -20315,10 +20333,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer);
-	}else radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, T input[], T buffer[]){radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, T input[], T buffer[]){radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+		}
+	}
+#endif
+	pcall(count, input, buffer);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -20326,10 +20381,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, varparameters...);
-	}else radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, varparameters...);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, V *const input[], V *output[], vararguments... varparameters){radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, V *const input[], V *output[], vararguments... varparameters){radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+		}
+	}
+#endif
+	pcall(count, input, output, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -20337,14 +20429,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, varparameters...);
-	}else radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, varparameters...);
-}
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, V *input[], V *buffer[], vararguments... varparameters){radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, V *input[], V *buffer[], vararguments... varparameters){radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortcopynoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+		}
+	}
 #endif
-#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT) && 2 <= (RSBD8_THREAD_LIMIT)
-// simply reroute to the 1 or 2-thread functions
+	pcall(count, input, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+}
+
+#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT)
+// simply reroute to the 1- or 2-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -20354,10 +20483,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+		}
+	}
+#endif
+	pcall(count, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -20368,10 +20534,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+		}
+	}
+#endif
+	pcall(count, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -20380,10 +20583,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+		}
+	}
+#endif
+	pcall(count, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -20392,10 +20632,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < std::thread::hardware_concurrency()){
-		radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	// select the smallest unsigned type for the indices
+#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+	void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+	}
+#else// multi-threading allowed
+	void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+		}
+	}
+#endif
+	pcall(count, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 }
 #elif !defined(RSBD8_THREAD_LIMIT) || 4 <= (RSBD8_THREAD_LIMIT)
 // up to 16-way multithreading
@@ -21134,6 +21411,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base4waythreshold()noexcept{
+	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -21171,7 +21449,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimtc(std::size_t count, T const input[], T output[])noexcept{
+	void> mergehalvesmtc(std::size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
 	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, W>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U> &&
@@ -21445,7 +21723,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimain(std::size_t count, T const input[], T output[])noexcept{
+	void> mergehalvesmain(std::size_t count, T const input[], T output[])noexcept{
 	using W = tounifunsigned<T>;
 	using U = std::conditional_t<std::is_integral_v<W> && sizeof(T) < sizeof(unsigned), unsigned, W>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U> &&
@@ -21585,7 +21863,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	*pout = static_cast<W>(curlo);
 }
 
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -21606,21 +21888,42 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+#else// no indirect secondary call
+			static constexpr void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
+#endif
 			std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+					asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
 					usemultithread = 1;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
@@ -21630,7 +21933,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 			// process the lower half (rounded down) here
-			radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count >> usemultithread, input, output, buffer);
+			pcall(count >> usemultithread, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
 		}
 
 		// merging phase
@@ -21640,20 +21943,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
-				asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+				asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 				// given the absolute rarity of this case, simply process this part in the current thread
-				radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+				mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
-			radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+			mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, output, buffer);
 #endif
 }
 
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -21673,21 +21980,42 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+#else// no indirect secondary call
+			static constexpr void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
+#endif
 			std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+					asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
 					usemultithread = 1;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
@@ -21697,7 +22025,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 			// process the lower half (rounded down) here
-			radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count >> usemultithread, input, buffer, movetobuffer);
+			pcall(count >> usemultithread, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
 		}
 
 		// merging phase
@@ -21712,16 +22040,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
-				asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+				asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 				// given the absolute rarity of this case, simply process this part in the current thread
-				radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+				mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
-			radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+			mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, buffer, movetobuffer);
 #endif
 }
 
@@ -21732,7 +22060,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> mergehalvesmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -21913,7 +22241,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	void> mergehalvesmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -22011,7 +22339,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	*pout = plo;
 }
 
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
@@ -22031,12 +22363,33 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+			}
+#else// no indirect secondary call
+			static constexpr void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
+#endif
 			std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22045,7 +22398,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+					asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
 					usemultithread = 1;
 					std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
@@ -22055,7 +22408,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 			// process the lower half (rounded down) here
-			radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+			pcall(count >> usemultithread, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 		}
 
 		// merging phase
@@ -22065,20 +22418,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
-				asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
+				asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 				// given the absolute rarity of this case, simply process this part in the current thread
-				radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+				mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 			}
-			radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+			mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, output, buffer, varparameters...);
 #endif
 }
 
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
@@ -22097,12 +22454,33 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 #endif
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
+#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+			}
+#else// no indirect secondary call
+			static constexpr void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
+#endif
 			std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22111,7 +22489,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
 					// process the upper half (rounded up) separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+					asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
 					usemultithread = 1;
 					movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 				}catch(...){// std::async may fail gracefully here
@@ -22121,7 +22499,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 			// process the lower half (rounded down) here
-			radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+			pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 		}
 
 		// merging phase
@@ -22136,16 +22514,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
-				asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
+				asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
 			}catch(...){// std::async may fail gracefully here
 				assert(false);
 				// given the absolute rarity of this case, simply process this part in the current thread
-				radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+				mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 			}
-			radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+			mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 		}
 #if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
 
@@ -22161,6 +22539,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base8waythreshold()noexcept{// TODO: this is purely 1.5 on top of the 4-way factor, adjust this formula after more benchmarking
+	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -22195,7 +22574,11 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		)) + 0x80000000u};
 }
 
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -22216,23 +22599,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+				}
+#else// no indirect secondary call
+				static constexpr void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
+#endif
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
 						usemultithread = 1;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
@@ -22242,7 +22646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
+				pcall(count >> usemultithread, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
@@ -22252,21 +22656,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+					asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
-					radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+					mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
-				radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+			pcall(count, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, output, buffer);
 #endif
 }
 
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
+#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -22286,23 +22713,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+				}
+#else// no indirect secondary call
+				static constexpr void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
+#endif
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
+				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 				if(7 < reportedcores && limit8way < count){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
 						usemultithread = 1;
 						movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
@@ -22312,7 +22760,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
+				pcall(count >> usemultithread, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
@@ -22327,21 +22775,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+					asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
-					radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+					mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
-				radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+			pcall(count, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, buffer, movetobuffer);
 #endif
 }
 
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
@@ -22361,14 +22832,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+				}
+#else// no indirect secondary call
+				static constexpr void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
+#endif
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22377,7 +22869,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
 						usemultithread = 1;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
@@ -22387,7 +22879,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+				pcall(count >> usemultithread, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
@@ -22397,21 +22889,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
+					asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
-					radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+					mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 				}
-				radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+			}
+			pcall(count, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, output, buffer, varparameters...);
 #endif
 }
 
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
+#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+	, typename X
+#endif
+	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
@@ -22430,14 +22945,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
+#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+				}
+#else// no indirect secondary call
+				static constexpr void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
+#endif
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22446,7 +22982,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
 						// process the upper half (rounded up) separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
 						usemultithread = 1;
 						movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
@@ -22456,7 +22992,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+				pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
@@ -22471,17 +23007,36 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
+					asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
-					radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+					mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 				}
-				radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 			}
 #if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
-		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+			}
+			pcall(count, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
 #endif// !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
@@ -22498,6 +23053,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base16waythreshold()noexcept{// TODO: this is purely 3 on top of the 4-way factor, adjust this formula after more benchmarking
+	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -22546,8 +23102,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -22555,13 +23111,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
+					// select the smallest unsigned type for the indices
+					void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+					}
+					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+					}
+					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+					}
+					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+					}
+					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 					if(15 < reportedcores && limit16way < count){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
+							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
 							usemultithread = 1;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
@@ -22569,7 +23142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					// process the lower half (rounded down) here
-					radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, output, buffer);
+					pcall(count >> usemultithread, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
@@ -22579,17 +23152,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+						mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 					}
-					radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
+					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
-			}else radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, output, buffer);
-		}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, output, buffer);
-	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, output, buffer);
+			}else{
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+				}
+				pcall(count, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
+			}
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+			pcall(count, input, output, buffer);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, output, buffer);
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -22605,8 +23216,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -22614,13 +23225,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
+					// select the smallest unsigned type for the indices
+					void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+					}
+					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+					}
+					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+					}
+					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+					}
+					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 					if(15 < reportedcores && limit16way < count){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
+							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
 							usemultithread = 1;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
@@ -22628,7 +23256,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					// process the lower half (rounded down) here
-					radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count >> usemultithread, input, buffer, movetobuffer);
+					pcall(count >> usemultithread, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
@@ -22643,17 +23271,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+						mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 					}
-					radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
+					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
-			}else radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer, movetobuffer);
-		}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>(count, input, buffer, movetobuffer);
-	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>(count, input, buffer, movetobuffer);
+			}else{
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+				}
+				pcall(count, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
+			}
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+			}
+			pcall(count, input, buffer, movetobuffer);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, buffer, movetobuffer);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -22669,8 +23335,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22678,13 +23344,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
+					// select the smallest unsigned type for the indices
+					void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+					}
+					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+					}
+					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+					}
+					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+					}
+					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					if(15 < reportedcores && limit16way < count){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
+							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
 							usemultithread = 1;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
@@ -22692,7 +23375,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					// process the lower half (rounded down) here
-					radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, output, buffer, varparameters...);
+					pcall(count >> usemultithread, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
@@ -22702,17 +23385,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
+						asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+						mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 					}
-					radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
+					mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 				}
-			}else radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, output, buffer, varparameters...);
-		}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, output, buffer, varparameters...);
-	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, output, buffer, varparameters...);
+			}else{
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+				}
+				pcall(count, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+			}
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+			}
+			pcall(count, input, output, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, output, buffer, varparameters...);
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -22727,8 +23448,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 	unsigned reportedcores;// when this is 0, assume single-core
-	// TODO: fine-tune, right now the threshold is set to the 7-bit limit (the minimum is 15)
-	if(0x7Fu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 		if(3 < reportedcores && limit4way < count){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
@@ -22736,13 +23457,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
+					// select the smallest unsigned type for the indices
+					void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+					}
+					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+					}
+					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+					}
+					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+					}
+					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					if(15 < reportedcores && limit16way < count){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
-							asynchandle = std::async(std::launch::async, radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
+							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
 							usemultithread = 1;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
@@ -22750,7 +23488,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					// process the lower half (rounded down) here
-					radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count >> usemultithread, input, buffer, movetobuffer, varparameters...);
+					pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
@@ -22765,17 +23503,55 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
+						asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
-						radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+						mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 					}
-					radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
+					mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 				}
-			}else radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-		}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, true, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
-	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
+			}else{
+				// select the smallest unsigned type for the indices
+				void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
+				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
+				}
+				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
+				}
+				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
+				}
+				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
+				}
+				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
+				}
+				pcall(count, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+			}
+		}else{
+			// select the smallest unsigned type for the indices
+			void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
+			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
+			}
+			if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
+			}
+			if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
+			}
+			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
+			}
+			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				pcall = radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
+			}
+			pcall(count, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
+		}
+	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 }
 #endif// !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
 #endif// 1- to 16-way multithreading function reroutes
