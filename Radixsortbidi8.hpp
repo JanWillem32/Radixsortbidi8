@@ -220,12 +220,13 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // rsbd8:: is radixsortbidi8, the enveloping namespace for this library
 // rsbd8::helper:: is the underlying namespace for helper functions and constants. These are usually not directly invoked by the user of this library. No efforts are made to actually hide items from the user though.
 // ### Templates:
-// <typename T, typename U, typename V, typename W>
+// <typename T, typename U, typename V, typename W, typename X>
 // These are the basic 4 placeholders for types.
 // T is used for the main input type, or the primary type being referred to.
 // U is the deferred type, for example the unsigned variant of T, or an unsigned general utility type that is larger than T.
 // V is always used as the class type of input and output arrays when dealing with indirection.
 // W is the wildcard type, often an automatically deduced item in templated helper functions, but also often just a companion type to U.
+// X is the index type, used for assigning unsigned integer indices of various sizes.
 // Some other template parts have defaults set up for them, especially for the longer lists of template parameters. This provides the user with often having less verbosity in their code.
 // Template variable arguments as a C++ feature are used extensively by this library. Function-based variable arguments passing as inherited from original C isn't needed.
 // All sorts of levels and configurations of template metaprogramming (C++17 and onward) are used in this library for optimisation, enhancing debugging or just making the code more concise.
@@ -21907,7 +21908,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
 			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
 			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
@@ -22620,7 +22621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 				}
 				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 				}
 				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
@@ -22678,7 +22679,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
 			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
 			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
@@ -23123,7 +23124,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 					}
 					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 					}
 					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
@@ -23173,7 +23174,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 				}
 				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;	
+					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 				}
 				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
@@ -23193,7 +23194,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
 			if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
-				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;	
+				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
 			if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
