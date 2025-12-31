@@ -54,7 +54,7 @@
 	</PropertyGroup>
 	<ItemDefinitionGroup>
 		<ClCompile>
-			<AdditionalOptions>/volatile:iso /vd0 /Gw /Zc:__cplusplus,__STDC__,checkGwOdr,enumTypes,externConstexpr,inline,templateScope,throwingNew %(AdditionalOptions)</AdditionalOptions>
+			<AdditionalOptions>/bigobj /volatile:iso /vd0 /Gw /Zc:__cplusplus,__STDC__,checkGwOdr,enumTypes,externConstexpr,inline,templateScope,throwingNew %(AdditionalOptions)</AdditionalOptions>
 			<CallingConvention>VectorCall</CallingConvention>
 			<ConformanceMode>true</ConformanceMode>
 			<EnableEnhancedInstructionSet Condition="'$(Platform)'=='Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
