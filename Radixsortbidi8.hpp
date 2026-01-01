@@ -696,7 +696,7 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 
 	// warning: this comparison operator performs an unsigned comparison, not a signed or floating-point comparison
 	RSBD8_FUNC_INLINE auto operator<(longdoubletest128 const &other)const noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
@@ -824,7 +824,7 @@ struct longdoubletest96{
 
 	// warning: this comparison operator performs an unsigned comparison, not a signed or floating-point comparison
 	RSBD8_FUNC_INLINE auto operator<(longdoubletest96 const &other)const noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
@@ -939,7 +939,7 @@ struct longdoubletest80{
 
 	// warning: this comparison operator performs an unsigned comparison, not a signed or floating-point comparison
 	RSBD8_FUNC_INLINE auto operator<(longdoubletest80 const &other)const noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
@@ -1092,7 +1092,7 @@ struct alignas(alignof(std::uint_least32_t) * 2) test64{
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
 			if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 				static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 				unsigned long carrymid, carry;
 				__builtin_subcl(data[1], other.data[1], 0, &carrymid);
@@ -1107,7 +1107,7 @@ struct alignas(alignof(std::uint_least32_t) * 2) test64{
 			}
 		}
 		// little-endian case
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 		unsigned long carrymid, carry;
 		__builtin_subcl(data[0], other.data[0], 0, &carrymid);
@@ -1184,7 +1184,7 @@ struct alignas(alignof(std::uint_least64_t) * 2) test128{
 			// basic endianess detection, relies on proper inlining and compiler optimisation of that
 			static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
 			if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 				static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
 				unsigned long long carrymid, carry;
@@ -1206,7 +1206,7 @@ struct alignas(alignof(std::uint_least64_t) * 2) test128{
 			}
 		}
 		// little-endian case
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
 		unsigned long long carrymid, carry;
@@ -1530,27 +1530,38 @@ using tounifunsigned = std::conditional_t<1 == sizeof(T), unsigned char,
 	typename std::conditional_t<std::is_integral_v<T> || std::is_enum_v<T>, std::make_unsigned<T>, std::enable_if<true, void>>::type>>>>>>>;
 
 // Utility template to use add-with-carry operations if possible for the boolean operator less than
-RSBD8_FUNC_INLINE void addcarryofless(unsigned &accumulator, std::size_t minuend, std::size_t subtrahend)noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl) && __has_builtin(__builtin_addc)
-#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-	static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
-	unsigned long long carry;
-	__builtin_subcll(minuend, subtrahend, 0, &carry);
-#else
-	static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
-	unsigned long carry;
-	__builtin_subcl(minuend, subtrahend, 0, &carry);
-#endif
+template <typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	64 >= CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<U>,
+	void> addcarryofless(unsigned &accumulator, U minuend, U subtrahend)noexcept{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc) && __has_builtin(__builtin_addc)
+	tounifunsigned<U> carry;
+	if constexpr(1 == sizeof(U)) __builtin_subcb(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(short) == sizeof(U)) __builtin_subcs(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(signed) == sizeof(U)) __builtin_subc(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(long) == sizeof(U)) __builtin_subcl(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(long long) == sizeof(U))__builtin_subcll(minuend, subtrahend, 0, &carry);
 	unsigned checkcarry;
 	accumulator = __builtin_addc(accumulator, 0, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
-	unsigned char checkcarry{_addcarry_u32(_subborrow_u64(0, minuend, subtrahend, nullptr), accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
+	unsigned char carry;
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, nullptr);
+	unsigned char checkcarry{_addcarry_u32(carry, accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_IX86)
-	unsigned char checkcarry{_addcarry_u32(_subborrow_u32(0, minuend, subtrahend, nullptr), accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
+	unsigned char carry;
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), nullptr);// decompose; cmp r, r followed by sbb r, r
+	unsigned char checkcarry{_addcarry_u32(carry, accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #else
@@ -1559,28 +1570,39 @@ RSBD8_FUNC_INLINE void addcarryofless(unsigned &accumulator, std::size_t minuend
 }
 
 // Utility template to use add-with-carry operations if possible for the boolean operator less than or equal
-RSBD8_FUNC_INLINE void addcarryoflessorequal(unsigned &accumulator, std::size_t minuend, std::size_t subtrahend)noexcept{
+template <typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	64 >= CHAR_BIT * sizeof(U) &&
+	std::is_unsigned_v<U>,
+	void> addcarryoflessorequal(unsigned &accumulator, U minuend, U subtrahend)noexcept{
 	// The specialised versions actually calculate greater-than-or-equal, but with everything reversed.
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subcl) && __has_builtin(__builtin_subc)
-#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-	static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
-	unsigned long long carry;
-	__builtin_subcll(subtrahend, minuend, 0, &carry);
-#else
-	static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
-	unsigned long carry;
-	__builtin_subcl(subtrahend, minuend, 0, &carry);
-#endif
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+	tounifunsigned<U> carry;// lowest rank with the same size as U
+	if constexpr(1 == sizeof(U)) __builtin_subcb(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(short) == sizeof(U)) __builtin_subcs(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(signed) == sizeof(U)) __builtin_subc(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(long) == sizeof(U)) __builtin_subcl(minuend, subtrahend, 0, &carry);
+	else if constexpr(sizeof(long long) == sizeof(U))__builtin_subcll(minuend, subtrahend, 0, &carry);
 	unsigned checkcarry;
 	accumulator = __builtin_subc(accumulator, ~0u, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
-	unsigned char checkcarry{_subborrow_u32(_subborrow_u64(0, subtrahend, minuend, nullptr), accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
+	unsigned char carry;
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, nullptr);
+	unsigned char checkcarry{_subborrow_u32(carry, accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_IX86)
-	unsigned char checkcarry{_subborrow_u32(_subborrow_u32(0, subtrahend, minuend, nullptr), accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
+	unsigned char carry;
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), nullptr);// decompose; cmp r, r followed by sbb r, r
+	unsigned char checkcarry{_subborrow_u32(carry, accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #else
@@ -1945,7 +1967,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode || !issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -1990,7 +2012,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isfltpmode) cure >>= 1;
 		if constexpr(issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2029,7 +2051,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		return{static_cast<std::size_t>(cure >> 8 & 0xFFu)};
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2102,7 +2124,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isfltpmode || !issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2179,7 +2201,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2264,7 +2286,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2368,7 +2390,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 			std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 			std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2505,7 +2527,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 			std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 			std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2658,7 +2680,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 		std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2808,7 +2830,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isabsvalue && !issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2852,7 +2874,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		if constexpr(issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2890,7 +2912,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cure ^= static_cast<U>(curq);
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -2958,7 +2980,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isabsvalue && !issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3031,7 +3053,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3113,7 +3135,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3212,7 +3234,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 			std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 			std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3343,7 +3365,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 			std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 			std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3495,7 +3517,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 		std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -3682,7 +3704,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode){
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl)
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymid, checkcarry;
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
@@ -3717,7 +3739,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysign;
 		curo = __builtin_addcs(curo, curo, 0, &carrysign);
@@ -3853,7 +3875,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curmb += curqb;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl)
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymida, checkcarrya;
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
@@ -3913,7 +3935,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysigna;
 		curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
@@ -4121,7 +4143,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmb += curqb;
 			curmc += curqc;
 			curmd += curqd;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl)
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymida, checkcarrya;
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
@@ -4232,7 +4254,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
 		std::uint_least16_t curod{static_cast<std::uint_least16_t>(cured)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysigna;
 		curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
@@ -4404,7 +4426,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cure = curo;
 		}else if constexpr(!issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4454,7 +4476,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isfltpmode) cure >>= 1;
 		if constexpr(issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4517,7 +4539,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode) cure &= 0xFFFFu >> 1;
 		else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysign;
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
@@ -4587,7 +4609,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			out[0].signexponent = static_cast<W>(cure);
 			out[0].mantissa = curm;
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4644,7 +4666,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				out[0].mantissa = curm;
 			}
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4710,7 +4732,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			out[0].mantissa = curm;
 		}else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysign;
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
@@ -4790,7 +4812,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			out[0].mantissa = curm;
 			dst[0].mantissa = curm;
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4850,7 +4872,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				dst[0].mantissa = curm;
 			}
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -4918,7 +4940,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			dst[0].mantissa = curm;
 		}else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysign;
 			curo = __builtin_addcs(curo, curo, 0, &carrysign);
@@ -4998,7 +5020,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else if constexpr(!issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5087,7 +5109,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5196,7 +5218,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysigna;
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
@@ -5314,7 +5336,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			outb[0].signexponent = static_cast<W>(cureb);
 			outb[0].mantissa = curmb;
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5410,7 +5432,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5523,7 +5545,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysigna;
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
@@ -5657,7 +5679,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			outb[0].mantissa = curmb;
 			dstb[0].mantissa = curmb;
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5759,7 +5781,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -5875,7 +5897,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 			unsigned short carrysigna;
 			curoa = __builtin_addcs(curoa, curoa, 0, &carrysigna);
@@ -7275,6 +7297,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglemtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
@@ -7292,7 +7315,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	std::size_t offset{count - (static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t))};
+	U offset{static_cast<U>(count) - static_cast<U>(*u) - static_cast<U>(*t)};
 	*u = static_cast<X>(count);// high half, the last offset always starts at the end
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		u += isdescsort * 2 - 1;
@@ -7300,13 +7323,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
-			std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};
+			U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 			*u = static_cast<X>(offset);// high half
 			t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// low half
 			u += isdescsort * 2 - 1;
 			t += isdescsort * 2 - 1;
 			offset -= difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
 		t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// low half
 	}else{// unsigned or signed absolute
@@ -7317,24 +7340,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned j{256 / 4 - 1};// double the number of items per loop
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};// even
+				U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
 				*u = static_cast<X>(offset);// even, high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset + 1);// odd, low half
 				offset -= difference;
-				addcarryofless(b, count, difference);
-				difference = static_cast<std::size_t>(u[isdescsort * 6 - 3]) + static_cast<std::size_t>(t[isdescsort * 6 - 3]);// odd
+				addcarryofless(b, static_cast<U>(count), difference);
+				difference = static_cast<U>(u[isdescsort * 6 - 3]) + static_cast<U>(t[isdescsort * 6 - 3]);// odd
 				u[isdescsort * 6 - 3] = static_cast<X>(offset);// odd, high half
 				*t = static_cast<X>(offset + 1);// even, low half
 				u += isdescsort * 4 - 2;// step forward twice
 				t += isdescsort * 4 - 2;
 				offset -= difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};// even
+			U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
 			*u = static_cast<X>(offset);// even, high half
 			t[isdescsort * 2 - 1] = static_cast<X>(offset + 1);// odd, low half
 			offset -= difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 			*t = static_cast<X>(offset + 1);// even, low half
 		}else{// all other modes
 			u += isdescsort * 2 - 1;
@@ -7344,13 +7367,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned j{256 / 2 - 1 - 127 / 2 * (isabsvalue && issignmode) - isfltpmode};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{static_cast<std::size_t>(*u) + static_cast<std::size_t>(*t)};
+				U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 				*u = static_cast<X>(offset);// even, high half
 				t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// odd, low half
 				u += isdescsort * 2 - 1;
 				t += isdescsort * 2 - 1;
 				offset -= difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// odd, low half
 		}
@@ -7419,6 +7442,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -7434,7 +7458,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
-	std::size_t offset{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
+	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
 	*t = 0;// low half, the first offset always starts at zero
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
@@ -7443,13 +7467,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
-			std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
+			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);// low half
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
 			offset += difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
 		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 	}else{// unsigned or signed absolute
@@ -7460,24 +7484,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned j{256 / 4 - 1};// double the number of items per loop
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};// even
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
 				*t = static_cast<X>(offset);// even, low half
 				u[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 				offset += difference;
-				addcarryofless(b, count, difference);
-				difference = static_cast<std::size_t>(t[3 - isdescsort * 6]) + static_cast<std::size_t>(u[3 - isdescsort * 6]);// odd
+				addcarryofless(b, static_cast<U>(count), difference);
+				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 				t[3 - isdescsort * 6] = static_cast<X>(offset);// odd, low half
 				*u = static_cast<X>(offset - 1);// even, high half
 				t += 2 - isdescsort * 4;// step forward twice
 				u += 2 - isdescsort * 4;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};// even
+			U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
 			*t = static_cast<X>(offset);// even, low half
 			u[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 			offset += difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 			*u = static_cast<X>(offset - 1);// even, high half
 		}else{// all other modes
 			t += 1 - isdescsort * 2;
@@ -7487,13 +7511,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned j{256 / 2 - 1 - (127 + 1) / 2 * (isabsvalue && issignmode)};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
-				std::size_t difference{static_cast<std::size_t>(*t) + static_cast<std::size_t>(*u)};
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 				*t = static_cast<X>(offset);// even, low half
 				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// odd, high half
 				t += 1 - isdescsort * 2;
 				u += 1 - isdescsort * 2;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// odd, high half
 		}
@@ -7506,6 +7530,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[])noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
@@ -7515,11 +7540,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	std::size_t offset{*t};
+	U offset{*t};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(isrevorder){
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
-			std::size_t difference{t[1 - isdescsort * 2]};
+			U difference{t[1 - isdescsort * 2]};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			--offset;
 			unsigned j{256 / 2 - 1};
@@ -7527,33 +7552,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t += 1 - isdescsort * 2;
 			do{
 				offset += difference;
-				addcarryofless(b, count, difference);
-				std::size_t difference{t[1 - isdescsort * 2]};
+				addcarryofless(b, static_cast<U>(count), difference);
+				U difference{t[1 - isdescsort * 2]};
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 			}while(--j);
 			offset += difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 			difference = t[256 * (isdescsort * 2 - 1)];
 			j = 256 / 2 - 3;
 			*t = static_cast<X>(offset);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			do{
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 				difference = *t;
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 			}while(--j);
 			offset += difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 			*t = static_cast<X>(offset);
-			addcarryofless(b, count, t[1 - isdescsort * 2]);
+			addcarryofless(b, static_cast<U>(count), t[1 - isdescsort * 2]);
 			t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 		}else{// unsigned or signed absolute
 			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
-				std::size_t difference{t[isdescsort * 2 - 1]};// even
+				U difference{t[isdescsort * 2 - 1]};// even
 				t += isdescsort * 2 - 1;// step back
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				--offset;
@@ -7561,35 +7586,35 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				do{
 					t[1 - isdescsort * 2] = static_cast<X>(offset);
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
 					*t = static_cast<X>(offset);
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[isdescsort * 2 - 1];// even
 					t += 2 - isdescsort * 4;// step forward twice
 				}while(--j);
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 				t[1 - isdescsort * 2] = static_cast<X>(offset);
-				addcarryofless(b, count, *t);
+				addcarryofless(b, static_cast<U>(count), *t);
 				*t = static_cast<X>(count);// the last offset always starts at the end
 			}else{// all other modes
-				std::size_t difference{t[1 - isdescsort * 2]};
+				U difference{t[1 - isdescsort * 2]};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				--offset;
 				unsigned j{256 - 2 - 127 * (isabsvalue && issignmode) - isfltpmode};
 				do{
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[2 - isdescsort * 4];
 					*t = static_cast<X>(offset);
 					t += 1 - isdescsort * 2;
 				}while(--j);
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 				*t = static_cast<X>(offset);
-				addcarryofless(b, count, t[1 - isdescsort * 2]);
+				addcarryofless(b, static_cast<U>(count), t[1 - isdescsort * 2]);
 				t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 			}
 		}
@@ -7599,26 +7624,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
-			std::size_t difference;
+			U difference;
 			do{
 				difference = *t;
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			difference = t[256 * (isdescsort * 2 - 1)];
 			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 2;
 			offset += difference;
-			addcarryofless(b, count, difference);
+			addcarryofless(b, static_cast<U>(count), difference);
 			do{
 				difference = *t;
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
 			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
@@ -7627,30 +7652,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned j{256 / 2 - 1};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
-					std::size_t difference{*t};// even
+					U difference{*t};// even
 					*t = static_cast<X>(offset);
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
 					t[3 - isdescsort * 6] = static_cast<X>(offset);
 					t += 2 - isdescsort * 4;// step forward twice
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}else{// all other modes
 				t += 1 - isdescsort * 2;
 				unsigned j{256 - 2 - 127 * (isabsvalue && issignmode) - isfltpmode};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
-					std::size_t difference{*t};
+					U difference{*t};
 					*t = static_cast<X>(offset);
 					t += 1 - isdescsort * 2;
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}
 		}
-		addcarryofless(b, count, *t);
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t));
 		*t = static_cast<X>(offset);
 	}
 	return{b};
@@ -7661,6 +7686,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssingle(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0)noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
@@ -7677,7 +7703,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	std::size_t offset{*t};
+	U offset{*t};
 	if constexpr(isrevorder){
 		t[stride] = 0;// high half, the first offset always starts at zero
 		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
@@ -7685,27 +7711,27 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{256 / 2 - 1};
 			do{
-				std::size_t difference{*t};
+				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 				t -= isdescsort * 2 - 1;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
+			U differencemid{t[256 * (isdescsort * 2 - 1)]};
 			t[stride + 256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);// high half
 			t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			offset += differencemid;
-			addcarryofless(b, count, differencemid);
+			addcarryofless(b, static_cast<U>(count), differencemid);
 			j = 256 / 2 - 2;
 			do{
-				std::size_t difference{*t};
+				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 				t -= isdescsort * 2 - 1;
 				offset -= difference * (isdescsort * 2 - 1);
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -7714,33 +7740,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				do{
-					std::size_t difference{*t};// even
+					U difference{*t};// even
 					t[stride] = static_cast<X>(offset);// high half
 					t[isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[isdescsort * -6 + 3];// odd
 					t[stride + isdescsort * -6 + 3] = static_cast<X>(offset);// high half
 					*t = static_cast<X>(offset - 1);// even
 					t += isdescsort * -4 + 2;// step forward twice
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}else{// all other modes
 				t -= isdescsort * 2 - 1;
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{256 - 2};
 				do{
-					std::size_t difference{*t};
+					U difference{*t};
 					t[stride] = static_cast<X>(static_cast<X>(offset));// high half
 					t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 					t -= isdescsort * 2 - 1;
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}
 		}
-		addcarryofless(b, count, *t);
+		addcarryofless(b, static_cast<U>(count), *t);
 		t[stride] = static_cast<X>(offset);// high half
 		*t = static_cast<X>(count);// the last offset always starts at the end
 		// again, adjust for the special mode
@@ -7752,27 +7778,27 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{256 / 2 - 1};
 			do{
-				std::size_t difference{*t};
+				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 				t -= isdescsort * 2 - 1;
 				offset += difference;
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			std::size_t differencemid{t[256 * (isdescsort * 2 - 1)]};
+			U differencemid{t[256 * (isdescsort * 2 - 1)]};
 			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
 			t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			offset += differencemid;
-			addcarryofless(b, count, differencemid);
+			addcarryofless(b, static_cast<U>(count), differencemid);
 			j = 256 / 2 - 2;
 			do{
-				std::size_t difference{*t};
+				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 				t -= isdescsort * 2 - 1;
 				offset -= difference * (isdescsort * 2 - 1);
-				addcarryofless(b, count, difference);
+				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -7781,33 +7807,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				do{
-					std::size_t difference{*t};// even
+					U difference{*t};// even
 					*t = static_cast<X>(offset);
 					t[stride + isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd, high half
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[isdescsort * -6 + 3];// odd
 					t[isdescsort * -6 + 3] = static_cast<X>(offset);
 					t[stride] = static_cast<X>(offset - 1);// even, high half
 					t += isdescsort * -4 + 2;// step forward twice
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}else{// all other modes
 				t -= isdescsort * 2 - 1;
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{256 - 2};
 				do{
-					std::size_t difference{*t};
+					U difference{*t};
 					*t = static_cast<X>(offset);
 					t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 					t -= isdescsort * 2 - 1;
 					offset += difference;
-					addcarryofless(b, count, difference);
+					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}
 		}
-		addcarryofless(b, count, *t);
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t));
 		*t = static_cast<X>(offset);
 		t[stride] = static_cast<X>(count);// high half, the last offset always starts at the end
 		// again, adjust for the special mode
@@ -20698,7 +20724,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cure = curo;
 		}else if constexpr(!issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -20748,7 +20774,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isfltpmode) cure >>= 1;
 		if constexpr(issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -20811,7 +20837,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode) cure &= 0xFFFFu >> 1;
 		else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
@@ -20904,7 +20930,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else if constexpr(!issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -20993,7 +21019,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(issignmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -21102,7 +21128,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_addcs)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
@@ -21260,7 +21286,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				cur = rotateleftportable<1>(static_cast<T>(cur));
 				cur ^= 1u;// flip the least significant bit
 			}else{// try to split the sequence
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
 				std::uint_least32_t curlo{static_cast<std::uint_least32_t>(cur & 0xFFFFFFFFu)}, curhi{static_cast<std::uint_least32_t>(cur >> 32)};// decompose
 				static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 				unsigned long carrylo, carryhi, checkcarry;
@@ -21353,7 +21379,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				cura ^= 1u;// flip the least significant bit
 				curb ^= 1u;
 			}else{// try to split the sequence
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addcl) && __has_builtin(__builtin_subcl)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
 				std::uint_least32_t curloa{static_cast<std::uint_least32_t>(cura & 0xFFFFFFFFu)}, curhia{static_cast<std::uint_least32_t>(cura >> 32)};// decompose
 				static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 				unsigned long carryloa, carryhia, checkcarrya;
