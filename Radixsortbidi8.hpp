@@ -21438,7 +21438,6 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base4waythreshold()noexcept{
-	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -22566,7 +22565,6 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base8waythreshold()noexcept{// TODO: this is purely 1.5 on top of the 4-way factor, adjust this formula after more benchmarking
-	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
@@ -23080,7 +23078,6 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	std::size_t> base16waythreshold()noexcept{// TODO: this is purely 3 on top of the 4-way factor, adjust this formula after more benchmarking
-	return{};
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
