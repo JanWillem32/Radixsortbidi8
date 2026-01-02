@@ -7305,15 +7305,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
-	X *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
+	X *t{isrevorder? offsetscompanion : offsets + (offsetsstride - 1)// high-to-low or low-to-high
 		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	X *u{offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
+	X *u{isrevorder? offsets : offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
 		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	if constexpr(isrevorder) std::swap(t, u);
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U initdifference{static_cast<U>(*u) + static_cast<U>(*t)};
 	*u = static_cast<X>(count);// high half, the last offset always starts at the end
@@ -7452,15 +7451,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X *t{offsets// low-to-high or high-to-low
+	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	X *u{offsetscompanion// low-to-high or high-to-low
+	X *u{isrevorder? offsets: offsetscompanion// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	if constexpr(isrevorder) std::swap(t, u);
 	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
 	*t = 0;// low half, the first offset always starts at zero
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
