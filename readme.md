@@ -206,7 +206,8 @@ Notice the same reverse stable sorting here, but opposite placement when encount
 ## Miscellaneous notes
 Sorting unsigned values is the fastest, very closely followed up by signed values, followed up by floating-point values in this library.
 Unsigned 128-bit and larger integers can be sorted by sequential sorting from the bottom to the top parts as unsigned (64-bit) elements when using indirection.
-Likewise, regular absolute-filtered floating-point 128-bit and larger types can be sorted like that as a top part with one or more unsigned bottom parts.
+Signed 128-bit and larger integers are sorted the same, with only the topmost (64-bit) element sorted as signed because of the sign bit. This does not work when filtered by the absolute modes.
+Regular absolute 128-bit and larger floating-point values are sorted the same, with only the topmost (64-bit) element sorted as absolute floating-point because of the sign bit. This does not work when filtered by the default or tiered absolute modes.
 Re-use the same intermediate buffer combined with radixsortnoalloc() or radixsortcopynoalloc() when sorting 128-bit and larger integers like this.
 Inputs of type bool are reinterpreted as the unsigned integer type of the same size (usually the unsigned char type), but handling them is extremely efficient anyway.
 Anything but 0 or 1 in bool source data will impact sorting, but this only happens if the user deliberately overrides the compiler behaviour for bool data.
