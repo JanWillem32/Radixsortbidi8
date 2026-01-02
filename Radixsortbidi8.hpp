@@ -450,6 +450,7 @@ RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the
 #include <cassert>
 #include <climits>
 #include <cfloat>
+#include <cstring>// for std::memcpy(), std::memset() and the like, this library doesn't use actual string functions
 #include <future>
 #include <atomic>
 #include <functional>
@@ -8988,7 +8989,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
@@ -9458,7 +9460,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -10632,7 +10635,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -11397,7 +11401,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -13021,7 +13026,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -13518,7 +13524,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -15585,7 +15592,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -17071,7 +17079,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -18875,7 +18884,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -19126,7 +19136,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
 		i -= 7;
@@ -19720,7 +19731,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -20076,7 +20088,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
