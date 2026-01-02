@@ -7315,13 +7315,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
 	if constexpr(isrevorder) std::swap(t, u);
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	U offset{static_cast<U>(count) - static_cast<U>(*u) - static_cast<U>(*t)};
+	U initdifference{static_cast<U>(*u) + static_cast<U>(*t)};
 	*u = static_cast<X>(count);// high half, the last offset always starts at the end
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		u += isdescsort * 2 - 1;
 		t += isdescsort * 2 - 1;
 		unsigned j{256 / 2 - 1};
-		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+		U offset{static_cast<U>(count) - initdifference};
+		b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 			*u = static_cast<X>(offset);// high half
@@ -7338,7 +7339,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			u += 1 - isdescsort * 2;// step back
 			t += 1 - isdescsort * 2;
 			unsigned j{256 / 4 - 1};// double the number of items per loop
-			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			U offset{static_cast<U>(count) - initdifference};
+			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
 				*u = static_cast<X>(offset);// even, high half
@@ -7365,7 +7367,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// 127 / 2 is only rounded down in the companion thread
 			// the floating-point case (-1 item) is for the companion thread
 			unsigned j{256 / 2 - 1 - 127 / 2 * (isabsvalue && issignmode) - isfltpmode};
-			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			U offset{static_cast<U>(count) - initdifference};
+			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 				*u = static_cast<X>(offset);// even, high half
