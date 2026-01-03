@@ -1761,9 +1761,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	std::size_t> filtertop8(U cur)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curo{static_cast<T>(cur)};
 			curo += curo;
 			cur = curo;
@@ -1781,7 +1781,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cur ^= curq;
 		if constexpr(8 < CHAR_BIT * sizeof(T)) cur >>= CHAR_BIT * sizeof(T) - 8;
 		return{static_cast<std::size_t>(cur)};
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			cur >>= CHAR_BIT * sizeof(T) - 8 - !issignmode;
 			return{static_cast<std::size_t>(cur & 0xFFu >> static_cast<unsigned char>(issignmode))};
@@ -1804,9 +1804,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	std::pair<std::size_t, std::size_t>> filtertop8(U cura, U curb)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -1814,7 +1814,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -1840,7 +1840,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= CHAR_BIT * sizeof(T) - 8;
 		}
 		return{static_cast<std::size_t>(cura), static_cast<std::size_t>(curb)};
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			cura >>= CHAR_BIT * sizeof(T) - 8 - !issignmode;
 			curb >>= CHAR_BIT * sizeof(T) - 8 - !issignmode;
@@ -1866,9 +1866,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>> filtertop8(U cura, U curb, U curc, U curd)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -1876,7 +1876,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -1884,7 +1884,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpb >>= CHAR_BIT * sizeof(T) - 1;
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -1892,7 +1892,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpc >>= CHAR_BIT * sizeof(T) - 1;
 		U curqc{static_cast<T>(curpc)};
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -1930,7 +1930,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curd >>= CHAR_BIT * sizeof(T) - 8;
 		}
 		return{static_cast<std::size_t>(cura), static_cast<std::size_t>(curb), static_cast<std::size_t>(curc), static_cast<std::size_t>(curd)};
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(8 < CHAR_BIT * sizeof(T)){
 			cura >>= CHAR_BIT * sizeof(T) - 8 - !issignmode;
 			curb >>= CHAR_BIT * sizeof(T) - 8 - !issignmode;
@@ -1965,9 +1965,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::size_t> filtertop8(std::uint_least64_t curm, U cure)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
@@ -2051,7 +2051,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cure ^= static_cast<U>(curq);
 		return{static_cast<std::size_t>(cure >> 8 & 0xFFu)};
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
@@ -2120,10 +2120,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::pair<std::size_t, std::size_t>> filtertop8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
@@ -2285,7 +2285,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
 		return{static_cast<std::size_t>(curea >> 8 & 0xFFu), static_cast<std::size_t>(cureb >> 8 & 0xFFu)};
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
@@ -2382,12 +2382,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>> filtertop8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, std::uint_least64_t curmc, U curec, std::uint_least64_t curmd, U cured)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		std::int_least16_t curpc{static_cast<std::int_least16_t>(curec)};
 		std::int_least16_t curpd{static_cast<std::int_least16_t>(cured)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 			std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 			std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
@@ -2677,7 +2677,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curec ^= static_cast<U>(curqc);
 		cured ^= static_cast<U>(curqd);
 		return{static_cast<std::size_t>(curea >> 8 & 0xFFu), static_cast<std::size_t>(cureb >> 8 & 0xFFu), static_cast<std::size_t>(curec >> 8 & 0xFFu), static_cast<std::size_t>(cured >> 8 & 0xFFu)};
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
@@ -2828,7 +2828,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::size_t> filterbelowtop8(std::uint_least64_t curm, U cure)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isabsvalue && !issignmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -2912,7 +2912,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cure = curo;
 		}
 		cure ^= static_cast<U>(curq);
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
@@ -2976,7 +2976,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::pair<std::size_t, std::size_t>> filterbelowtop8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isabsvalue && !issignmode){
@@ -3134,7 +3134,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
@@ -3226,7 +3226,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(U),
 	std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>> filterbelowtop8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, std::uint_least64_t curmc, U curec, std::uint_least64_t curmd, U cured)noexcept{
 	// Filtering is simplified if possible.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		std::int_least16_t curpc{static_cast<std::int_least16_t>(curec)};
@@ -3514,7 +3514,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cureb ^= static_cast<U>(curqb);
 		curec ^= static_cast<U>(curqc);
 		cured ^= static_cast<U>(curqd);
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
@@ -3661,7 +3661,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> filtershift8(U cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top part for non-absolute floating-point inputs.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		if constexpr(isabsvalue && !issignmode){
 			T curo{static_cast<T>(cur)};
@@ -3676,7 +3676,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		cur = rotateleftportable<1>(static_cast<T>(cur));
 	}
 	cur >>= shift;
@@ -3694,7 +3694,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> filtershift8(std::uint_least64_t curm, U cure, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top 16 bits.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isabsvalue && !issignmode) curm += curm;
 		curp >>= 16 - 1;
@@ -3739,7 +3739,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
@@ -3810,7 +3810,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
 	std::pair<std::size_t, std::size_t>> filtershift8(U cura, U curb, unsigned shift)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(isabsvalue && !issignmode){
 			T curoa{static_cast<T>(cura)};
@@ -3837,7 +3837,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curqa;
 		curb ^= curqb;
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		cura = rotateleftportable<1>(static_cast<T>(cura));
 		curb = rotateleftportable<1>(static_cast<T>(curb));
 	}
@@ -3857,7 +3857,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::pair<std::size_t, std::size_t>> filtershift8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top 16 bits.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isabsvalue && !issignmode){
@@ -3934,7 +3934,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
 #endif
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
@@ -4038,7 +4038,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
 	std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>> filtershift8(U cura, U curb, U curc, U curd, unsigned shift)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(isabsvalue && !issignmode){
 			T curoa{static_cast<T>(cura)};
@@ -4089,7 +4089,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curqb;
 		curc ^= curqc;
 		curd ^= curqd;
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		cura = rotateleftportable<1>(static_cast<T>(cura));
 		curb = rotateleftportable<1>(static_cast<T>(curb));
 		curc = rotateleftportable<1>(static_cast<T>(curc));
@@ -4113,7 +4113,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>> filtershift8(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, std::uint_least64_t curmc, U curec, std::uint_least64_t curmd, U cured, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top 16 bits.
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		std::int_least16_t curpc{static_cast<std::int_least16_t>(curec)};
@@ -4251,7 +4251,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
 		curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
 #endif
-	}else if constexpr(isfltpmode && isabsvalue && !issignmode){// one-register filtering
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
 		std::uint_least16_t curoc{static_cast<std::uint_least16_t>(curec)};
@@ -4420,7 +4420,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curm, U &cure)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -4537,7 +4537,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
 		cure ^= static_cast<U>(curq);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode) cure &= 0xFFFFu >> 1;
 		else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -4600,7 +4600,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(out);
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode){
 			out[0].signexponent = static_cast<W>(cure);
@@ -4727,7 +4727,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
 		cure ^= static_cast<U>(curq);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		out[0].signexponent = static_cast<W>(cure);
 		if constexpr(issignmode){
 			cure &= 0xFFFFu >> 1;
@@ -4800,7 +4800,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(out);
 	assert(dst);
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode){
 			out[0].signexponent = static_cast<W>(cure);
@@ -4933,7 +4933,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
 		cure ^= static_cast<U>(curq);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		out[0].signexponent = static_cast<W>(cure);
 		dst[0].signexponent = static_cast<W>(cure);
 		if constexpr(issignmode){
@@ -5009,7 +5009,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, std::uint_least64_t &curmb, U &cureb)noexcept{
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isfltpmode){
@@ -5213,7 +5213,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			curea &= 0xFFFFu >> 1;
 			cureb &= 0xFFFFu >> 1;
@@ -5319,7 +5319,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outa);
 	assert(outb);
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isfltpmode){
@@ -5536,7 +5536,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		outa[0].signexponent = static_cast<W>(curea);
 		outb[0].signexponent = static_cast<W>(cureb);
 		if constexpr(issignmode){
@@ -5656,7 +5656,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outb);
 	assert(dstb);
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isfltpmode){
@@ -5884,7 +5884,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		outa[0].signexponent = static_cast<W>(curea);
 		dsta[0].signexponent = static_cast<W>(curea);
 		outb[0].signexponent = static_cast<W>(cureb);
@@ -6009,9 +6009,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cur)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curo{static_cast<T>(cur)};
 			curo += curo;
 			cur = curo;
@@ -6025,7 +6025,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(!issignmode) cur &= ~static_cast<T>(0) >> 1;
 		else cur = rotateleftportable<1>(static_cast<T>(cur));
 	}
@@ -6040,10 +6040,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> filterinput(U &cur, T *out)noexcept{
 	// do not pass a nullptr here
 	assert(out);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		*out = static_cast<T>(cur);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curo{static_cast<T>(cur)};
 			curo += curo;
 			cur = curo;
@@ -6057,7 +6057,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*out = static_cast<T>(cur);
 		if constexpr(issignmode) cur &= ~static_cast<T>(0) >> 1;
 		else cur = rotateleftportable<1>(static_cast<T>(cur));
@@ -6074,11 +6074,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		*out = static_cast<T>(cur);
 		*dst = static_cast<T>(cur);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curo{static_cast<T>(cur)};
 			curo += curo;
 			cur = curo;
@@ -6092,7 +6092,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*out = static_cast<T>(cur);
 		*dst = static_cast<T>(cur);
 		if constexpr(issignmode) cur &= ~static_cast<T>(0) >> 1;
@@ -6110,9 +6110,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, U &curb)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6120,7 +6120,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6141,7 +6141,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curqa;
 		curb ^= curqb;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
@@ -6162,10 +6162,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6174,7 +6174,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6195,7 +6195,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curqa;
 		curb ^= curqb;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(static_cast<T>(cura));
@@ -6220,11 +6220,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dsta);
 	assert(outb);
 	assert(dstb);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6234,7 +6234,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
 		*dstb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6255,7 +6255,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curqa;
 		curb ^= curqb;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
@@ -6279,9 +6279,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, U &curb, U &curc)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6289,7 +6289,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6297,7 +6297,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpb >>= CHAR_BIT * sizeof(T) - 1;
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6323,7 +6323,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cura ^= curqa;
 		curb ^= curqb;
 		curc ^= curqc;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
@@ -6347,10 +6347,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outa);
 	assert(outb);
 	assert(outc);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6359,7 +6359,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6368,7 +6368,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6394,7 +6394,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cura ^= curqa;
 		curb ^= curqb;
 		curc ^= curqc;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(static_cast<T>(cura));
@@ -6425,11 +6425,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstb);
 	assert(outc);
 	assert(dstc);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6439,7 +6439,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
 		*dstb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6449,7 +6449,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
 		*dstc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6475,7 +6475,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cura ^= curqa;
 		curb ^= curqb;
 		curc ^= curqc;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
@@ -6505,9 +6505,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, U &curb, U &curc, U &curd)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6515,7 +6515,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6523,7 +6523,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpb >>= CHAR_BIT * sizeof(T) - 1;
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6531,7 +6531,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpc >>= CHAR_BIT * sizeof(T) - 1;
 		U curqc{static_cast<T>(curpc)};
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -6562,7 +6562,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curqb;
 		curc ^= curqc;
 		curd ^= curqd;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
@@ -6589,10 +6589,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outb);
 	assert(outc);
 	assert(outd);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6601,7 +6601,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6610,7 +6610,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6619,7 +6619,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqc{static_cast<T>(curpc)};
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
 		*outd = static_cast<T>(curd);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -6650,7 +6650,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curqb;
 		curc ^= curqc;
 		curd ^= curqd;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(static_cast<T>(cura));
@@ -6687,11 +6687,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstc);
 	assert(outd);
 	assert(dstd);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6701,7 +6701,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
 		*dstb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6711,7 +6711,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
 		*dstc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6721,7 +6721,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
 		*outd = static_cast<T>(curd);
 		*dstd = static_cast<T>(curd);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -6752,7 +6752,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb ^= curqb;
 		curc ^= curqc;
 		curd ^= curqd;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
@@ -6788,9 +6788,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, U &curb, U &curc, U &curd, U &cure, U &curf, U &curg, U &curh)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6798,7 +6798,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6806,7 +6806,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpb >>= CHAR_BIT * sizeof(T) - 1;
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6814,7 +6814,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpc >>= CHAR_BIT * sizeof(T) - 1;
 		U curqc{static_cast<T>(curpc)};
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -6822,7 +6822,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpd >>= CHAR_BIT * sizeof(T) - 1;
 		U curqd{static_cast<T>(curpd)};
 		std::make_signed_t<T> curpe{static_cast<std::make_signed_t<T>>(cure)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoe{static_cast<T>(cure)};
 			curoe += curoe;
 			cure = curoe;
@@ -6830,7 +6830,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpe >>= CHAR_BIT * sizeof(T) - 1;
 		U curqe{static_cast<T>(curpe)};
 		std::make_signed_t<T> curpf{static_cast<std::make_signed_t<T>>(curf)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curof{static_cast<T>(curf)};
 			curof += curof;
 			curf = curof;
@@ -6838,7 +6838,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpf >>= CHAR_BIT * sizeof(T) - 1;
 		U curqf{static_cast<T>(curpf)};
 		std::make_signed_t<T> curpg{static_cast<std::make_signed_t<T>>(curg)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curog{static_cast<T>(curg)};
 			curog += curog;
 			curg = curog;
@@ -6846,7 +6846,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpg >>= CHAR_BIT * sizeof(T) - 1;
 		U curqg{static_cast<T>(curpg)};
 		std::make_signed_t<T> curph{static_cast<std::make_signed_t<T>>(curh)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoh{static_cast<T>(curh)};
 			curoh += curoh;
 			curh = curoh;
@@ -6897,7 +6897,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curf ^= curqf;
 		curg ^= curqg;
 		curh ^= curqh;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
@@ -6936,10 +6936,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outf);
 	assert(outg);
 	assert(outh);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -6948,7 +6948,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -6957,7 +6957,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqb{static_cast<T>(curpb)};
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -6966,7 +6966,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqc{static_cast<T>(curpc)};
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
 		*outd = static_cast<T>(curd);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -6975,7 +6975,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqd{static_cast<T>(curpd)};
 		std::make_signed_t<T> curpe{static_cast<std::make_signed_t<T>>(cure)};
 		*oute = static_cast<T>(cure);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoe{static_cast<T>(cure)};
 			curoe += curoe;
 			cure = curoe;
@@ -6984,7 +6984,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqe{static_cast<T>(curpe)};
 		std::make_signed_t<T> curpf{static_cast<std::make_signed_t<T>>(curf)};
 		*outf = static_cast<T>(curf);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curof{static_cast<T>(curf)};
 			curof += curof;
 			curf = curof;
@@ -6993,7 +6993,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqf{static_cast<T>(curpf)};
 		std::make_signed_t<T> curpg{static_cast<std::make_signed_t<T>>(curg)};
 		*outg = static_cast<T>(curg);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curog{static_cast<T>(curg)};
 			curog += curog;
 			curg = curog;
@@ -7002,7 +7002,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		U curqg{static_cast<T>(curpg)};
 		std::make_signed_t<T> curph{static_cast<std::make_signed_t<T>>(curh)};
 		*outh = static_cast<T>(curh);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoh{static_cast<T>(curh)};
 			curoh += curoh;
 			curh = curoh;
@@ -7053,7 +7053,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curf ^= curqf;
 		curg ^= curqg;
 		curh ^= curqh;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
 		else cura = rotateleftportable<1>(static_cast<T>(cura));
@@ -7114,11 +7114,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstg);
 	assert(outh);
 	assert(dsth);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -7128,7 +7128,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
 		*outb = static_cast<T>(curb);
 		*dstb = static_cast<T>(curb);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -7138,7 +7138,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpc{static_cast<std::make_signed_t<T>>(curc)};
 		*outc = static_cast<T>(curc);
 		*dstc = static_cast<T>(curc);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoc{static_cast<T>(curc)};
 			curoc += curoc;
 			curc = curoc;
@@ -7148,7 +7148,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpd{static_cast<std::make_signed_t<T>>(curd)};
 		*outd = static_cast<T>(curd);
 		*dstd = static_cast<T>(curd);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curod{static_cast<T>(curd)};
 			curod += curod;
 			curd = curod;
@@ -7158,7 +7158,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpe{static_cast<std::make_signed_t<T>>(cure)};
 		*oute = static_cast<T>(cure);
 		*dste = static_cast<T>(cure);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoe{static_cast<T>(cure)};
 			curoe += curoe;
 			cure = curoe;
@@ -7168,7 +7168,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpf{static_cast<std::make_signed_t<T>>(curf)};
 		*outf = static_cast<T>(curf);
 		*dstf = static_cast<T>(curf);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curof{static_cast<T>(curf)};
 			curof += curof;
 			curf = curof;
@@ -7178,7 +7178,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curpg{static_cast<std::make_signed_t<T>>(curg)};
 		*outg = static_cast<T>(curg);
 		*dstg = static_cast<T>(curg);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curog{static_cast<T>(curg)};
 			curog += curog;
 			curg = curog;
@@ -7188,7 +7188,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::make_signed_t<T> curph{static_cast<std::make_signed_t<T>>(curh)};
 		*outh = static_cast<T>(curh);
 		*dsth = static_cast<T>(curh);
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoh{static_cast<T>(curh)};
 			curoh += curoh;
 			curh = curoh;
@@ -7239,7 +7239,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curf ^= curqf;
 		curg ^= curqg;
 		curh ^= curqh;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		*outa = static_cast<T>(cura);
 		*dsta = static_cast<T>(cura);
 		if constexpr(issignmode) cura &= ~static_cast<T>(0) >> 1;
@@ -7307,13 +7307,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	X *u{isrevorder? offsets : offsetscompanion// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
 	*t = 0;// the first offset always starts at zero
@@ -7350,7 +7350,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while(--j);
 	}else{// unsigned or signed absolute
 		// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
-		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			t += isdescsort * 2 - 1;// step back
 			u += isdescsort * 2 - 1;
 			unsigned j{(256 - 2) / 2};// double the number of items per loop
@@ -7389,7 +7389,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	*t = static_cast<X>(offset);
 	*u = static_cast<X>(count);// high half, the last offset always starts at the end
 	// again, adjust for the special mode
-	u[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
+	u[((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
 	return{b};
 }
 
@@ -7407,13 +7407,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	assert(offsetscompanion);
 	X *t{isrevorder? offsetscompanion : offsets + (offsetsstride - 1)// high-to-low or low-to-high
-		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	X *u{isrevorder? offsets : offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
-		- (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		- (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		- (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U initdifference{static_cast<U>(*u) + static_cast<U>(*t)};
 	*u = static_cast<X>(count);// high half, the last offset always starts at the end
@@ -7434,7 +7434,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while(--j);
 		t[1 - isdescsort * 2] = static_cast<X>(offset + 1);// low half
 	}else{// unsigned or signed absolute
-		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			u += 1 - isdescsort * 2;// step back
 			t += 1 - isdescsort * 2;
@@ -7550,13 +7550,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	X *u{isrevorder? offsets : offsetscompanion// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
 	*t = 0;// low half, the first offset always starts at zero
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
@@ -7576,7 +7576,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while(--j);
 		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 	}else{// unsigned or signed absolute
-		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			t += isdescsort * 2 - 1;// step back
 			u += isdescsort * 2 - 1;
@@ -7636,9 +7636,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	X *t{offsets// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U offset{*t};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(isrevorder){
@@ -7675,7 +7675,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			addcarryofless(b, static_cast<U>(count), t[1 - isdescsort * 2]);
 			t[1 - isdescsort * 2] = static_cast<X>(count);// the last offset always starts at the end
 		}else{// unsigned or signed absolute
-			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 				U difference{t[isdescsort * 2 - 1]};// even
 				t += isdescsort * 2 - 1;// step back
@@ -7744,7 +7744,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
-			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 				t += isdescsort * 2 - 1;// step back
 				unsigned j{256 / 2 - 1};// double the number of items per loop
@@ -7797,9 +7797,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::is_same_v<std::nullptr_t, T>? 8 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr stride{offsetsstride + (typebitsize / 8 - 1) * 256};// offsetsstride, adapted for the multi-part types
 	X *t{offsets// low-to-high or high-to-low
-		+ (issignmode && !isabsvalue) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
-		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
-		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+		+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U offset{*t};
 	if constexpr(isrevorder){
@@ -7833,7 +7833,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
-			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
@@ -7868,7 +7868,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		t[stride] = static_cast<X>(offset);// high half
 		*t = static_cast<X>(count);// the last offset always starts at the end
 		// again, adjust for the special mode
-		t[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);
+		t[((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);
 	}else{// not reversed order
 		*t = 0;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
@@ -7900,7 +7900,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
-			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
@@ -7935,7 +7935,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		*t = static_cast<X>(offset);
 		t[stride] = static_cast<X>(count);// high half, the last offset always starts at the end
 		// again, adjust for the special mode
-		t[stride + ((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
+		t[stride + ((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
 	}
 	return{b};
 }
@@ -7979,7 +7979,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		paritybool ^= b;
 		skipsteps = b << (typebitsize / 8 - 1);
 	}else skipsteps = 0;
-	if constexpr(16 < typebitsize || !issignmode && !(isfltpmode && !issignmode && isabsvalue)){
+	if constexpr(16 < typebitsize || !issignmode && !(isabsvalue && !issignmode && isfltpmode)){
 		signed k{static_cast<signed>(typebitsize / 8 - 1 - issignmode)};
 		do{// handle these sets like regular unsigned
 			unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
@@ -7987,14 +7987,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			paritybool ^= b;
 			skipsteps |= b << k;
 			--k;
-		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
+		}while((isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
 		unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
 		paritybool ^= b;
-		if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+		if constexpr(isabsvalue && !issignmode && isfltpmode) skipsteps = b << 1;
 		else skipsteps |= b;
 	}
-	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
+	if constexpr(isabsvalue && !issignmode && isfltpmode){	// handle the least significant bit
 		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets)};
 		paritybool ^= b;
 		skipsteps |= b;
@@ -8025,7 +8025,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if(usemultithread){
 		// the main thread mostly handles the bottom sets
 		X *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
-		if constexpr(issignmode && isabsvalue){// start off with signed absolute handling on the top, split it up if absolute mode is used
+		if constexpr(isabsvalue && issignmode){// start off with signed absolute handling on the top, split it up if absolute mode is used
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
 			paritybool ^= b;
 			skipsteps = b << (typebitsize / 8 - 1);
@@ -8034,7 +8034,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static std::size_t constexpr halfsets{fullsets >> 1};
 		tbase -= 256 * halfsets;
 		ubase -= 256 * halfsets;
-		if constexpr(1 + (isfltpmode && !issignmode && isabsvalue) < halfsets){
+		if constexpr(1 + (isabsvalue && !issignmode && isfltpmode) < halfsets){
 			signed k{static_cast<signed>(halfsets - 1)};
 			do{// handle these sets like regular unsigned
 				unsigned b{generateoffsetsshared<isdescsort, false, false, false, false>(count, tbase, ubase)};
@@ -8043,14 +8043,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				paritybool ^= b;
 				skipsteps |= b << k;
 				--k;
-			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
-		}else if constexpr(1 + (isfltpmode && !issignmode && isabsvalue) == halfsets){// handle this set like regular unsigned
+			}while((isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
+		}else if constexpr(1 + (isabsvalue && !issignmode && isfltpmode) == halfsets){// handle this set like regular unsigned
 			unsigned b{generateoffsetsshared<isdescsort, false, false, false, false>(count, tbase, ubase)};
 			paritybool ^= b;
-			if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+			if constexpr(isabsvalue && !issignmode && isfltpmode) skipsteps = b << 1;
 			else skipsteps |= b;
 		}
-		if constexpr((1 & fullsets) || isfltpmode && !issignmode && isabsvalue){	// handle the last split up set (for odd counts) and the least significant bit
+		if constexpr((1 & fullsets) || isabsvalue && !issignmode && isfltpmode){	// handle the last split up set (for odd counts) and the least significant bit
 			unsigned b;
 			if constexpr(1 & fullsets) b = generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
 			else b = generateoffsetsshared<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
@@ -8064,7 +8064,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			paritybool ^= b;
 			skipsteps = b << (typebitsize / 8 - 1);
 		}else skipsteps = 0;
-		if constexpr(16 < typebitsize || !issignmode && !(isfltpmode && !issignmode && isabsvalue)){
+		if constexpr(16 < typebitsize || !issignmode && !(isabsvalue && !issignmode && isfltpmode)){
 			signed k{typebitsize / 8 - 1 - issignmode};
 			do{// handle these sets like regular unsigned
 				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
@@ -8072,14 +8072,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				paritybool ^= b;
 				skipsteps |= b << k;
 				--k;
-			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
+			}while((isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 		}else{// handle this set like regular unsigned
 			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
 			paritybool ^= b;
-			if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+			if constexpr(isabsvalue && !issignmode && isfltpmode) skipsteps = b << 1;
 			else skipsteps |= b;
 		}
-		if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
+		if constexpr(isabsvalue && !issignmode && isfltpmode){	// handle the least significant bit
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets)};
 			paritybool ^= b;
 			skipsteps |= b;
@@ -8120,7 +8120,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curehi{input[1].signexponent};
 				std::uint_least64_t curmhi{input[1].mantissa};
 				input += 2;
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pout, pdst,
 						curmhi, curehi, pout - 1, pdst - 1);
@@ -8129,7 +8129,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the low half here
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].signexponent = static_cast<W>(curelo);
 					pdst[0].signexponent = static_cast<W>(curelo);
 				}
@@ -8141,7 +8141,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].mantissa = curmlo;
 					pdst[0].mantissa = curmlo;
 				}
@@ -8166,7 +8166,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[-1].signexponent = static_cast<W>(curehi);
 					pdst[-1].signexponent = static_cast<W>(curehi);
 				}
@@ -8178,7 +8178,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[-1].mantissa = curmhi;
 					pout -= 2;
 					pdst[-1].mantissa = curmhi;
@@ -8214,7 +8214,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t curmlo{pinputlo[0].mantissa};
 				U curehi{pinputhi[0].signexponent};
 				std::uint_least64_t curmhi{pinputhi[0].mantissa};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pinputhi, poutputhi,
 						curmhi, curehi, pinputlo, poutputlo);
@@ -8225,7 +8225,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the low half here
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].signexponent = static_cast<W>(curelo);
 					poutputhi[0].signexponent = static_cast<W>(curelo);
 				}
@@ -8237,7 +8237,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
 					--pinputhi;
 					poutputhi[0].mantissa = curmlo;
@@ -8264,7 +8264,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].signexponent = static_cast<W>(curehi);
 					poutputlo[0].signexponent = static_cast<W>(curehi);
 				}
@@ -8276,7 +8276,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmhi;
 					++pinputlo;
 					poutputlo[0].mantissa = curmhi;
@@ -8313,14 +8313,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U curelo{input[-1].signexponent};
 			std::uint_least64_t curmlo{input[-1].mantissa};
 			input -= 2;
-			if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(
 					curmhi, curehi, pout,
 					curmlo, curelo, pout - 1);
 				pout -= 2;
 			}
 			unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[0].signexponent = static_cast<W>(curehi);
 			}
 			curehi >>= 8;
@@ -8331,7 +8331,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 			unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 			unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[0].mantissa = curmhi;
 			}
 			curmhi >>= 56;
@@ -8354,7 +8354,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
 			// register pressure performance issue on several platforms: do the low half here second
 			unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[-1].signexponent = static_cast<W>(curelo);
 			}
 			curelo >>= 8;
@@ -8365,7 +8365,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 			unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 			unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-			if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[-1].mantissa = curmlo;
 				pout -= 2;
 			}
@@ -9095,7 +9095,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput - 1) + 1)};
 				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinput - 1)};
 				pinput -= 2;
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmhi, curehi, poutput, pbuffer,
 						curmlo, curelo, poutput + 1, pbuffer + 1);
@@ -9104,7 +9104,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].signexponent = static_cast<W>(curehi);
 					pbuffer[0].signexponent = static_cast<W>(curehi);
 				}
@@ -9116,7 +9116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curmhi;
 					pbuffer[0].mantissa = curmhi;
 				}
@@ -9141,7 +9141,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[1].signexponent = static_cast<W>(curelo);
 					pbuffer[1].signexponent = static_cast<W>(curelo);
 				}
@@ -9153,7 +9153,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[1].mantissa = curmlo;
 					poutput += 2;
 					pbuffer[1].mantissa = curmlo;
@@ -9183,11 +9183,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!(1 & i)){// fill in the final item for odd counts
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
 				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].signexponent = static_cast<W>(cure);
 					pbuffer[0].signexponent = static_cast<W>(cure);
 				}
@@ -9199,7 +9199,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curm4{static_cast<unsigned>(curm >> 32)};
 				unsigned curm5{static_cast<unsigned>(curm >> 40)};
 				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curm;
 					pbuffer[0].mantissa = curm;
 				}
@@ -9232,14 +9232,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput + 1) + 1)};
 				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinput + 1)};
 				pinput += 2;
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, poutput,
 						curmhi, curehi, poutput + 1);
 					poutput += 2;
 				}
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].signexponent = static_cast<W>(curelo);
 				}
 				curelo >>= 8;
@@ -9250,7 +9250,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curmlo;
 				}
 				curmlo >>= 56;
@@ -9273,7 +9273,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[1].signexponent = static_cast<W>(curehi);
 				}
 				curehi >>= 8;
@@ -9284,7 +9284,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[1].mantissa = curmhi;
 					poutput += 2;
 				}
@@ -9311,11 +9311,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!(1 & i)){// fill in the final item for odd counts
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
 				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].signexponent = static_cast<W>(cure);
 				}
 				cure >>= 8;
@@ -9326,7 +9326,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curm4{static_cast<unsigned>(curm >> 32)};
 				unsigned curm5{static_cast<unsigned>(curm >> 40)};
 				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					poutput[0].mantissa = curm;
 				}
 				curm >>= 56;
@@ -9573,7 +9573,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinputlo)};
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinputhi) + 1)};
 				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinputhi)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pinputhi, pbufferhi,
 						curmhi, curehi, pinputlo, pbufferlo);
@@ -9584,7 +9584,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the low half here
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].signexponent = static_cast<W>(curelo);
 					pbufferhi[0].signexponent = static_cast<W>(curelo);
 				}
@@ -9596,7 +9596,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
 					--pinputhi;
 					pbufferhi[0].mantissa = curmlo;
@@ -9623,7 +9623,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].signexponent = static_cast<W>(curehi);
 					pbufferlo[0].signexponent = static_cast<W>(curehi);
 				}
@@ -9635,7 +9635,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmlo;
 					++pinputlo;
 					pbufferlo[0].mantissa = curmhi;
@@ -9665,11 +9665,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				U cure{pinputlo[0].signexponent};
 				std::uint_least64_t curm{pinputlo[0].mantissa};
 				// no write to input, as this is the midpoint
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbufferhi);
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbufferhi[0].signexponent = static_cast<W>(cure);
 				}
 				cure >>= 8;
@@ -9680,7 +9680,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curm4{static_cast<unsigned>(curm >> 32)};
 				unsigned curm5{static_cast<unsigned>(curm >> 40)};
 				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbufferhi[0].mantissa = curm;
 				}
 				curm >>= 56;
@@ -9713,7 +9713,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput + 1) + 1)};
 				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinput + 1)};
 				pinput += 2;
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pbuffer,
 						curmhi, curehi, pbuffer + 1);
@@ -9721,7 +9721,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				// register pressure performance issue on several platforms: first do the low half here
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[0].signexponent = static_cast<W>(curelo);
 				}
 				curelo >>= 8;
@@ -9732,7 +9732,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
 				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[0].mantissa = curmlo;
 				}
 				curmlo >>= 56;
@@ -9755,7 +9755,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[1].signexponent = static_cast<W>(curehi);
 				}
 				curehi >>= 8;
@@ -9766,7 +9766,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
 				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
 				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[1].signexponent = static_cast<W>(curmhi);
 					pbuffer += 2;
 				}
@@ -9793,11 +9793,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(!(1 & i)){// fill in the final item for odd counts
 				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
 				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
 				}
 				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[0].signexponent = static_cast<W>(cure);
 				}
 				cure >>= 8;
@@ -9808,7 +9808,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curm4{static_cast<unsigned>(curm >> 32)};
 				unsigned curm5{static_cast<unsigned>(curm >> 40)};
 				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)){
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pbuffer[0].mantissa = curm;
 					++pbuffer;
 				}
@@ -9928,7 +9928,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U curhi{input[i]};
 				U curlo{input[i - 1]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curhi, pout + i,
 						curlo, pout + i - 1);
@@ -9941,7 +9941,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curhi4{curhi >> 32};
 				U curhi5{curhi >> 40};
 				U curhi6{curhi >> 48};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 56;
 				++offsetscompanion[curhi0];
 				curhi1 &= 0xFFu;
@@ -9966,7 +9966,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curlo4{curlo >> 32};
 				U curlo5{curlo >> 40};
 				U curlo6{curlo >> 48};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 56;
 				++offsetscompanion[curlo0];
 				curlo1 &= 0xFFu;
@@ -9995,7 +9995,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U curhi{input[i]};
 				U curlo{input[i - 1]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curhi, pout + i,
 						curlo, pout + i - 1);
@@ -10007,7 +10007,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curhi3{curhi >> 24};
 				U curhi4{curhi >> 32};
 				U curhi5{curhi >> 40};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 48;
 				++offsetscompanion[curhi0];
 				curhi1 &= 0xFFu;
@@ -10029,7 +10029,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curlo3{curlo >> 24};
 				U curlo4{curlo >> 32};
 				U curlo5{curlo >> 40};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 48;
 				++offsetscompanion[curlo0];
 				curlo1 &= 0xFFu;
@@ -10056,7 +10056,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U curhi{input[i]};
 				U curlo{input[i - 1]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curhi, pout + i,
 						curlo, pout + i - 1);
@@ -10067,7 +10067,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curhi2{curhi >> 16};
 				U curhi3{curhi >> 24};
 				U curhi4{curhi >> 32};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 40;
 				++offsetscompanion[curhi0];
 				curhi1 &= 0xFFu;
@@ -10086,7 +10086,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curlo2{curlo >> 16};
 				U curlo3{curlo >> 24};
 				U curlo4{curlo >> 32};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
 				curlo >>= 40;
 				++offsetscompanion[curlo0];
 				curlo1 &= 0xFFu;
@@ -10111,7 +10111,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U curhi{input[i]};
 				U curlo{input[i - 1]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curhi, pout + i,
 						curlo, pout + i - 1);
@@ -10120,13 +10120,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curhi1{curhi >> 8};
 				U curhi2{curhi >> 16};
 				U curhi3{curhi >> 24};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
 				curhi >>= 32;
 				U curlo0{curlo & 0xFFu};
 				U curlo1{curlo >> 8};
 				U curlo2{curlo >> 16};
 				U curlo3{curlo >> 24};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
 				curlo >>= 32;
 				++offsetscompanion[curhi0];
 				curhi1 &= 0xFFu;
@@ -10158,7 +10158,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U cura{input[i]};
 				U curb{input[i - 1]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						cura, pout + i,
 						curb, pout + i - 1);
@@ -10166,12 +10166,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U cur0a{cura & 0xFFu};
 				U cur1a{cura >> 8};
 				U cur2a{cura >> 16};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
 				cura >>= 24;
 				U cur0b{curb & 0xFFu};
 				U cur1b{curb >> 8};
 				U cur2b{curb >> 16};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
 				curb >>= 24;
 				++offsetscompanion[cur0a];
 				cur1a &= 0xFFu;
@@ -10200,7 +10200,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U cura{input[i]};
 				U curb{input[i - 1]};
 				U curc{input[i - 2]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						cura, pout + i,
 						curb, pout + i - 1,
@@ -10208,15 +10208,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 				U cur0a{cura & 0xFFu};
 				U cur1a{cura >> 8};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
 				cura >>= 16;
 				U cur0b{curb & 0xFFu};
 				U cur1b{curb >> 8};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
 				curb >>= 16;
 				U cur0c{curc & 0xFFu};
 				U cur1c{curc >> 8};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
 				curc >>= 16;
 				++offsetscompanion[cur0a];
 				cur1a &= 0xFFu;
@@ -10247,7 +10247,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curb{input[i - 1]};
 				U curc{input[i - 2]};
 				U curd{input[i - 3]};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						cura, pout + i,
 						curb, pout + i - 1,
@@ -10255,16 +10255,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						curd, pout + i - 3);
 				}
 				U cur0a{cura & 0xFFu};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
 				cura >>= 8;
 				U cur0b{curb & 0xFFu};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
 				curb >>= 8;
 				U cur0c{curc & 0xFFu};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
 				curc >>= 8;
 				U cur0d{curd & 0xFFu};
-				if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) pout[i - 3] = static_cast<T>(curd);
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 3] = static_cast<T>(curd);
 				curd >>= 8;
 				++offsetscompanion[cur0a];
 				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
@@ -10736,7 +10736,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, output + i,
 							curlo, output + i - 1);
@@ -10749,7 +10749,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> 32};
 					U curhi5{curhi >> 40};
 					U curhi6{curhi >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -10774,7 +10774,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> 32};
 					U curlo5{curlo >> 40};
 					U curlo6{curlo >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -10795,7 +10795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
@@ -10805,7 +10805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
 					U cur6{cur >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -10832,7 +10832,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, output + i,
 							curlo, output + i - 1);
@@ -10844,7 +10844,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> 24};
 					U curhi4{curhi >> 32};
 					U curhi5{curhi >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -10866,7 +10866,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
 					U curlo5{curlo >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -10885,7 +10885,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
@@ -10894,7 +10894,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -10919,7 +10919,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, output + i,
 							curlo, output + i - 1);
@@ -10930,7 +10930,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi2{curhi >> 16};
 					U curhi3{curhi >> 24};
 					U curhi4{curhi >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -10949,7 +10949,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -10966,7 +10966,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
@@ -10974,7 +10974,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -10997,7 +10997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, output + i,
 							curlo, output + i - 1);
@@ -11006,13 +11006,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> 8};
 					U curhi2{curhi >> 16};
 					U curhi3{curhi >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> 8};
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -11036,14 +11036,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> 8};
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11064,7 +11064,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i,
 							curb, output + i - 1);
@@ -11072,12 +11072,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
 					U cur2a{cura >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
 					U cur2b{curb >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11097,13 +11097,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> 8};
 					U cur2{static_cast<unsigned>(cur) >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11128,7 +11128,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
 					U curc{input[i]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i + 2,
 							curb, output + i + 1,
@@ -11136,15 +11136,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11166,18 +11166,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i + 2,
 							curb, output + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11191,12 +11191,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 				}else if(1 & i){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11220,7 +11220,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{input[i + 2]};
 					U curc{input[i + 1]};
 					U curd{input[i]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i + 3,
 							curb, output + i + 2,
@@ -11228,16 +11228,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curd, output + i);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curc);
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curd);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curd);
 					curd >>= 8;
 					++offsets[cur0a];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
@@ -11256,16 +11256,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
 					U cura{input[i + 3]};
 					U curb{input[i + 2]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i + 3,
 							curb, output + i + 2);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					++offsets[cur0a];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
@@ -11276,11 +11276,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				if(1 & i){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
 					cur >>= 8;
 					++offsets[cur0];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
@@ -11502,7 +11502,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -11515,7 +11515,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi4{curhi >> 32};
 					U curhi5{curhi >> 40};
 					U curhi6{curhi >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 56;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -11540,7 +11540,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo4{curlo >> 32};
 					U curlo5{curlo >> 40};
 					U curlo6{curlo >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 56;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -11561,7 +11561,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -11571,7 +11571,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
 					U cur6{cur >> 48};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 56;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11598,7 +11598,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -11610,7 +11610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi3{curhi >> 24};
 					U curhi4{curhi >> 32};
 					U curhi5{curhi >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 48;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -11632,7 +11632,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
 					U curlo5{curlo >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 48;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -11651,7 +11651,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -11660,7 +11660,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 48;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11685,7 +11685,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -11696,7 +11696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi2{curhi >> 16};
 					U curhi3{curhi >> 24};
 					U curhi4{curhi >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 40;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -11715,7 +11715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 40;
 					++offsets[curlo0];
 					curlo1 &= 0xFFu;
@@ -11732,7 +11732,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
@@ -11740,7 +11740,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 40;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11763,7 +11763,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, buffer + i,
 							curlo, buffer + i - 1);
@@ -11772,13 +11772,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curhi1{curhi >> 8};
 					U curhi2{curhi >> 16};
 					U curhi3{curhi >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
 					curhi >>= 32;
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> 8};
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
 					curlo >>= 32;
 					++offsets[curhi0];
 					curhi1 &= 0xFFu;
@@ -11802,14 +11802,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{cur >> 8};
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 32;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11830,7 +11830,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i,
 							curb, buffer + i - 1);
@@ -11838,12 +11838,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
 					U cur2a{cura >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cura);
 					cura >>= 24;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
 					U cur2b{curb >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curb);
 					curb >>= 24;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11863,13 +11863,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> 8};
 					U cur2{static_cast<unsigned>(cur) >> 16};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 24;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11894,7 +11894,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
 					U curc{input[i]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1,
@@ -11902,15 +11902,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 16;
 					U cur0c{curc & 0xFFu};
 					U cur1c{curc >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 16;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11932,18 +11932,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
 					U cura{input[i + 2]};
 					U curb{input[i + 1]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i + 2,
 							curb, buffer + i + 1);
 					}
 					U cur0a{cura & 0xFFu};
 					U cur1a{cura >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(cura);
 					cura >>= 16;
 					U cur0b{curb & 0xFFu};
 					U cur1b{curb >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curb);
 					curb >>= 16;
 					++offsets[cur0a];
 					cur1a &= 0xFFu;
@@ -11958,12 +11958,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				if(1 & i){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
 					U cur1{static_cast<unsigned>(cur) >> 8};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 16;
 					++offsets[cur0];
 					cur1 &= 0xFFu;
@@ -11987,7 +11987,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{input[i + 2]};
 					U curc{input[i + 1]};
 					U curd{input[i]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2,
@@ -11995,16 +11995,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curd, buffer + i);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					U cur0c{curc & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
 					curc >>= 8;
 					U cur0d{curd & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curd);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curd);
 					curd >>= 8;
 					++offsets[cur0a];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
@@ -12023,16 +12023,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
 					U cura{input[i + 3]};
 					U curb{input[i + 2]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i + 3,
 							curb, buffer + i + 2);
 					}
 					U cur0a{cura & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
 					cura >>= 8;
 					U cur0b{curb & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
 					curb >>= 8;
 					++offsets[cur0a];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
@@ -12043,11 +12043,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				if(1 & i){// fill in the final item for odd counts
 					U cur{input[0]};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 					}
 					U cur0{cur & 0xFFu};
-					if constexpr(isfltpmode == isabsvalue && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
 					cur >>= 8;
 					++offsets[cur0];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
@@ -12171,7 +12171,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 				std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
 				}
 				// register pressure performance issue on several platforms: first do the low half here
@@ -12253,7 +12253,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 				std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
 				}
 				// register pressure performance issue on several platforms: first do the low half here
@@ -12334,7 +12334,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 			std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 			U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-			if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
 			}
 			// register pressure performance issue on several platforms: first do the high half here
@@ -13156,7 +13156,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -13227,7 +13227,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
 					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -13272,7 +13272,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -13342,7 +13342,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
 					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -13655,7 +13655,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
 					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
 					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -13725,7 +13725,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
 					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -13766,7 +13766,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
 					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -13834,7 +13834,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
 					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
 					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
@@ -13981,7 +13981,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -14048,7 +14048,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -14115,7 +14115,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 				}
 				// register pressure performance issue on several platforms: first do the high half here
@@ -14187,7 +14187,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -14248,7 +14248,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -14309,7 +14309,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 				}
 				// register pressure performance issue on several platforms: first do the high half here
@@ -14375,7 +14375,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -14430,7 +14430,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -14485,7 +14485,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 				}
 				// register pressure performance issue on several platforms: first do the high half here
@@ -14545,7 +14545,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -14594,7 +14594,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 					}
 					U curlo0{curlo & 0xFFu};
@@ -14641,7 +14641,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 				}
 				U curhi0{curhi & 0xFFu};
@@ -14693,7 +14693,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -14734,7 +14734,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
 					U cur0a{cura & 0xFFu};
@@ -14775,7 +14775,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 				}
 				U cur0a{cura & 0xFFu};
@@ -14826,7 +14826,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -14876,7 +14876,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					// register pressure performance issue on several platforms: first do the high half here
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 					}
 					U cur0a{cura & 0xFFu};
@@ -14922,7 +14922,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
 					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
 					// register pressure performance issue on several platforms: do the low half here second
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 					}
 					U cur0d{curd & 0xFFu};
@@ -14969,7 +14969,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 				}
 				U cur0a{cura & 0xFFu};
@@ -15027,7 +15027,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -15080,7 +15080,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 					}
 					U cur0a{cura & 0xFFu};
@@ -15127,7 +15127,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 				}
 				U cur0a{cura & 0xFFu};
@@ -15719,7 +15719,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -15778,7 +15778,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[i] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -15815,7 +15815,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -15873,7 +15873,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -15926,7 +15926,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -15979,7 +15979,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[i] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16013,7 +16013,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -16065,7 +16065,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16115,7 +16115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -16162,7 +16162,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[i] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16193,7 +16193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -16239,7 +16239,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16286,7 +16286,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
@@ -16325,7 +16325,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[i] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16353,7 +16353,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
@@ -16391,7 +16391,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16435,7 +16435,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16468,7 +16468,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16493,7 +16493,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16525,7 +16525,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16576,7 +16576,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16617,7 +16617,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16643,7 +16643,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16674,7 +16674,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16712,7 +16712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16737,7 +16737,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16790,7 +16790,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16827,7 +16827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16847,7 +16847,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -16879,7 +16879,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16913,7 +16913,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -16932,7 +16932,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17207,7 +17207,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -17265,7 +17265,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17304,7 +17304,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -17362,7 +17362,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17416,7 +17416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -17468,7 +17468,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17504,7 +17504,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -17556,7 +17556,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 						}
 						U cur0{cur & 0xFFu};
@@ -17607,7 +17607,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -17650,7 +17650,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						U cur{pinputlo[0]};
 						// no write to input, as this is the midpoint
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17683,7 +17683,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
@@ -17729,7 +17729,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17777,7 +17777,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
 						U curlo0{curlo & 0xFFu};
@@ -17815,7 +17815,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17845,7 +17845,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
 						U curhi0{curhi & 0xFFu};
@@ -17883,7 +17883,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17928,7 +17928,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -17960,7 +17960,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -17987,7 +17987,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18019,7 +18019,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -18079,7 +18079,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18125,7 +18125,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18167,7 +18167,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						// register pressure performance issue on several platforms: first do the high half here
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18213,7 +18213,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
 						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
 						// register pressure performance issue on several platforms: do the low half here second
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
 						}
 						U cur0d{curd & 0xFFu};
@@ -18247,7 +18247,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -18280,7 +18280,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18318,7 +18318,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18343,7 +18343,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -18382,7 +18382,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18425,7 +18425,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18455,7 +18455,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						*pbufferhi = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -18489,7 +18489,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18523,7 +18523,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
 						U cur0a{cura & 0xFFu};
@@ -18542,7 +18542,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[0] = p;
 						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isfltpmode != isabsvalue || isabsvalue && !issignmode){
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
 						U cur0{cur & 0xFFu};
@@ -20821,7 +20821,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	longdoubletest80> convertinput(std::uint_least64_t curm, U cure)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode){
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -20938,7 +20938,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
 		cure ^= static_cast<U>(curq);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode) cure &= 0xFFFFu >> 1;
 		else{
 			std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -20999,7 +20999,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cure = curo;
 		}
 	}
-	if constexpr(issignmode && !isabsvalue) cure += static_cast<U>(1) << 15;// flip the sign bit
+	if constexpr(!isabsvalue && issignmode) cure += static_cast<U>(1) << 15;// flip the sign bit
 	return{curm, static_cast<std::uint_least16_t>(cure)};
 }
 
@@ -21022,7 +21022,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U),
 	std::pair<longdoubletest80, longdoubletest80>> convertinput(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb)noexcept{
 	using W = decltype(T::signexponent);
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isfltpmode){
@@ -21226,7 +21226,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			curea &= 0xFFFFu >> 1;
 			cureb &= 0xFFFFu >> 1;
@@ -21336,7 +21336,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cureb = curob;
 		}
 	}
-	if constexpr(issignmode && !isabsvalue) curea += static_cast<U>(1) << 15, cureb += static_cast<U>(1) << 15;// flip the sign bit
+	if constexpr(!isabsvalue && issignmode) curea += static_cast<U>(1) << 15, cureb += static_cast<U>(1) << 15;// flip the sign bit
 	return{{curma, static_cast<std::uint_least16_t>(curea)}, {curmb, static_cast<std::uint_least16_t>(cureb)}};
 }
 
@@ -21364,9 +21364,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::conditional_t<64 == CHAR_BIT * sizeof(T), test64, T>
 #endif
 	> convertinput(U cur)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curo{static_cast<T>(cur)};
 			curo += curo;
 			cur = curo;
@@ -21380,7 +21380,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cur = curo;
 		}
 		cur ^= curq;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(!issignmode) cur &= ~static_cast<T>(0) >> 1;
 		else{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// no use for any tricks when the type is already small enough
@@ -21415,7 +21415,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		}
 	}
-	if constexpr(issignmode && !isabsvalue) cur += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1);// flip the sign bit
+	if constexpr(!isabsvalue && issignmode) cur += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1);// flip the sign bit
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	return{static_cast<T>(cur)};
 #else
@@ -21436,9 +21436,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::conditional_t<64 == CHAR_BIT * sizeof(T), std::pair<test64, test64>, std::pair<T, T>>
 #endif
 	> convertinput(U cura, U curb)noexcept{
-	if constexpr(isfltpmode != isabsvalue){// two-register filtering
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curoa{static_cast<T>(cura)};
 			curoa += curoa;
 			cura = curoa;
@@ -21446,7 +21446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curpa >>= CHAR_BIT * sizeof(T) - 1;
 		U curqa{static_cast<T>(curpa)};
 		std::make_signed_t<T> curpb{static_cast<std::make_signed_t<T>>(curb)};
-		if constexpr(isfltpmode || !issignmode){
+		if constexpr(!issignmode || isfltpmode){
 			T curob{static_cast<T>(curb)};
 			curob += curob;
 			curb = curob;
@@ -21467,7 +21467,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		cura ^= curqa;
 		curb ^= curqb;
-	}else if constexpr(isfltpmode && isabsvalue){// one-register filtering
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode){
 			cura &= ~static_cast<T>(0) >> 1;
 			curb &= ~static_cast<T>(0) >> 1;
@@ -21523,7 +21523,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		}
 	}
-	if constexpr(issignmode && !isabsvalue) cura += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1), curb += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1);// flip the sign bit
+	if constexpr(!isabsvalue && issignmode) cura += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1), curb += static_cast<U>(1) << (CHAR_BIT * sizeof(T) - 1);// flip the sign bit
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	return{static_cast<T>(cura), static_cast<T>(curb)};
 #else
@@ -21555,7 +21555,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isfltpmode && isabsvalue)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
 		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
 #if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
 		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
@@ -22682,7 +22682,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isfltpmode && isabsvalue)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
 		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
 #if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
 		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
@@ -23195,7 +23195,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isfltpmode && isabsvalue)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
 		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
 #if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
 		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
