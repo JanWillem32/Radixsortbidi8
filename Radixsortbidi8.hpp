@@ -7294,6 +7294,105 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // Helper functions to implement the offset transforms
 
+// version for both threads when multithreading is used at run time (writes a full set of offsets in this case)
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X>,
+	unsigned> generateoffsetsshared(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
+	// do not pass a nullptr here
+	assert(offsets);
+	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
+	static_assert(!isabsvalue || !issignmode, "this function variant is not entirely intended for usage on the top part in absolute signed modes");
+	// Determining the starting point depends on several factors here.
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
+		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
+		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+	X *u{isrevorder? offsets : offsetscompanion// low-to-high or high-to-low
+		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
+		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
+		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
+	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
+	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
+	*t = 0;// the first offset always starts at zero
+	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+		t -= isdescsort * 2 - 1;
+		u -= isdescsort * 2 - 1;
+		unsigned j{256 / 2 - 1};
+		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+		do{
+			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+			*t = static_cast<X>(offset);
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
+			t -= isdescsort * 2 - 1;
+			u -= isdescsort * 2 - 1;
+			offset += difference;
+			addcarryofless(b, static_cast<U>(count), difference);
+		}while(--j);
+		U differencemid{static_cast<U>(t[256 * (isdescsort * 2 - 1)]) + static_cast<U>(u[256 * (isdescsort * 2 - 1)])};
+		t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
+		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
+		t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+		u += (256 - 1) * (isdescsort * 2 - 1);
+		j = 256 / 2 - 2;
+		offset += differencemid;
+		addcarryofless(b, static_cast<U>(count), differencemid);
+		do{
+			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+			*t = static_cast<X>(offset);
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
+			t -= isdescsort * 2 - 1;
+			u -= isdescsort * 2 - 1;
+			offset -= difference * (isdescsort * 2 - 1);
+			addcarryofless(b, static_cast<U>(count), difference);
+		}while(--j);
+	}else{// unsigned or signed absolute
+		// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+		if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
+			t += isdescsort * 2 - 1;// step back
+			u += isdescsort * 2 - 1;
+			unsigned j{(256 - 2) / 2};// double the number of items per loop
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			do{
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
+				*t = static_cast<X>(offset);
+				u[isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd, high half
+				offset += difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+				difference = static_cast<U>(t[isdescsort * -6 + 3]) + static_cast<U>(u[isdescsort * -6 + 3]);// odd
+				t[isdescsort * -6 + 3] = static_cast<X>(offset);
+				*u = static_cast<X>(offset - 1);// even, high half
+				t += isdescsort * -4 + 2;// step forward twice
+				u += isdescsort * -4 + 2;
+				offset += difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+			}while(--j);
+		}else{// all other modes
+			t -= isdescsort * 2 - 1;
+			u -= isdescsort * 2 - 1;
+			unsigned j{256 - 2};
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+			do{
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+				*t = static_cast<X>(offset);
+				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
+				t -= isdescsort * 2 - 1;
+				u -= isdescsort * 2 - 1;
+				offset += difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+			}while(--j);
+		}
+	}
+	addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(*u));
+	*t = static_cast<X>(offset);
+	*u = static_cast<X>(count);// high half, the last offset always starts at the end
+	// again, adjust for the special mode
+	u[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);// high half
+	return{b};
+}
+
 // version for the companion thread
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -7398,43 +7497,40 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
-	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
+	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
+	// the companion thread mostly handles the top sets
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	X *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
-	unsigned skipsteps{};
-	unsigned paritybool;// only the main thread may initialise at 0 or 1 for the parity
-	if constexpr(issignmode){// start off with signed handling on the top
-		paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase);
+	unsigned skipsteps, paritybool;// only the main thread may initialise at 0 or 1 for the parity
+	if constexpr(issignmode){// start off with signed handling on the top, split it up if absolute mode is used
+		if constexpr(!isabsvalue) paritybool = generateoffsetsshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase);
+		else paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase);
 		tbase -= 256;
 		ubase -= 256;
-		skipsteps |= paritybool << (typebitsize / 8 - 1);
-	}else paritybool = 0;
-	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
-		signed k{typebitsize / 8 - 1 - issignmode};
+		skipsteps = paritybool << (typebitsize / 8 - 1);
+	}else{
+		paritybool = 0;
+		skipsteps = 0;
+	}
+	static std::size_t constexpr fullsets{typebitsize / 8 - (isabsvalue && issignmode)};
+	static std::size_t constexpr halfsets{fullsets >> 1};
+	if constexpr(1 < halfsets - (!isabsvalue && issignmode)){
+		signed k{static_cast<signed>(typebitsize / 8 - 1 - issignmode)};
 		do{// handle these sets like regular unsigned
-			unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
+			unsigned b{generateoffsetsshared<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
 			tbase -= 256;
 			ubase -= 256;
 			paritybool ^= b;
 			skipsteps |= b << k;
 			--k;
-		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
-	}else{// handle this set like regular unsigned
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
-		if constexpr(isfltpmode && !issignmode && isabsvalue){
-			tbase -= 256;
-			ubase -= 256;
-		}
-		if constexpr(issignmode){
-			paritybool ^= b;
-			skipsteps |= b;
-		}else{
-			paritybool = b;
-			skipsteps += b * 2;
-		}
+		}while(static_cast<unsigned>(halfsets - 1) < k);
+	}else if constexpr(1 == halfsets - (!isabsvalue && issignmode)){// handle this set like regular unsigned
+		unsigned b{generateoffsetsshared<isdescsort, false, false, false, false, X>(count, tbase, ubase)};
+		paritybool ^= b;
+		skipsteps += b * (1u << (typebitsize / 8 - 1 - issignmode));// this will usually optimise out
 	}
-	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, tbase, ubase)};
+	if constexpr(1 & fullsets){// handle the last split up set (for odd counts)
+		unsigned b{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -7457,7 +7553,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
-	X *u{isrevorder? offsets: offsetscompanion// low-to-high or high-to-low
+	X *u{isrevorder? offsets : offsetscompanion// low-to-high or high-to-low
 		+ (issignmode && !isabsvalue) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (!issignmode || isabsvalue)) * (offsetsstride - 1)
 		+ (isfltpmode && !issignmode && isabsvalue) * (1 - isdescsort * 2)};
@@ -7627,22 +7723,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
-			U difference;
 			do{
-				difference = *t;
+				U difference{*t};
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			difference = t[256 * (isdescsort * 2 - 1)];
+			U differencemid{t[256 * (isdescsort * 2 - 1)]};
 			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 2;
-			offset += difference;
-			addcarryofless(b, static_cast<U>(count), difference);
+			offset += differencemid;
+			addcarryofless(b, static_cast<U>(count), differencemid);
 			do{
-				difference = *t;
+				U difference{*t};
 				*t = static_cast<X>(offset);
 				t += 1 - isdescsort * 2;
 				offset += difference;
@@ -7709,10 +7804,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	U offset{*t};
 	if constexpr(isrevorder){
 		t[stride] = 0;// high half, the first offset always starts at zero
-		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			t -= isdescsort * 2 - 1;
-			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{256 / 2 - 1};
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
@@ -7725,9 +7820,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t[stride + 256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);// high half
 			t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+			j = 256 / 2 - 2;
 			offset += differencemid;
 			addcarryofless(b, static_cast<U>(count), differencemid);
-			j = 256 / 2 - 2;
 			do{
 				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
@@ -7736,12 +7831,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-		}else{// unsigned
+		}else{// unsigned or signed absolute
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
-				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};// even
 					t[stride] = static_cast<X>(offset);// high half
@@ -7757,8 +7852,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}else{// all other modes
 				t -= isdescsort * 2 - 1;
-				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{256 - 2};
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
 					t[stride] = static_cast<X>(static_cast<X>(offset));// high half
@@ -7776,10 +7871,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		t[((isfltpmode && !issignmode && isabsvalue) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1);
 	}else{// not reversed order
 		*t = 0;// the first offset always starts at zero
-		if constexpr(issignmode){// handle the sign bit, virtually offset the top part by half the range here
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			t -= isdescsort * 2 - 1;
-			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			unsigned j{256 / 2 - 1};
+			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
@@ -7792,9 +7887,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t[256 * (isdescsort * 2 - 1)] = static_cast<X>(offset);
 			t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+			j = 256 / 2 - 2;
 			offset += differencemid;
 			addcarryofless(b, static_cast<U>(count), differencemid);
-			j = 256 / 2 - 2;
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
@@ -7803,12 +7898,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-		}else{// unsigned
+		}else{// unsigned or signed absolute
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isfltpmode && !issignmode && isabsvalue){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
-				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};// even
 					*t = static_cast<X>(offset);
@@ -7824,8 +7919,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}else{// all other modes
 				t -= isdescsort * 2 - 1;
-				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				unsigned j{256 - 2};
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
 					*t = static_cast<X>(offset);
@@ -7875,17 +7970,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
-	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
+	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
-	unsigned skipsteps{};
+	unsigned skipsteps;
 	if constexpr(issignmode){// start off with signed handling on the top
 		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, tbase)};
 		tbase -= 256;
 		paritybool ^= b;
-		skipsteps |= b << (typebitsize / 8 - 1);
-	}
-	if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
-		signed k{typebitsize / 8 - 1 - issignmode};
+		skipsteps = b << (typebitsize / 8 - 1);
+	}else skipsteps = 0;
+	if constexpr(16 < typebitsize || !issignmode && !(isfltpmode && !issignmode && isabsvalue)){
+		signed k{static_cast<signed>(typebitsize / 8 - 1 - issignmode)};
 		do{// handle these sets like regular unsigned
 			unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
 			tbase -= 256;
@@ -7895,15 +7990,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 	}else{// handle this set like regular unsigned
 		unsigned b{generateoffsetssingle<isdescsort, false, false, false, false, T, X>(count, tbase)};
-		if constexpr(isfltpmode && !issignmode && isabsvalue){
-			tbase -= 256;
-		}
 		paritybool ^= b;
-		if constexpr(issignmode) skipsteps |= b;
-		else skipsteps += b * 2;
+		if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+		else skipsteps |= b;
 	}
 	if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, tbase)};
+		unsigned b{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets)};
 		paritybool ^= b;
 		skipsteps |= b;
 	}
@@ -7927,40 +8019,41 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
-	// transform the top set of offsets first and work downwards to keep the cache hot for the first stage
+	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
-	unsigned skipsteps{};
+	unsigned skipsteps;
 	if(usemultithread){
+		// the main thread mostly handles the bottom sets
 		X *ubase{offsetscompanion + (typebitsize / 8 - 1) * 256};
-		if constexpr(issignmode){// start off with signed handling on the top
+		if constexpr(issignmode && isabsvalue){// start off with signed absolute handling on the top, split it up if absolute mode is used
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
-			tbase -= 256;
-			ubase -= 256;
 			paritybool ^= b;
-			skipsteps |= b << (typebitsize / 8 - 1);
-		}
-		if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
-			signed k{typebitsize / 8 - 1 - issignmode - (isfltpmode && !issignmode && isabsvalue)};
+			skipsteps = b << (typebitsize / 8 - 1);
+		}else skipsteps = 0;
+		static std::size_t constexpr fullsets{typebitsize / 8 - (isabsvalue && issignmode)};
+		static std::size_t constexpr halfsets{fullsets >> 1};
+		tbase -= 256 * halfsets;
+		ubase -= 256 * halfsets;
+		if constexpr(1 + (isfltpmode && !issignmode && isabsvalue) < halfsets){
+			signed k{static_cast<signed>(halfsets - 1)};
 			do{// handle these sets like regular unsigned
-				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase, ubase)};
+				unsigned b{generateoffsetsshared<isdescsort, false, false, false, false>(count, tbase, ubase)};
 				tbase -= 256;
 				ubase -= 256;
 				paritybool ^= b;
 				skipsteps |= b << k;
 				--k;
 			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
-		}else{// handle this set like regular unsigned
-			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase, ubase)};
-			if constexpr(isfltpmode && !issignmode && isabsvalue){
-				tbase -= 256;
-				ubase -= 256;
-			}
+		}else if constexpr(1 + (isfltpmode && !issignmode && isabsvalue) == halfsets){// handle this set like regular unsigned
+			unsigned b{generateoffsetsshared<isdescsort, false, false, false, false>(count, tbase, ubase)};
 			paritybool ^= b;
-			if constexpr(issignmode) skipsteps |= b;
-			else skipsteps += b * 2;
+			if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+			else skipsteps |= b;
 		}
-		if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase, ubase)};
+		if constexpr((1 & fullsets) || isfltpmode && !issignmode && isabsvalue){	// handle the last split up set (for odd counts) and the least significant bit
+			unsigned b;
+			if constexpr(1 & fullsets) b = generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
+			else b = generateoffsetsshared<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets, offsetscompanion);
 			paritybool ^= b;
 			skipsteps |= b;
 		}
@@ -7969,9 +8062,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
 			tbase -= 256;
 			paritybool ^= b;
-			skipsteps |= b << (typebitsize / 8 - 1);
-		}
-		if constexpr(16 < typebitsize || !issignmode || !(isfltpmode && !issignmode && isabsvalue)){
+			skipsteps = b << (typebitsize / 8 - 1);
+		}else skipsteps = 0;
+		if constexpr(16 < typebitsize || !issignmode && !(isfltpmode && !issignmode && isabsvalue)){
 			signed k{typebitsize / 8 - 1 - issignmode};
 			do{// handle these sets like regular unsigned
 				unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
@@ -7982,15 +8075,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while((isfltpmode && !issignmode && isabsvalue)? 0 < k : 0 <= k);
 		}else{// handle this set like regular unsigned
 			unsigned b{generateoffsetssinglemain<isdescsort, false, false, false, false>(count, tbase)};
-			if constexpr(isfltpmode && !issignmode && isabsvalue){
-				tbase -= 256;
-			}
 			paritybool ^= b;
-			if constexpr(issignmode) skipsteps |= b;
-			else skipsteps += b * 2;
+			if constexpr(isfltpmode && !issignmode && isabsvalue) skipsteps = b << 1;
+			else skipsteps |= b;
 		}
 		if constexpr(isfltpmode && !issignmode && isabsvalue){	// handle the least significant bit
-			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, tbase)};
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode>(count, offsets)};
 			paritybool ^= b;
 			skipsteps |= b;
 		}
