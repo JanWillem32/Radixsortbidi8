@@ -32,8 +32,10 @@
 // These index parameters are typically used in a more straightforward manner and use regular indexing.
 // The variant with a getter function allows any number of extra arguments to pass on to the getter function.
 // Using a getter function that can throw (meaning that it lacks "noexcept") will incur some extra processing overhead.
-// Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_LIMIT to 1, 2, 4, 8 or 16 simultaneous threads.
+// Multithreading can be limited at compile-time by setting the macro RSBD8_THREAD_MAXIMUM to 1, 2, 4, 8 or 16 simultaneous threads.
 // There is no multithreading limit by default, but when multithreading is enabled, std::thread will be queried once per call to get the default available processor core count to the process.
+// Limits for multithreading based on the input count can be disabled at compile-time by setting the macro RSBD8_THREAD_MINIMUM to force using at least 4, 8 or 16 simultaneous threads.
+// This is again not enabled by default, and it only applies when processor cores are available at runtime. The much lower limits for allowing 2-way multithreading at runtime always apply.
 //
 // - bool succeeded{rsbd8::radixsort<&myclass::getterfunc>(count, inputarr, pagesizeoptional)};
 // - bool succeeded{rsbd8::radixsort<&myclass::member>(count, inputarr, pagesizeoptional)};
@@ -9024,7 +9026,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -9034,7 +9036,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<longdoubletest96, T> ||
 	std::is_same_v<longdoubletest80, T>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
@@ -9042,7 +9044,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -9496,7 +9498,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // radixsortnoalloc() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -9506,7 +9508,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<longdoubletest96, T> ||
 	std::is_same_v<longdoubletest80, T>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
@@ -9514,7 +9516,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -10669,7 +10671,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for multi-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -10681,14 +10683,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -11436,7 +11438,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for multi-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -11448,14 +11450,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -13054,7 +13056,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -13070,7 +13072,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
@@ -13079,7 +13081,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -13553,7 +13555,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -13569,7 +13571,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
@@ -13578,7 +13580,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -15627,7 +15629,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -15637,7 +15639,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
 	radixsortcopynoallocmulti2thread
@@ -15645,7 +15647,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -17115,7 +17117,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -17125,7 +17127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
 	radixsortnoallocmulti2thread
@@ -17133,7 +17135,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -18920,7 +18922,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -18931,14 +18933,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocsingle1thread
 #else
 	radixsortcopynoallocsingle2thread
 #endif
 	(std::size_t count, T const input[], T output[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -19172,7 +19174,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	>
@@ -19183,14 +19185,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocsingle1thread
 #else
 	radixsortnoallocsingle2thread
 #endif
 	(std::size_t count, T input[], T buffer[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -19768,7 +19770,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortcopynoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -19777,7 +19779,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocsingle1thread
 #else
 	radixsortcopynoallocsingle2thread
@@ -19785,7 +19787,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -20125,7 +20127,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // radixsortnoalloc() function implementation template for single-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_LIMIT) || 1 < (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	, bool ismultithreadcapable = true
 #endif
 	, typename... vararguments>
@@ -20134,7 +20136,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocsingle1thread
 #else
 	radixsortnoallocsingle2thread
@@ -20142,7 +20144,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if (ismultithreadcapable){
@@ -20415,7 +20417,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, T const input[], T output[]){radixsortcopynoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -20466,7 +20468,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, T input[], T buffer[]){radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
@@ -20514,7 +20516,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, V *const input[], V *output[], vararguments... varparameters){radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
@@ -20562,7 +20564,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, V *input[], V *buffer[], vararguments... varparameters){radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortcopynoallocsingle1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
@@ -20604,7 +20606,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	pcall(count, input, buffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 }
 
-#if defined(RSBD8_THREAD_LIMIT) && 4 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 4 > (RSBD8_THREAD_MAXIMUM)
 // simply reroute to the 1- or 2-thread functions
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
@@ -20616,7 +20618,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortcopynoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
@@ -20667,7 +20669,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortnoallocmulti1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
@@ -20716,7 +20718,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortcopynoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
@@ -20765,7 +20767,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
-#if defined(RSBD8_THREAD_LIMIT) && 1 >= (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortnoallocmulti1thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
@@ -20806,7 +20808,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	pcall(count, input, buffer, movetobuffer, varparameters...);// indirect calls only have a modest performance penalty on most platforms
 }
-#elif !defined(RSBD8_THREAD_LIMIT) || 4 <= (RSBD8_THREAD_LIMIT)
+#elif !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 // up to 16-way multithreading
 
 // helper functions for converting inputs to perform unsigned comparisons in a final merging phase
@@ -21995,7 +21997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
-#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	>
@@ -22006,7 +22008,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti4thread
@@ -22017,7 +22019,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
@@ -22025,7 +22027,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
 			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22047,9 +22049,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static constexpr void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 #endif
 			std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-			if(3 < reportedcores && limit4way < count){// 4-way limit
+			if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+				&& limit4way < count
+#endif
+				){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
@@ -22060,7 +22066,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			}
 #endif
 			// process the lower half (rounded down) here
@@ -22082,13 +22088,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 		}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	}else radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, output, buffer);
 #endif
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
-#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	>
@@ -22099,7 +22105,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti4thread
@@ -22109,7 +22115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
@@ -22117,7 +22123,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
 			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22139,9 +22145,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static constexpr void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 #endif
 			std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-			if(3 < reportedcores && limit4way < count){// 4-way limit
+			if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+				&& limit4way < count
+#endif
+				){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
@@ -22152,7 +22162,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			}
 #endif
 			// process the lower half (rounded down) here
@@ -22179,7 +22189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 		}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	}else radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>(count, input, buffer, movetobuffer);
 #endif
 }
@@ -22471,7 +22481,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
-#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	, typename... vararguments>
@@ -22480,7 +22490,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti4thread
@@ -22492,7 +22502,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
@@ -22500,7 +22510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
 			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22522,9 +22532,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static constexpr void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 #endif
 			std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-			if(3 < reportedcores && limit4way < count){// 4-way limit
+			if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+				&& limit4way < count
+#endif
+				){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
@@ -22535,7 +22549,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			}
 #endif
 			// process the lower half (rounded down) here
@@ -22557,13 +22571,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 		}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	}else radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, output, buffer, varparameters...);
 #endif
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
-#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	, typename... vararguments>
@@ -22572,7 +22586,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti4thread
@@ -22583,7 +22597,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
@@ -22591,7 +22605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// initial phase with regular sorting of both halves
 		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 		{
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
 			if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22613,9 +22627,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static constexpr void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 #endif
 			std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-			if(3 < reportedcores && limit4way < count){// 4-way limit
+			if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+				&& limit4way < count
+#endif
+				){// 4-way limit
 #endif
 				std::size_t const halfcount{count >> 1};// rounded down
 				try{
@@ -22626,7 +22644,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 				}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			}
 #endif
 			// process the lower half (rounded down) here
@@ -22653,12 +22671,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 		}
-#if defined(RSBD8_THREAD_LIMIT) && 8 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
 
-#if !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 // up to 8-way multithreading functions
 
 // function to establish the initial treshold for 8-way multithreading
@@ -22705,7 +22723,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
-#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	>
@@ -22716,7 +22734,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti8thread
@@ -22727,17 +22745,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				// select the smallest unsigned type for the indices
 				void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22759,9 +22781,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				static constexpr void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
 #endif
 				std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-				if(7 < reportedcores && limit8way < count){// 8-way limit
+				if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+					&& limit8way < count
+#endif
+					){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
@@ -22772,7 +22798,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				}
 #endif
 				// process the lower half (rounded down) here
@@ -22794,7 +22820,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 		}else{
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, T const input[], T output[], T buffer[]){radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
@@ -22820,7 +22846,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
-#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	>
@@ -22831,7 +22857,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti8thread
@@ -22841,17 +22867,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				// select the smallest unsigned type for the indices
 				void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
 				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22873,9 +22903,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				static constexpr void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
 #endif
 				std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-				if(7 < reportedcores && limit8way < count){// 8-way limit
+				if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+					&& limit8way < count
+#endif
+					){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
@@ -22886,7 +22920,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				}
 #endif
 				// process the lower half (rounded down) here
@@ -22913,7 +22947,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 		}else{
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, T input[], T buffer[], bool movetobuffer){radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>};
@@ -22939,7 +22973,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
-#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	, typename... vararguments>
@@ -22948,7 +22982,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti8thread
@@ -22960,17 +22994,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				// select the smallest unsigned type for the indices
 				void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -22992,9 +23030,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				static constexpr void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
 #endif
 				std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-				if(7 < reportedcores && limit8way < count){// 8-way limit
+				if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+					&& limit8way < count
+#endif
+					){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
@@ -23005,7 +23047,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				}
 #endif
 				// process the lower half (rounded down) here
@@ -23027,7 +23069,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 			}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 		}else{
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters){radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>};
@@ -23053,7 +23095,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V
-#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 	, typename X
 #endif
 	, typename... vararguments>
@@ -23062,7 +23104,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
 	void>
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti8thread
@@ -23073,17 +23115,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	unsigned reportedcores;// when this is 0, assume single-core
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 #endif
 			// initial phase with regular sorting of both halves
 			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 			{
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				// select the smallest unsigned type for the indices
 				void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
 				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
@@ -23105,9 +23151,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				static constexpr void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
 #endif
 				std::future<void> asynchandle;
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-				if(7 < reportedcores && limit8way < count){// 8-way limit
+				if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+					&& limit8way < count
+#endif
+					){// 8-way limit
 #endif
 					std::size_t const halfcount{count >> 1};// rounded down
 					try{
@@ -23118,7 +23168,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 					}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				}
 #endif
 				// process the lower half (rounded down) here
@@ -23145,7 +23195,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 			}
-#if defined(RSBD8_THREAD_LIMIT) && 16 > (RSBD8_THREAD_LIMIT)
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 		}else{
 			// select the smallest unsigned type for the indices
 			void(*pcall)(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters){radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
@@ -23169,9 +23219,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 #endif
 }
-#endif// !defined(RSBD8_THREAD_LIMIT) || 8 <= (RSBD8_THREAD_LIMIT)
+#endif// !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 
-#if !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 // up to 16-way multithreading functions
 
 // function to establish the initial treshold for 16-way multithreading
@@ -23234,9 +23284,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-			if(7 < reportedcores && limit8way < count){// 8-way limit
+			if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+				&& limit8way < count
+#endif
+				){// 8-way limit
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
@@ -23259,7 +23317,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-					if(15 < reportedcores && limit16way < count){// 16-way limit
+					if(15 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
+						&& limit16way < count
+#endif
+						){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
@@ -23348,9 +23410,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-			if(7 < reportedcores && limit8way < count){// 8-way limit
+			if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+				&& limit8way < count
+#endif
+				){// 8-way limit
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
@@ -23373,7 +23443,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
-					if(15 < reportedcores && limit16way < count){// 16-way limit
+					if(15 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
+						&& limit16way < count
+#endif
+						){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
@@ -23467,9 +23541,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-			if(7 < reportedcores && limit8way < count){// 8-way limit
+			if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+				&& limit8way < count
+#endif
+				){// 8-way limit
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
@@ -23492,7 +23574,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					if(15 < reportedcores && limit16way < count){// 16-way limit
+					if(15 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
+						&& limit16way < count
+#endif
+						){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
@@ -23580,9 +23666,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	if(0xFFu < count && 1 < (reportedcores = std::thread::hardware_concurrency())){// 2-way limit
 		static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-		if(3 < reportedcores && limit4way < count){// 4-way limit
+		if(3 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
+			&& limit4way < count
+#endif
+			){// 4-way limit
 			static std::size_t constexpr limit8way{base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-			if(7 < reportedcores && limit8way < count){// 8-way limit
+			if(7 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
+				&& limit8way < count
+#endif
+				){// 8-way limit
 				// initial phase with regular sorting of both halves
 				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
 				{
@@ -23605,7 +23699,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::future<void> asynchandle;
 					static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					if(15 < reportedcores && limit16way < count){// 16-way limit
+					if(15 < reportedcores
+#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
+						&& limit16way < count
+#endif
+						){// 16-way limit
 						std::size_t const halfcount{count >> 1};// rounded down
 						try{
 							// process the upper half (rounded up) separately if possible
@@ -23682,7 +23780,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>(count, input, buffer, movetobuffer, varparameters...);
 }
-#endif// !defined(RSBD8_THREAD_LIMIT) || 16 <= (RSBD8_THREAD_LIMIT)
+#endif// !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 #endif// 1- to 16-way multithreading function reroutes
 
 }// namespace helper
