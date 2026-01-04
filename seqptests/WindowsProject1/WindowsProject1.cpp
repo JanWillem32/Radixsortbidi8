@@ -824,7 +824,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1000,7 +1000,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<std::uint16_t *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1269,7 +1269,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<float *>(in), reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1540,7 +1540,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<double *>(in), reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1987,7 +1987,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::uint64_t *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2258,7 +2258,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::int64_t *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2529,7 +2529,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::uint32_t *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2800,7 +2800,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::int32_t *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3071,7 +3071,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::uint16_t *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3342,7 +3342,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::int16_t *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3613,7 +3613,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::uint8_t *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3884,7 +3884,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::int8_t *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3939,12 +3939,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		std::uint64_t u64start{__rdtsc()};
 
 #ifdef _WIN64
-		std::uint64_t *pSource{reinterpret_cast<std::uint64_t *>(in)};
-		std::uint64_t **pDest{reinterpret_cast<std::uint64_t **>(out)};
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 #else
-		std::uint32_t *pSource{reinterpret_cast<std::uint32_t *>(in)};
-		std::uint32_t **pDest{reinterpret_cast<std::uint32_t **>(out)};
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::uint32_t i{268435456ui32};// in 268435456 batches of 4 bytes
 #endif
 		do{
@@ -4050,12 +4050,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		std::uint64_t u64start{__rdtsc()};
 
 #ifdef _WIN64
-		std::uint64_t *pSource{reinterpret_cast<std::uint64_t *>(in)};
-		std::uint64_t **pDest{reinterpret_cast<std::uint64_t **>(out)};
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
 #else
-		std::uint32_t *pSource{reinterpret_cast<std::uint32_t *>(in)};
-		std::uint32_t **pDest{reinterpret_cast<std::uint32_t **>(out)};
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::uint32_t i{268435456ui32};// in 268435456 batches of 4 bytes
 #endif
 		do{
