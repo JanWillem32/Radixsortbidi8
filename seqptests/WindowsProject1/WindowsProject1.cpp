@@ -1088,6 +1088,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+#endif
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
 #endif
 		// stop measuring
@@ -1294,6 +1385,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728);// in 134217728 batches of 8 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"double std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1806,6 +1988,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint64_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+#endif
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
 #endif
 		// stop measuring
@@ -2012,6 +2285,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::int64_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2348,6 +2712,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint32_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+#endif
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
 #endif
 		// stop measuring
@@ -2554,6 +3009,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::int32_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2890,6 +3436,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint16_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+#endif
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
 #endif
 		// stop measuring
@@ -3096,6 +3733,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::int16_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3432,6 +4160,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint8_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+#endif
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
 		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
 #endif
 		// stop measuring
@@ -3638,6 +4457,97 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 
 		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+	}
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::memcpy(out, in, 1073741824);// dummy copy
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+	}
+	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+#endif
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::int8_t std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
+#endif
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
