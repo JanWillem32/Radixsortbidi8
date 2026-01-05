@@ -24142,7 +24142,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
@@ -24186,7 +24186,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
@@ -24416,7 +24416,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -24460,7 +24460,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -24673,7 +24673,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		radixsortnoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
@@ -24714,7 +24714,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
@@ -24931,7 +24931,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
@@ -24971,7 +24971,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			);
 		return{true};
 	}
-	return{false};
+	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
