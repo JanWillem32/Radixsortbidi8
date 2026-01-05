@@ -1024,6 +1024,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"half rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1206,6 +1207,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1386,6 +1388,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1568,6 +1571,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1924,6 +1928,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"encapsulated long double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2106,6 +2111,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2286,6 +2292,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2468,6 +2475,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2648,6 +2656,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2830,6 +2839,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3010,6 +3020,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3192,6 +3203,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3372,6 +3384,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3554,6 +3567,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3734,6 +3748,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3916,6 +3931,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4096,6 +4112,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4278,6 +4295,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4458,6 +4476,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
 	}
+#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4640,6 +4659,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
 #endif
 	}
+#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
