@@ -9418,7 +9418,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
@@ -9901,7 +9901,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
@@ -11357,7 +11357,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
@@ -12124,7 +12124,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
@@ -13453,7 +13453,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
@@ -13945,7 +13945,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
@@ -17022,7 +17022,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
@@ -18631,7 +18631,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // Function implementation templates for single-part types
@@ -19106,7 +19106,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// perform the bidirectional 8-bit sorting sequence
 			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets, usemultithread);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // main part, multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
@@ -19410,7 +19410,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// perform the bidirectional 8-bit sorting sequence
 			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, buffer, input, offsets, usemultithread);
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
@@ -20045,7 +20045,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, output, offsets, usemultithread, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
 // multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types with indirection
@@ -20402,7 +20402,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, buffer, input, offsets, usemultithread, varparameters...);
 			}
 		}
-	}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
 // 1- to 16-way multithreading function reroutes
@@ -24120,29 +24120,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<T>(count
+			{allocatearray<T>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortnoalloc<direction, mode, T>(count, input, buffer);// last parameter not filled in on purpose
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortnoalloc<direction, mode, T>(count, input, buffer);// last parameter not filled in on purpose
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
+				);
+			return{true};
+		}
+		return{false};
 	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
@@ -24164,29 +24167,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<T>(count
+			{allocatearray<T>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortcopynoalloc<direction, mode, T>(count, input, output, buffer);
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortcopynoalloc<direction, mode, T>(count, input, output, buffer);
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
-	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+				);
+			return{true};
+		}
+		return{false};
+	}else if(1 == count) *output = *input;// copy the single element if the count is 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function without indirection, which only allocates some memory prior to sorting arrays
@@ -24394,29 +24400,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<T *>(count
+			{allocatearray<T *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortnoalloc<direction, mode, indirection2, isindexed2, T>(count, input, buffer, false, varparameters...);
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortnoalloc<direction, mode, indirection2, isindexed2, T>(count, input, buffer, false, varparameters...);
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
+				);
+			return{true};
+		}
+		return{false};
 	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -24438,29 +24447,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<T *>(count
+			{allocatearray<T *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, buffer, varparameters...);
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, buffer, varparameters...);
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
-	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+				);
+			return{true};
+		}
+		return{false};
+	}else if(1 == count) *output = *input;// copy the single element if the count is 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -24651,29 +24663,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+				, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+				, mmapflags
 #endif
-		)};
-	if(buffer){
-		buffermemorywrapper<V *> guard{buffer
+			)};
+		if(buffer){
+			buffermemorywrapper<V *> guard{buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-		};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
-		radixsortnoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
-		return{true};
+			};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
+			radixsortnoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
+			return{true};
+		}
+		return{false};
 	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
@@ -24692,29 +24707,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		buffermemorywrapper<V *> guard{buffer
+			)};
+		if(buffer){
+			buffermemorywrapper<V *> guard{buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-		};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
-		radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
-		return{true};
-	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+			};// ensure the buffer is deallocated, even if an exception is thrown by the getter function here
+			radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
+			return{true};
+		}
+		return{false};
+	}else if(1 == count) *output = *input;// copy the single element if the count is 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with indirection, which only allocates some memory prior to sorting arrays
@@ -24909,29 +24927,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortnoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortnoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, buffer, false, varparameters...);
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
+				);
+			return{true};
+		}
+		return{false};
 	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the multi-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
@@ -24949,29 +24970,32 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	auto
+	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+		auto
 #if defined(_POSIX_C_SOURCE)
-		[buffer, allocsize]
+			[buffer, allocsize]
 #else
-		buffer
+			buffer
 #endif
-		{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
-		, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-		, mmapflags
+			, mmapflags
 #endif
-		)};
-	if(buffer){
-		radixsortcopynoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
-		deallocatearray(buffer
+			)};
+		if(buffer){
+			radixsortcopynoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
+			deallocatearray(buffer
 #if defined(_POSIX_C_SOURCE)
-			, allocsize
+				, allocsize
 #endif
-			);
-		return{true};
-	}
-	return{1 >= count};// the array is already considered sorted if the count is 0 or 1
+				);
+			return{true};
+		}
+		return{false};
+	}else if(1 == count) *output = *input;// copy the single element if the count is 1
+	return{true};// the array is already considered sorted if the count is 0 or 1
 }
 
 // Wrapper to implement the single-part radixsortcopy() function with with type and offset pointer indirection, which only allocates some memory prior to sorting arrays with indirection
