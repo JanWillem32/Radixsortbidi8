@@ -1535,7 +1535,7 @@ using tounifunsigned = std::conditional_t<1 == sizeof(T), unsigned char,
 	typename std::conditional_t<std::is_integral_v<T> || std::is_enum_v<T>, std::make_unsigned<T>, std::enable_if<true, void>>::type>>>>>>>;
 
 // Utility template to use add-with-carry operations if possible for the boolean operator less than
-template <typename U>
+template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
@@ -1575,7 +1575,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // Utility template to use add-with-carry operations if possible for the boolean operator less than or equal
-template <typename U>
+template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
@@ -9048,7 +9048,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -9520,7 +9520,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -10694,7 +10694,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -11461,7 +11461,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -13085,7 +13085,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -13584,7 +13584,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -15651,7 +15651,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -17139,7 +17139,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -18944,7 +18944,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -19196,7 +19196,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -19791,7 +19791,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -20148,7 +20148,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
 #endif
-	if (ismultithreadcapable){
+	if constexpr(ismultithreadcapable){
 		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
@@ -23834,7 +23834,7 @@ union PaddedUnion
 };
 
 // ~~~~~ Begin core modification ~~~~~
-template <
+template<
 	auto MemberPtr,
 	typename B,
 	std::size_t Low,
@@ -23854,7 +23854,7 @@ struct OffsetHelper{
 };
 // ~~~~~ End core modification ~~~~~
 
-template <auto MemberPtr, typename B>
+template<auto MemberPtr, typename B>
 constexpr std::size_t GetOffsetOf = OffsetHelper<MemberPtr, B, 0, sizeof(B)>::GetOffsetOf();
 // Section end
 
@@ -24120,7 +24120,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24167,7 +24167,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24400,7 +24400,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24447,7 +24447,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24663,7 +24663,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24707,7 +24707,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24927,7 +24927,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
@@ -24970,7 +24970,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
-	if (1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
