@@ -5,12 +5,18 @@
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // WindowsProject1.cpp : Defines the entry point for the application.
+// the test batch size for the performance tests (1 GiB default)
+#define TESTBATCHSIZE 1024 * 1024 * 1024
 
 #include "pch.h"
 #include "..\..\Radixsortbidi8.hpp"
 #include <Aclapi.h>
 #include <cmath>
-#include <algorithm>// just for std::sort() (wich strictly doesn't do the same) and std::stable_sort()
+#include <algorithm>// just for std::sort() (wich strictly doesn't do the same) an
+
+static_assert(!(15 & (TESTBATCHSIZE)), "TESTBATCHSIZE must be a multiple of 16");
+static_assert(!((TESTBATCHSIZE) - 1 & (TESTBATCHSIZE)), "limitation of the current implementation: TESTBATCHSIZE must be a power of two");
+static_assert(PTRDIFF_MAX >= (TESTBATCHSIZE), "limitation of the current implementation: TESTBATCHSIZE must be les than or equal to PTRDIFF_MAX");
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
@@ -610,13 +616,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	upLargePageSize = !upLargePageSize? 4096 : upLargePageSize;// just set it to 4096 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	std::size_t upLargePageSizem1{upLargePageSize - 1};
-	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(1073741824)) + 1073741824};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(TESTBATCHSIZE)) + (TESTBATCHSIZE)};// round up to the nearest multiple of upLargePageSize
 	void *in{VirtualAlloc(nullptr, upSizeIn, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
 	if(!in){
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(1073741824 + (upLargePageSize >> 1))) + (1073741824 + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>((TESTBATCHSIZE) + (upLargePageSize >> 1))) + ((TESTBATCHSIZE) + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -664,7 +670,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
 		std::uint64_t *pFIin{reinterpret_cast<std::uint64_t *>(in)};
-		std::uint32_t j{134217728ui32};// in 134217728 batches of 8 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 8};
 		do{
 			*pFIin++ = static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 60
 				| static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 30
@@ -680,7 +686,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -699,7 +705,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -736,7 +742,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -768,7 +774,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -787,7 +793,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -824,7 +830,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(1073741824, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -856,7 +862,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -875,7 +881,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -912,7 +918,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -944,7 +950,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -963,7 +969,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1000,7 +1006,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(536870912, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1033,7 +1039,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1052,7 +1058,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1089,7 +1095,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1113,7 +1119,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1124,7 +1130,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1143,7 +1149,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1180,7 +1186,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1204,7 +1210,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -1216,7 +1222,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1235,7 +1241,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1272,7 +1278,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(268435456, reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1296,7 +1302,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1306,7 +1312,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1325,7 +1331,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1362,7 +1368,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1386,7 +1392,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + 268435456));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -1397,7 +1403,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1416,7 +1422,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1453,7 +1459,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1477,7 +1483,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1488,7 +1494,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1507,7 +1513,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1544,7 +1550,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1568,7 +1574,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -1580,7 +1586,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1599,7 +1605,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1636,7 +1642,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(134217728, reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1660,7 +1666,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1670,7 +1676,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1689,7 +1695,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1726,7 +1732,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1750,7 +1756,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + 134217728));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1760,7 +1766,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1779,7 +1785,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1816,7 +1822,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(67108864, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);// in 67108864 batches of 16 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1848,7 +1854,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1867,7 +1873,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1904,7 +1910,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(67108864, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);// in 67108864 batches of 16 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1937,7 +1943,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1956,7 +1962,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1993,7 +1999,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2017,7 +2023,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2028,7 +2034,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2047,7 +2053,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2084,7 +2090,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2108,7 +2114,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -2120,7 +2126,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2139,7 +2145,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2176,7 +2182,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(134217728, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2200,7 +2206,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2210,7 +2216,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2229,7 +2235,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2266,7 +2272,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2290,7 +2296,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -2301,7 +2307,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2320,7 +2326,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2357,7 +2363,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2381,7 +2387,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2392,7 +2398,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2411,7 +2417,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2448,7 +2454,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728);// in 134217728 batches of 8 bytes
+		std::stable_sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2472,7 +2478,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -2484,7 +2490,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2503,7 +2509,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2540,7 +2546,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(134217728, reinterpret_cast<std::int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2564,7 +2570,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2574,7 +2580,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2593,7 +2599,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2630,7 +2636,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(134217728, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);// in 134217728 batches of 8 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2654,7 +2660,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + 134217728));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -2665,7 +2671,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2684,7 +2690,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2721,7 +2727,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2745,7 +2751,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2756,7 +2762,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2775,7 +2781,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2812,7 +2818,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2836,7 +2842,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -2848,7 +2854,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2867,7 +2873,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2904,7 +2910,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(268435456, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2928,7 +2934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2938,7 +2944,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2957,7 +2963,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2994,7 +3000,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3018,7 +3024,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -3029,7 +3035,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3048,7 +3054,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3085,7 +3091,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3109,7 +3115,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3120,7 +3126,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3139,7 +3145,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3176,7 +3182,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456);// in 268435456 batches of 4 bytes
+		std::stable_sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3200,7 +3206,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -3212,7 +3218,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3231,7 +3237,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3268,7 +3274,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(268435456, reinterpret_cast<std::int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3292,7 +3298,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3302,7 +3308,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3321,7 +3327,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3358,7 +3364,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(268435456, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);// in 268435456 batches of 4 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3382,7 +3388,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + 268435456));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -3393,7 +3399,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3412,7 +3418,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3449,7 +3455,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3473,7 +3479,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3484,7 +3490,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3503,7 +3509,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3540,7 +3546,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3564,7 +3570,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -3576,7 +3582,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3595,7 +3601,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3632,7 +3638,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(536870912, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3656,7 +3662,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3666,7 +3672,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3685,7 +3691,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3722,7 +3728,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3746,7 +3752,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -3757,7 +3763,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3776,7 +3782,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3813,7 +3819,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3837,7 +3843,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3848,7 +3854,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3867,7 +3873,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3904,7 +3910,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912);// in 536870912 batches of 2 bytes
+		std::stable_sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3928,7 +3934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -3940,7 +3946,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3959,7 +3965,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3996,7 +4002,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(536870912, reinterpret_cast<std::int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsort((TESTBATCHSIZE) / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4020,7 +4026,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4030,7 +4036,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4049,7 +4055,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4086,7 +4092,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(536870912, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);// in 536870912 batches of 2 bytes
+		rsbd8::radixsortcopy((TESTBATCHSIZE) / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4110,7 +4116,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + 536870912));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -4121,7 +4127,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4140,7 +4146,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4177,7 +4183,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4201,7 +4207,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4212,7 +4218,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4231,7 +4237,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4268,7 +4274,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4292,7 +4298,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -4304,7 +4310,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4323,7 +4329,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4360,7 +4366,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(1073741824, reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsort((TESTBATCHSIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4384,7 +4390,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4394,7 +4400,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4413,7 +4419,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4450,7 +4456,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy((TESTBATCHSIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4474,7 +4480,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
 	}
 #if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
 	// run an empty loop to warm up the caches first
@@ -4485,7 +4491,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4504,7 +4510,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4541,7 +4547,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4565,7 +4571,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4576,7 +4582,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4595,7 +4601,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4632,7 +4638,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824);// in 1073741824 batches of 1 byte
+		std::stable_sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4656,7 +4662,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
 #endif
 	}
 #endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
@@ -4668,7 +4674,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4687,7 +4693,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4724,7 +4730,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(1073741824, reinterpret_cast<std::int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsort((TESTBATCHSIZE), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4748,7 +4754,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
 	}
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4758,7 +4764,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4777,7 +4783,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::memcpy(out, in, 1073741824);// dummy copy
+		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4814,7 +4820,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy(1073741824, reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);// in 1073741824 batches of 1 byte
+		rsbd8::radixsortcopy((TESTBATCHSIZE), reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4838,7 +4844,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + 1073741824));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
 	}
 	// two basic indirection tests, these warm up the caches differently
 	// run an empty loop to warm up the caches first
@@ -4849,7 +4855,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4871,11 +4877,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		std::uint32_t i{(TESTBATCHSIZE) / 8};
 #else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::uint32_t i{268435456ui32};// in 268435456 batches of 4 bytes
+		std::uint32_t i{(TESTBATCHSIZE) / 4};
 #endif
 		do{
 			*pDest++ = pSource++;
@@ -4918,9 +4924,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		rsbd8::radixsort(
 #ifdef _WIN64
-			134217728, reinterpret_cast<std::uint64_t **>(out),// in 134217728 batches of 8 bytes
+			(TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t **>(out),
 #else
-			268435456, reinterpret_cast<std::uint32_t **>(out),// in 268435456 batches of 4 bytes
+			(TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t **>(out),
 #endif
 			upLargePageSize);
 
@@ -4960,7 +4966,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{67108864ui32};// in 67108864 batches of 16 bytes
+		std::uint32_t j{(TESTBATCHSIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4982,11 +4988,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::uint32_t i{134217728ui32};// in 134217728 batches of 8 bytes
+		std::uint32_t i{(TESTBATCHSIZE) / 8};
 #else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::uint32_t i{268435456ui32};// in 268435456 batches of 4 bytes
+		std::uint32_t i{(TESTBATCHSIZE) / 4};
 #endif
 		do{
 			*pDest++ = pSource++;
@@ -5029,9 +5035,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		rsbd8::radixsort(
 #ifdef _WIN64
-			134217728, reinterpret_cast<double **>(out),// in 134217728 batches of 8 bytes
+			(TESTBATCHSIZE) / 8, reinterpret_cast<double **>(out),
 #else
-			268435456, reinterpret_cast<float **>(out),// in 268435456 batches of 4 bytes
+			(TESTBATCHSIZE) / 4, reinterpret_cast<float **>(out),
 #endif
 			upLargePageSize);
 
