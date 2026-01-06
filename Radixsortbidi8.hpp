@@ -8438,7 +8438,25 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				U outea{psrchi[0].signexponent};
+				std::uint_least64_t outma{psrchi[0].mantissa};
+				U outeb{psrchi[-1].signexponent};
+				std::uint_least64_t outmb{psrchi[-1].mantissa};
+				psrchi -= 2;
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+			}while(--j);
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				U outea{psrchi[0].signexponent};
@@ -8504,8 +8522,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 			{
-				{
 handletop16:
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						U outea{psrchi[0].signexponent};
+						std::uint_least64_t outma{psrchi[0].mantissa};
+						U outeb{psrchi[-1].signexponent};
+						std::uint_least64_t outmb{psrchi[-1].mantissa};
+						psrchi -= 2;
+						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
 					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 					do{// fill the array, four at a time
 						U outea{psrchi[0].signexponent};
@@ -8553,35 +8589,55 @@ handletop16:
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
 				}
 handletop8:
-				std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-				do{// fill the array, four at a time
-					U outea{psrchi[0].signexponent};
-					std::uint_least64_t outma{psrchi[0].mantissa};
-					U outeb{psrchi[-1].signexponent};
-					std::uint_least64_t outmb{psrchi[-1].mantissa};
-					U outec{psrchi[-2].signexponent};
-					std::uint_least64_t outmc{psrchi[-2].mantissa};
-					U outed{psrchi[-3].signexponent};
-					std::uint_least64_t outmd{psrchi[-3].mantissa};
-					psrchi -= 4;
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-					std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
-					std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
-					std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
-					std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					T *pwc = pdst + offsetc;
-					T *pwd = pdst + offsetd;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-					pwc[0].signexponent = static_cast<W>(outec);
-					pwc[0].mantissa = outmc;
-					pwd[0].signexponent = static_cast<W>(outed);
-					pwd[0].mantissa = outmd;
-				}while(--j);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						U outea{psrchi[0].signexponent};
+						std::uint_least64_t outma{psrchi[0].mantissa};
+						U outeb{psrchi[-1].signexponent};
+						std::uint_least64_t outmb{psrchi[-1].mantissa};
+						psrchi -= 2;
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+					do{// fill the array, four at a time
+						U outea{psrchi[0].signexponent};
+						std::uint_least64_t outma{psrchi[0].mantissa};
+						U outeb{psrchi[-1].signexponent};
+						std::uint_least64_t outmb{psrchi[-1].mantissa};
+						U outec{psrchi[-2].signexponent};
+						std::uint_least64_t outmc{psrchi[-2].mantissa};
+						U outed{psrchi[-3].signexponent};
+						std::uint_least64_t outmd{psrchi[-3].mantissa};
+						psrchi -= 4;
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
+						std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						T *pwc = pdst + offsetc;
+						T *pwd = pdst + offsetd;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+						pwc[0].signexponent = static_cast<W>(outec);
+						pwc[0].mantissa = outmc;
+						pwd[0].signexponent = static_cast<W>(outed);
+						pwd[0].mantissa = outmd;
+					}while(--j);
+				}
 				break;// no further processing beyond the top part
 			}
 		}
@@ -8633,50 +8689,70 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	shifter *= 8;
 	for(;;){
 		if constexpr(ismultithreadcapable){
-			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-			while(0 <= --j){// fill the array, four at a time
-				U outea{psrclo[0].signexponent};
-				std::uint_least64_t outma{psrclo[0].mantissa};
-				U outeb{psrclo[1].signexponent};
-				std::uint_least64_t outmb{psrclo[1].mantissa};
-				U outec{psrclo[2].signexponent};
-				std::uint_least64_t outmc{psrclo[2].mantissa};
-				U outed{psrclo[3].signexponent};
-				std::uint_least64_t outmd{psrclo[3].mantissa};
-				psrclo += 4;
-				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				std::size_t offsetc{poffset[curc]++};
-				std::size_t offsetd{poffset[curd]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				T *pwc = pdst + offsetc;
-				T *pwd = pdst + offsetd;
-				pwa[0].signexponent = static_cast<W>(outea);
-				pwa[0].mantissa = outma;
-				pwb[0].signexponent = static_cast<W>(outeb);
-				pwb[0].mantissa = outmb;
-				pwc[0].signexponent = static_cast<W>(outec);
-				pwc[0].mantissa = outmc;
-				pwd[0].signexponent = static_cast<W>(outed);
-				pwd[0].mantissa = outmd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				U outea{psrclo[0].signexponent};
-				std::uint_least64_t outma{psrclo[0].mantissa};
-				U outeb{psrclo[1].signexponent};
-				std::uint_least64_t outmb{psrclo[1].mantissa};
-				psrclo += 2;
-				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				pwa[0].signexponent = static_cast<W>(outea);
-				pwa[0].mantissa = outma;
-				pwb[0].signexponent = static_cast<W>(outeb);
-				pwb[0].mantissa = outmb;
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					U outea{psrclo[0].signexponent};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{psrclo[1].signexponent};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					psrclo += 2;
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					U outea{psrclo[0].signexponent};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{psrclo[1].signexponent};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					U outec{psrclo[2].signexponent};
+					std::uint_least64_t outmc{psrclo[2].mantissa};
+					U outed{psrclo[3].signexponent};
+					std::uint_least64_t outmd{psrclo[3].mantissa};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					std::size_t offsetc{poffset[curc]++};
+					std::size_t offsetd{poffset[curd]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					T *pwc = pdst + offsetc;
+					T *pwd = pdst + offsetd;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+					pwc[0].signexponent = static_cast<W>(outec);
+					pwc[0].mantissa = outmc;
+					pwd[0].signexponent = static_cast<W>(outed);
+					pwd[0].mantissa = outmd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					U outea{psrclo[0].signexponent};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{psrclo[1].signexponent};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					psrclo += 2;
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				U oute{psrclo[0].signexponent};
@@ -8756,50 +8832,70 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			{
 handletop16:
 				if constexpr(ismultithreadcapable){
-					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-					while(0 <= --j){// fill the array, four at a time
-						U outea{psrclo[0].signexponent};
-						std::uint_least64_t outma{psrclo[0].mantissa};
-						U outeb{psrclo[1].signexponent};
-						std::uint_least64_t outmb{psrclo[1].mantissa};
-						U outec{psrclo[2].signexponent};
-						std::uint_least64_t outmc{psrclo[2].mantissa};
-						U outed{psrclo[3].signexponent};
-						std::uint_least64_t outmd{psrclo[3].mantissa};
-						psrclo += 4;
-						auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-						std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
-						std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						T *pwc = pdst + offsetc;
-						T *pwd = pdst + offsetd;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
-						pwc[0].signexponent = static_cast<W>(outec);
-						pwc[0].mantissa = outmc;
-						pwd[0].signexponent = static_cast<W>(outed);
-						pwd[0].mantissa = outmd;
-					}
-					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-						U outea{psrclo[0].signexponent};
-						std::uint_least64_t outma{psrclo[0].mantissa};
-						U outeb{psrclo[1].signexponent};
-						std::uint_least64_t outmb{psrclo[1].mantissa};
-						psrclo += 2;
-						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, two at a time
+							U outea{psrclo[0].signexponent};
+							std::uint_least64_t outma{psrclo[0].mantissa};
+							U outeb{psrclo[1].signexponent};
+							std::uint_least64_t outmb{psrclo[1].mantissa};
+							psrclo += 2;
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							T *pwa = pdst + offseta;
+							T *pwb = pdst + offsetb;
+							pwa[0].signexponent = static_cast<W>(outea);
+							pwa[0].mantissa = outma;
+							pwb[0].signexponent = static_cast<W>(outeb);
+							pwb[0].mantissa = outmb;
+						}
+					}else{// architecture: limit to four at a time when there's a decent amount of registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, four at a time
+							U outea{psrclo[0].signexponent};
+							std::uint_least64_t outma{psrclo[0].mantissa};
+							U outeb{psrclo[1].signexponent};
+							std::uint_least64_t outmb{psrclo[1].mantissa};
+							U outec{psrclo[2].signexponent};
+							std::uint_least64_t outmc{psrclo[2].mantissa};
+							U outed{psrclo[3].signexponent};
+							std::uint_least64_t outmd{psrclo[3].mantissa};
+							psrclo += 4;
+							auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
+							std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
+							T *pwa = pdst + offseta;
+							T *pwb = pdst + offsetb;
+							T *pwc = pdst + offsetc;
+							T *pwd = pdst + offsetd;
+							pwa[0].signexponent = static_cast<W>(outea);
+							pwa[0].mantissa = outma;
+							pwb[0].signexponent = static_cast<W>(outeb);
+							pwb[0].mantissa = outmb;
+							pwc[0].signexponent = static_cast<W>(outec);
+							pwc[0].mantissa = outmc;
+							pwd[0].signexponent = static_cast<W>(outed);
+							pwd[0].mantissa = outmd;
+						}
+						if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+							U outea{psrclo[0].signexponent};
+							std::uint_least64_t outma{psrclo[0].mantissa};
+							U outeb{psrclo[1].signexponent};
+							std::uint_least64_t outmb{psrclo[1].mantissa};
+							psrclo += 2;
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							T *pwa = pdst + offseta;
+							T *pwb = pdst + offsetb;
+							pwa[0].signexponent = static_cast<W>(outea);
+							pwa[0].mantissa = outma;
+							pwb[0].signexponent = static_cast<W>(outeb);
+							pwb[0].mantissa = outmb;
+						}
 					}
 					if(!(1 & count)){// fill in the final item for odd counts
 						U oute{psrclo[0].signexponent};
@@ -8860,50 +8956,70 @@ handletop16:
 			}
 handletop8:
 			if constexpr(ismultithreadcapable){
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					U outea{psrclo[0].signexponent};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{psrclo[1].signexponent};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					U outec{psrclo[2].signexponent};
-					std::uint_least64_t outmc{psrclo[2].mantissa};
-					U outed{psrclo[3].signexponent};
-					std::uint_least64_t outmd{psrclo[3].mantissa};
-					psrclo += 4;
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-					std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
-					std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					T *pwc = pdst + offsetc;
-					T *pwd = pdst + offsetd;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-					pwc[0].signexponent = static_cast<W>(outec);
-					pwc[0].mantissa = outmc;
-					pwd[0].signexponent = static_cast<W>(outed);
-					pwd[0].mantissa = outmd;
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					U outea{psrclo[0].signexponent};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{psrclo[1].signexponent};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					psrclo += 2;
-					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, two at a time
+						U outea{psrclo[0].signexponent};
+						std::uint_least64_t outma{psrclo[0].mantissa};
+						U outeb{psrclo[1].signexponent};
+						std::uint_least64_t outmb{psrclo[1].mantissa};
+						psrclo += 2;
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+					}
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, four at a time
+						U outea{psrclo[0].signexponent};
+						std::uint_least64_t outma{psrclo[0].mantissa};
+						U outeb{psrclo[1].signexponent};
+						std::uint_least64_t outmb{psrclo[1].mantissa};
+						U outec{psrclo[2].signexponent};
+						std::uint_least64_t outmc{psrclo[2].mantissa};
+						U outed{psrclo[3].signexponent};
+						std::uint_least64_t outmd{psrclo[3].mantissa};
+						psrclo += 4;
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
+						std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						T *pwc = pdst + offsetc;
+						T *pwd = pdst + offsetd;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+						pwc[0].signexponent = static_cast<W>(outec);
+						pwc[0].mantissa = outmc;
+						pwd[0].signexponent = static_cast<W>(outed);
+						pwd[0].mantissa = outmd;
+					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						U outea{psrclo[0].signexponent};
+						std::uint_least64_t outma{psrclo[0].mantissa};
+						U outeb{psrclo[1].signexponent};
+						std::uint_least64_t outmb{psrclo[1].mantissa};
+						psrclo += 2;
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						T *pwa = pdst + offseta;
+						T *pwb = pdst + offsetb;
+						pwa[0].signexponent = static_cast<W>(outea);
+						pwa[0].mantissa = outma;
+						pwb[0].signexponent = static_cast<W>(outeb);
+						pwb[0].mantissa = outmb;
+					}
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					U oute{psrclo[0].signexponent};
@@ -10325,7 +10441,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				U outa{psrchi[0]};
+				U outb{psrchi[-1]};
+				psrchi -= 2;
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				pdst[offseta] = static_cast<T>(outa);
+				pdst[offsetb] = static_cast<T>(outb);
+			}while(--j);
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				U outa{psrchi[0]};
@@ -10381,23 +10509,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
-			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-			do{// fill the array, four at a time
-				U outa{psrchi[0]};
-				U outb{psrchi[-1]};
-				U outc{psrchi[-2]};
-				U outd{psrchi[-3]};
-				psrchi -= 4;
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-				std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
-				std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				std::size_t offsetc{offsetscompanion[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				std::size_t offsetd{offsetscompanion[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				pdst[offseta] = static_cast<T>(outa);
-				pdst[offsetb] = static_cast<T>(outb);
-				pdst[offsetc] = static_cast<T>(outc);
-				pdst[offsetd] = static_cast<T>(outd);
-			}while(--j);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+				do{// fill the array, two at a time
+					U outa{psrchi[0]};
+					U outb{psrchi[-1]};
+					psrchi -= 2;
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+				}while(--j);
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+				do{// fill the array, four at a time
+					U outa{psrchi[0]};
+					U outb{psrchi[-1]};
+					U outc{psrchi[-2]};
+					U outd{psrchi[-3]};
+					psrchi -= 4;
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					std::size_t offsetc{offsetscompanion[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					std::size_t offsetd{offsetscompanion[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+					pdst[offsetc] = static_cast<T>(outc);
+					pdst[offsetd] = static_cast<T>(outd);
+				}while(--j);
+			}
 			break;// no further processing beyond the top part
 		}
 	}
@@ -10444,32 +10586,46 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	shifter *= 8;
 	for(;;){
 		if constexpr(ismultithreadcapable){
-			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-			while(0 <= --j){// fill the array, four at a time
-				U outa{psrclo[0]};
-				U outb{psrclo[1]};
-				U outc{psrclo[2]};
-				U outd{psrclo[3]};
-				psrclo += 4;
-				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				std::size_t offsetc{poffset[curc]++};
-				std::size_t offsetd{poffset[curd]++};
-				pdst[offseta] = static_cast<T>(outa);
-				pdst[offsetb] = static_cast<T>(outb);
-				pdst[offsetc] = static_cast<T>(outc);
-				pdst[offsetd] = static_cast<T>(outd);
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				U outa{psrclo[0]};
-				U outb{psrclo[1]};
-				psrclo += 2;
-				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				pdst[offseta] = static_cast<T>(outa);
-				pdst[offsetb] = static_cast<T>(outb);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					U outa{psrclo[0]};
+					U outb{psrclo[1]};
+					psrclo += 2;
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+				}
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					U outa{psrclo[0]};
+					U outb{psrclo[1]};
+					U outc{psrclo[2]};
+					U outd{psrclo[3]};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					std::size_t offsetc{poffset[curc]++};
+					std::size_t offsetd{poffset[curd]++};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+					pdst[offsetc] = static_cast<T>(outc);
+					pdst[offsetd] = static_cast<T>(outd);
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					U outa{psrclo[0]};
+					U outb{psrclo[1]};
+					psrclo += 2;
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = static_cast<T>(outa);
+					pdst[offsetb] = static_cast<T>(outb);
+				}
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				U out{psrclo[0]};
@@ -10536,32 +10692,46 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(ismultithreadcapable){
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					U outa{psrclo[0]};
-					U outb{psrclo[1]};
-					U outc{psrclo[2]};
-					U outd{psrclo[3]};
-					psrclo += 4;
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					pdst[offseta] = static_cast<T>(outa);
-					pdst[offsetb] = static_cast<T>(outb);
-					pdst[offsetc] = static_cast<T>(outc);
-					pdst[offsetd] = static_cast<T>(outd);
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					U outa{psrclo[0]};
-					U outb{psrclo[1]};
-					psrclo += 2;
-					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode,T, U>(outa, outb)};
-					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					pdst[offseta] = static_cast<T>(outa);
-					pdst[offsetb] = static_cast<T>(outb);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, two at a time
+						U outa{psrclo[0]};
+						U outb{psrclo[1]};
+						psrclo += 2;
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = static_cast<T>(outa);
+						pdst[offsetb] = static_cast<T>(outb);
+					}
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, four at a time
+						U outa{psrclo[0]};
+						U outb{psrclo[1]};
+						U outc{psrclo[2]};
+						U outd{psrclo[3]};
+						psrclo += 4;
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = static_cast<T>(outa);
+						pdst[offsetb] = static_cast<T>(outb);
+						pdst[offsetc] = static_cast<T>(outc);
+						pdst[offsetd] = static_cast<T>(outd);
+					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						U outa{psrclo[0]};
+						U outb{psrclo[1]};
+						psrclo += 2;
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode,T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = static_cast<T>(outa);
+						pdst[offsetb] = static_cast<T>(outb);
+					}
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					U out{psrclo[0]};
@@ -12451,7 +12621,23 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				psrchi -= 2;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}while(--j);
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				V *pa{psrchi[0]};
@@ -12521,8 +12707,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 			{
-				{
 handletop16:
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						psrchi -= 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
 					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 					do{// fill the array, four at a time
 						V *pa{psrchi[0]};
@@ -12574,31 +12776,49 @@ handletop16:
 					}
 				}
 handletop8:
-				std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-				do{// fill the array, four at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
-					V *pc{psrchi[-2]};
-					V *pd{psrchi[-3]};
-					psrchi -= 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-					std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
-					std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
-					std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
-					std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-					pdst[offsetc] = pc;
-					pdst[offsetd] = pd;
-				}while(--j);
+				if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						psrchi -= 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+					do{// fill the array, four at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						V *pc{psrchi[-2]};
+						V *pd{psrchi[-3]};
+						psrchi -= 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
+						std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}while(--j);
+				}
 				break;// no further processing beyond the top part
 			}
 		}
@@ -12656,44 +12876,62 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	shifter *= 8;
 	for(;;){
 		if constexpr(ismultithreadcapable){
-			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-			while(0 <= --j){// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
-				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				std::size_t offsetc{poffset[curc]++};
-				std::size_t offsetd{poffset[curd]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					std::size_t offsetc{poffset[curc]++};
+					std::size_t offsetd{poffset[curd]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
@@ -12777,44 +13015,62 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			{
 handletop16:
 				if constexpr(ismultithreadcapable){
-					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-					while(0 <= --j){// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
-						psrclo += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-						std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
-						std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}
-					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
+					if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, two at a time
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							psrclo += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+						}
+					}else{// architecture: limit to four at a time when there's a decent amount of registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, four at a time
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							V *pc{psrclo[2]};
+							V *pd{psrclo[3]};
+							psrclo += 4;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
+							std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+							pdst[offsetc] = pc;
+							pdst[offsetd] = pd;
+						}
+						if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							psrclo += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+						}
 					}
 					if(!(1 & count)){// fill in the final item for odd counts
 						V *p{psrclo[0]};
@@ -12880,44 +13136,62 @@ handletop16:
 			}
 handletop8:
 			if constexpr(ismultithreadcapable){
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
-					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-					std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
-					std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-					pdst[offsetc] = pc;
-					pdst[offsetd] = pd;
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-					std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
+				if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, two at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, four at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						V *pc{psrclo[2]};
+						V *pd{psrclo[3]};
+						psrclo += 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
+						std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
@@ -15196,7 +15470,23 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop8;// rare, but possible
 	shifter *= 8;
 	for(;;){
-		{
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				psrchi -= 2;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}while(--j);
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				V *pa{psrchi[0]};
@@ -15268,31 +15558,49 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
-			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-			do{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
-				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-				std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
-				std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				std::size_t offsetc{offsetscompanion[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				std::size_t offsetd{offsetscompanion[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}while(--j);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+				do{// fill the array, two at a time
+					V *pa{psrchi[0]};
+					V *pb{psrchi[-1]};
+					psrchi -= 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}while(--j);
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+				do{// fill the array, four at a time
+					V *pa{psrchi[0]};
+					V *pb{psrchi[-1]};
+					V *pc{psrchi[-2]};
+					V *pd{psrchi[-3]};
+					psrchi -= 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					std::size_t offsetc{offsetscompanion[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					std::size_t offsetd{offsetscompanion[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}while(--j);
+			}
 			break;// no further processing beyond the top part
 		}
 	}
@@ -15338,44 +15646,62 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	shifter *= 8;
 	for(;;){
 		if constexpr(ismultithreadcapable){
-			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-			while(0 <= --j){// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
-				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				std::size_t offsetc{poffset[curc]++};
-				std::size_t offsetd{poffset[curd]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}
-			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-				std::size_t offsetb{poffset[curb]++};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					std::size_t offsetc{poffset[curc]++};
+					std::size_t offsetd{poffset[curd]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
@@ -15460,44 +15786,62 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		{
 handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
 			if constexpr(ismultithreadcapable){
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
-					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-					pdst[offsetc] = pc;
-					pdst[offsetd] = pd;
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, two at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, four at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						V *pc{psrclo[2]};
+						V *pd{psrclo[3]};
+						psrclo += 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
@@ -18729,31 +19073,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsetscompanion);
 	T const *psrchi{psrclo + count};
-	std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-	do{// fill the array, four at a time
-		U outa{psrchi[0]};
-		U outb{psrchi[-1]};
-		U outc{psrchi[-2]};
-		U outd{psrchi[-3]};
-		psrchi -= 4;
-		auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-		std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-		if constexpr(false){// useless if not using indirection: isrevorder){
-			offseta = offsetscompanion[cura]++;// the next item will be placed one higher
-			offsetb = offsetscompanion[curb]++;
-			offsetc = offsetscompanion[curc]++;
-			offsetd = offsetscompanion[curd]++;
-		}else{
-			offseta = offsetscompanion[cura]--;// the next item will be placed one lower
-			offsetb = offsetscompanion[curb]--;
-			offsetc = offsetscompanion[curc]--;
-			offsetd = offsetscompanion[curd]--;
-		}
-		pdst[offseta] = static_cast<T>(outa);
-		pdst[offsetb] = static_cast<T>(outb);
-		pdst[offsetc] = static_cast<T>(outc);
-		pdst[offsetd] = static_cast<T>(outd);
-	}while(--j);
+	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+		do{// fill the array, two at a time
+			U outa{psrchi[0]};
+			U outb{psrchi[-1]};
+			psrchi -= 2;
+			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
+				offsetb = offsetscompanion[curb]++;
+			}else{
+				offseta = offsetscompanion[cura]--;// the next item will be placed one lower
+				offsetb = offsetscompanion[curb]--;
+			}
+			pdst[offseta] = static_cast<T>(outa);
+			pdst[offsetb] = static_cast<T>(outb);
+		}while(--j);
+	}else{// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			U outa{psrchi[0]};
+			U outb{psrchi[-1]};
+			U outc{psrchi[-2]};
+			U outd{psrchi[-3]};
+			psrchi -= 4;
+			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(false){// useless if not using indirection: isrevorder){
+				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
+				offsetb = offsetscompanion[curb]++;
+				offsetc = offsetscompanion[curc]++;
+				offsetd = offsetscompanion[curd]++;
+			}else{
+				offseta = offsetscompanion[cura]--;// the next item will be placed one lower
+				offsetb = offsetscompanion[curb]--;
+				offsetc = offsetscompanion[curc]--;
+				offsetd = offsetscompanion[curd]--;
+			}
+			pdst[offseta] = static_cast<T>(outa);
+			pdst[offsetb] = static_cast<T>(outb);
+			pdst[offsetc] = static_cast<T>(outc);
+			pdst[offsetd] = static_cast<T>(outd);
+		}while(--j);
+	}
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
@@ -18773,46 +19137,66 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsets);
 	if constexpr(ismultithreadcapable){
-		std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-		while(0 <= --j){// fill the array, four at a time
-			U outa{psrclo[0]};
-			U outb{psrclo[1]};
-			U outc{psrclo[2]};
-			U outd{psrclo[3]};
-			psrclo += 4;
-			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
-				offseta = offsets[cura]--;// the next item will be placed one lower
-				offsetb = offsets[curb]--;
-				offsetc = offsets[curc]--;
-				offsetd = offsets[curd]--;
-			}else{
-				offseta = offsets[cura]++;// the next item will be placed one higher
-				offsetb = offsets[curb]++;
-				offsetc = offsets[curc]++;
-				offsetd = offsets[curd]++;
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				U outa{psrclo[0]};
+				U outb{psrclo[1]};
+				psrclo += 2;
+				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(false){// useless if not using indirection: isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+				}
+				pdst[offseta] = static_cast<T>(outa);
+				pdst[offsetb] = static_cast<T>(outb);
 			}
-			pdst[offseta] = static_cast<T>(outa);
-			pdst[offsetb] = static_cast<T>(outb);
-			pdst[offsetc] = static_cast<T>(outc);
-			pdst[offsetd] = static_cast<T>(outd);
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			U outa{psrclo[0]};
-			U outb{psrclo[1]};
-			psrclo += 2;
-			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
-				offseta = offsets[cura]--;// the next item will be placed one lower
-				offsetb = offsets[curb]--;
-			}else{
-				offseta = offsets[cura]++;// the next item will be placed one higher
-				offsetb = offsets[curb]++;
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				U outa{psrclo[0]};
+				U outb{psrclo[1]};
+				U outc{psrclo[2]};
+				U outd{psrclo[3]};
+				psrclo += 4;
+				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(false){// useless if not using indirection: isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+					offsetc = offsets[curc]--;
+					offsetd = offsets[curd]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+					offsetc = offsets[curc]++;
+					offsetd = offsets[curd]++;
+				}
+				pdst[offseta] = static_cast<T>(outa);
+				pdst[offsetb] = static_cast<T>(outb);
+				pdst[offsetc] = static_cast<T>(outc);
+				pdst[offsetd] = static_cast<T>(outd);
 			}
-			pdst[offseta] = static_cast<T>(outa);
-			pdst[offsetb] = static_cast<T>(outb);
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				U outa{psrclo[0]};
+				U outb{psrclo[1]};
+				psrclo += 2;
+				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(false){// useless if not using indirection: isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+				}
+				pdst[offseta] = static_cast<T>(outa);
+				pdst[offsetb] = static_cast<T>(outb);
+			}
 		}
 		if(!(1 & count)){// fill in the final item for odd counts
 			U out{psrclo[0]};
@@ -19536,39 +19920,63 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsetscompanion);
 	V *const *psrchi{psrclo + count};
-	std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-	do{// fill the array, four at a time
-		V *pa{psrchi[0]};
-		V *pb{psrchi[-1]};
-		V *pc{psrchi[-2]};
-		V *pd{psrchi[-3]};
-		psrchi -= 4;
-		auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-		auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-		auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-		auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-		auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-		auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-		auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-		auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-		auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-		std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-		if constexpr(isrevorder){
-			offseta = offsetscompanion[cura]++;// the next item will be placed one higher
-			offsetb = offsetscompanion[curb]++;
-			offsetc = offsetscompanion[curc]++;
-			offsetd = offsetscompanion[curd]++;
-		}else{
-			offseta = offsetscompanion[cura]--;// the next item will be placed one lower
-			offsetb = offsetscompanion[curb]--;
-			offsetc = offsetscompanion[curc]--;
-			offsetd = offsetscompanion[curd]--;
-		}
-		pdst[offseta] = pa;
-		pdst[offsetb] = pb;
-		pdst[offsetc] = pc;
-		pdst[offsetd] = pd;
-	}while(--j);
+	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+		do{// fill the array, two at a time
+			V *pa{psrchi[0]};
+			V *pb{psrchi[-1]};
+			psrchi -= 2;
+			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
+				offsetb = offsetscompanion[curb]++;
+			}else{
+				offseta = offsetscompanion[cura]--;// the next item will be placed one lower
+				offsetb = offsetscompanion[curb]--;
+			}
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+		}while(--j);
+	}else{// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			V *pa{psrchi[0]};
+			V *pb{psrchi[-1]};
+			V *pc{psrchi[-2]};
+			V *pd{psrchi[-3]};
+			psrchi -= 4;
+			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+			auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+			auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+			if constexpr(isrevorder){
+				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
+				offsetb = offsetscompanion[curb]++;
+				offsetc = offsetscompanion[curc]++;
+				offsetd = offsetscompanion[curd]++;
+			}else{
+				offseta = offsetscompanion[cura]--;// the next item will be placed one lower
+				offsetb = offsetscompanion[curb]--;
+				offsetc = offsetscompanion[curc]--;
+				offsetd = offsetscompanion[curd]--;
+			}
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+			pdst[offsetc] = pc;
+			pdst[offsetd] = pd;
+		}while(--j);
+	}
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
@@ -19587,58 +19995,82 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsets);
 	if constexpr(ismultithreadcapable){
-		std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-		while(0 <= --j){// fill the array, four at a time
-			V *pa{psrclo[0]};
-			V *pb{psrclo[1]};
-			V *pc{psrclo[2]};
-			V *pd{psrclo[3]};
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
-			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-			U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
-			U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
-			psrclo += 4;
-			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(isrevorder){
-				offseta = offsets[cura]--;// the next item will be placed one lower
-				offsetb = offsets[curb]--;
-				offsetc = offsets[curc]--;
-				offsetd = offsets[curd]--;
-			}else{
-				offseta = offsets[cura]++;// the next item will be placed one higher
-				offsetb = offsets[curb]++;
-				offsetc = offsets[curc]++;
-				offsetd = offsets[curd]++;
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+				psrclo += 2;
+				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+				}
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
 			}
-			pdst[offseta] = pa;
-			pdst[offsetb] = pb;
-			pdst[offsetc] = pc;
-			pdst[offsetd] = pd;
-		}
-		if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-			V *pa{psrclo[0]};
-			V *pb{psrclo[1]};
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
-			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-			psrclo += 2;
-			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(isrevorder){
-				offseta = offsets[cura]--;// the next item will be placed one lower
-				offsetb = offsets[curb]--;
-			}else{
-				offseta = offsets[cura]++;// the next item will be placed one higher
-				offsetb = offsets[curb]++;
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				V *pc{psrclo[2]};
+				V *pd{psrclo[3]};
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+				U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
+				U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
+				psrclo += 4;
+				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+					offsetc = offsets[curc]--;
+					offsetd = offsets[curd]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+					offsetc = offsets[curc]++;
+					offsetd = offsets[curd]++;
+				}
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
 			}
-			pdst[offseta] = pa;
-			pdst[offsetb] = pb;
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+				psrclo += 2;
+				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
+				if constexpr(isrevorder){
+					offseta = offsets[cura]--;// the next item will be placed one lower
+					offsetb = offsets[curb]--;
+				}else{
+					offseta = offsets[cura]++;// the next item will be placed one higher
+					offsetb = offsets[curb]++;
+				}
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
 		}
 		if(!(1 & count)){// fill in the final item for odd counts
 			V *p{psrclo[0]};
