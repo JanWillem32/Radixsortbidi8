@@ -6,7 +6,9 @@
 
 // WindowsProject1.cpp : Defines the entry point for the application.
 // the test batch size for the performance tests (1 GiB default)
-#define TESTBATCHSIZE 1024 * 1024 * 1024
+#define RSBD8_TEST_BATCH_SIZE 1024 * 1024 * 1024
+// the entire benchmarks for the external std::sort() and std::stable_sort() calls can be disabled by uncommenting the following line
+//#define RSBD8_DISABLE_BENCHMARK_EXTERNAL
 
 #include "pch.h"
 #include "..\..\Radixsortbidi8.hpp"
@@ -14,9 +16,9 @@
 #include <cmath>
 #include <algorithm>// just for std::sort() (wich strictly doesn't do the same) an
 
-static_assert(!(15 & (TESTBATCHSIZE)), "TESTBATCHSIZE must be a multiple of 16");
-static_assert(!((TESTBATCHSIZE) - 1 & (TESTBATCHSIZE)), "limitation of the current implementation: TESTBATCHSIZE must be a power of two");
-static_assert(PTRDIFF_MAX >= (TESTBATCHSIZE), "limitation of the current implementation: TESTBATCHSIZE must be les than or equal to PTRDIFF_MAX");
+static_assert(!(15 & (RSBD8_TEST_BATCH_SIZE)), "RSBD8_TEST_BATCH_SIZE must be a multiple of 16");
+static_assert(!((RSBD8_TEST_BATCH_SIZE) - 1 & (RSBD8_TEST_BATCH_SIZE)), "limitation of the current implementation: RSBD8_TEST_BATCH_SIZE must be a power of two");
+static_assert(PTRDIFF_MAX >= (RSBD8_TEST_BATCH_SIZE), "limitation of the current implementation: RSBD8_TEST_BATCH_SIZE must be les than or equal to PTRDIFF_MAX");
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
@@ -611,18 +613,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// TODO: add more unit tests
 	}
 
-	// allocate 1 GiB for the in- and outputs
+	// allocate RSBD8_TEST_BATCH_SIZE for the in- and outputs
 	SIZE_T upLargePageSize{GetLargePageMinimum()};
 	upLargePageSize = !upLargePageSize? 4096 : upLargePageSize;// just set it to 4096 if the system doesn't support large pages
 	assert(!(upLargePageSize - 1 & upLargePageSize));// only one bit should be set in the value of upLargePageSize
 	std::size_t upLargePageSizem1{upLargePageSize - 1};
-	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(TESTBATCHSIZE)) + (TESTBATCHSIZE)};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeIn{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>(RSBD8_TEST_BATCH_SIZE)) + (RSBD8_TEST_BATCH_SIZE)};// round up to the nearest multiple of upLargePageSize
 	void *in{VirtualAlloc(nullptr, upSizeIn, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
 	if(!in){
 		MessageBoxW(nullptr, L"out of memory failure", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 		return{0};// failure status
 	}
-	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>((TESTBATCHSIZE) + (upLargePageSize >> 1))) + ((TESTBATCHSIZE) + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
+	std::size_t upSizeOut{(upLargePageSizem1 & -static_cast<std::ptrdiff_t>((RSBD8_TEST_BATCH_SIZE) + (upLargePageSize >> 1))) + ((RSBD8_TEST_BATCH_SIZE) + (upLargePageSize >> 1))};// round up to the nearest multiple of upLargePageSize
 	void *oriout{VirtualAlloc(nullptr, upSizeOut, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};// add half a page
 	if(!oriout){
 		BOOL boVirtualFree{VirtualFree(in, 0, MEM_RELEASE)};
@@ -670,7 +672,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
 		std::uint64_t *pFIin{reinterpret_cast<std::uint64_t *>(in)};
-		std::uint32_t j{(TESTBATCHSIZE) / 8};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 8};
 		do{
 			*pFIin++ = static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 60
 				| static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 30
@@ -678,15 +680,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--j);
 	}
 
+	bool succeeded;// used to check for successful sorting, or repeat runs if needed
+
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -703,15 +707,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -723,13 +727,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -742,7 +745,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -765,16 +768,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"mini rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -791,15 +794,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -811,13 +814,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -830,7 +831,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -853,16 +854,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"mini rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -879,15 +880,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -899,13 +900,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -918,7 +918,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -941,16 +941,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"half rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -967,15 +967,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -987,13 +987,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1006,7 +1004,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1029,8 +1027,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"half rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1039,7 +1037,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1056,15 +1054,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1076,13 +1074,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1095,7 +1092,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4);
+		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1119,7 +1116,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1130,7 +1127,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1147,15 +1144,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1167,13 +1164,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1186,7 +1182,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4);
+		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1210,19 +1206,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1239,15 +1235,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1259,13 +1255,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1278,7 +1273,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1302,17 +1297,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
-	}
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1329,15 +1324,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1349,13 +1344,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1368,7 +1361,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1392,9 +1385,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (TESTBATCHSIZE) / 4));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1403,7 +1396,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1420,15 +1413,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1440,13 +1433,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1459,7 +1451,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8);
+		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1483,7 +1475,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1494,7 +1486,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1511,15 +1503,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1531,13 +1523,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1550,7 +1541,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8);
+		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1574,19 +1565,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1603,15 +1594,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1623,13 +1614,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1642,7 +1632,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1666,17 +1656,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
-	}
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1693,15 +1683,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1713,13 +1703,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1732,7 +1720,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1756,17 +1744,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (TESTBATCHSIZE) / 8));
-	}
+		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1783,15 +1771,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1803,13 +1791,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1822,7 +1809,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1845,16 +1832,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"encapsulated long double rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1871,15 +1858,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1891,13 +1878,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1910,7 +1895,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1933,8 +1918,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		OutputDebugStringW(L"encapsulated long double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -1943,7 +1928,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1960,15 +1945,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -1980,13 +1965,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -1999,7 +1983,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8);
+		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2023,7 +2007,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2034,7 +2018,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2051,15 +2035,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2071,13 +2055,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2090,7 +2073,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8);
+		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2114,19 +2097,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2143,15 +2126,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2163,13 +2146,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2182,7 +2164,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2206,17 +2188,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2233,15 +2215,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2253,13 +2235,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2272,7 +2252,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t const *>(in), reinterpret_cast<std::uint64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2296,9 +2276,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (TESTBATCHSIZE) / 8));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2307,7 +2287,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2324,15 +2304,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2344,13 +2324,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2363,7 +2342,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8);
+		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2387,7 +2366,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2398,7 +2377,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2415,15 +2394,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2435,13 +2414,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2454,7 +2432,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8);
+		std::stable_sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2478,19 +2456,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2507,15 +2485,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2527,13 +2505,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2546,7 +2523,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2570,17 +2547,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2597,15 +2574,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2617,13 +2594,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2636,7 +2611,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::int64_t const *>(in), reinterpret_cast<std::int64_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2660,9 +2635,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (TESTBATCHSIZE) / 8));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -2671,7 +2646,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2688,15 +2663,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2708,13 +2683,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2727,7 +2701,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4);
+		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2751,7 +2725,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2762,7 +2736,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2779,15 +2753,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2799,13 +2773,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2818,7 +2791,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4);
+		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2842,19 +2815,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2871,15 +2844,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2891,13 +2864,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -2910,7 +2882,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2934,17 +2906,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2961,15 +2933,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -2981,13 +2953,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3000,7 +2970,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t const *>(in), reinterpret_cast<std::uint32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3024,9 +2994,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (TESTBATCHSIZE) / 4));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3035,7 +3005,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3052,15 +3022,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3072,13 +3042,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3091,7 +3060,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4);
+		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3115,7 +3084,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3126,7 +3095,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3143,15 +3112,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3163,13 +3132,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3182,7 +3150,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4);
+		std::stable_sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3206,19 +3174,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3235,15 +3203,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3255,13 +3223,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3274,7 +3241,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3298,17 +3265,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3325,15 +3292,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3345,13 +3312,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3364,7 +3329,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::int32_t const *>(in), reinterpret_cast<std::int32_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3388,9 +3353,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (TESTBATCHSIZE) / 4));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3399,7 +3364,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3416,15 +3381,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3436,13 +3401,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3455,7 +3419,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2);
+		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3479,7 +3443,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3490,7 +3454,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3507,15 +3471,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3527,13 +3491,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3546,7 +3509,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2);
+		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3570,19 +3533,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3599,15 +3562,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3619,13 +3582,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3638,7 +3600,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3662,17 +3624,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3689,15 +3651,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3709,13 +3671,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3728,7 +3688,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3752,9 +3712,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (TESTBATCHSIZE) / 2));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -3763,7 +3723,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3780,15 +3740,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3800,13 +3760,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3819,7 +3778,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2);
+		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3843,7 +3802,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3854,7 +3813,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3871,15 +3830,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3891,13 +3850,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -3910,7 +3868,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2);
+		std::stable_sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3934,19 +3892,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3963,15 +3921,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -3983,13 +3941,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4002,7 +3959,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE) / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4026,17 +3983,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4053,15 +4010,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4073,13 +4030,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4092,7 +4047,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE) / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::int16_t const *>(in), reinterpret_cast<std::int16_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4116,9 +4071,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (TESTBATCHSIZE) / 2));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4127,7 +4082,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4144,15 +4099,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4164,13 +4119,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4183,7 +4137,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE));
+		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4207,7 +4161,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4218,7 +4172,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4235,15 +4189,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4255,13 +4209,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4274,7 +4227,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE));
+		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4298,19 +4251,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4327,15 +4280,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4347,13 +4300,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4366,7 +4318,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4390,17 +4342,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4417,15 +4369,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4437,13 +4389,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4456,7 +4406,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4480,9 +4430,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (TESTBATCHSIZE)));
-	}
-#if !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	{
@@ -4491,7 +4441,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4508,15 +4458,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4528,13 +4478,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4547,7 +4496,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE));
+		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4571,7 +4520,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4582,7 +4531,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4599,15 +4548,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4619,13 +4568,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4638,7 +4586,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE));
+		std::stable_sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4662,19 +4610,19 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
-#endif// !defined(RSBD8_DISABLE_BENCHMARK_EXTERNAL) || !(RSBD8_DISABLE_BENCHMARK_EXTERNAL)
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4691,15 +4639,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4711,13 +4659,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4730,7 +4677,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort((TESTBATCHSIZE), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4754,17 +4701,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4781,15 +4728,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		std::memcpy(out, in, (TESTBATCHSIZE));// dummy copy
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// dummy copy
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4801,13 +4748,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4820,7 +4765,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsortcopy((TESTBATCHSIZE), reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::int8_t const *>(in), reinterpret_cast<std::int8_t *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4844,18 +4789,18 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (TESTBATCHSIZE)));
-	}
+		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+	}while(!succeeded);
 	// two basic indirection tests, these warm up the caches differently
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4877,11 +4822,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::uint32_t i{(TESTBATCHSIZE) / 8};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
 #else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::uint32_t i{(TESTBATCHSIZE) / 4};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
 #endif
 		do{
 			*pDest++ = pSource++;
@@ -4908,8 +4853,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -4920,21 +4864,21 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
-		rsbd8::radixsort(
+		succeeded = rsbd8::radixsort(
 #ifdef _WIN64
-			(TESTBATCHSIZE) / 8, reinterpret_cast<std::uint64_t **>(out),
+			(RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t **>(out),
 #else
-			(TESTBATCHSIZE) / 4, reinterpret_cast<std::uint32_t **>(out),
+			(RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t **>(out),
 #endif
 			upLargePageSize);
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -4946,7 +4890,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		OutputDebugStringW(
@@ -4957,16 +4901,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #endif
 		);
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
+	do{
 		// filled initialization of the output part
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::uint32_t j{(TESTBATCHSIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4983,26 +4927,26 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
 #ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::uint32_t i{(TESTBATCHSIZE) / 8};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
 #else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::uint32_t i{(TESTBATCHSIZE) / 4};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
 #endif
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
 
 		// stop measuring
-		std::uint64_t u64stop;
+		std::uint64_t u64wstop;
 		{
 			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
+			u64wstop = __rdtscp(&uAux);
 			static_cast<void>(uAux);
 		}
 		{
@@ -5014,13 +4958,12 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
 		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
 		//OutputDebugStringW(szTicksRu64Text);
-	}
-	{// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
 		{
 			int cpuInfo[4];// unused
@@ -5033,11 +4976,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		rsbd8::radixsort(
+		succeeded = rsbd8::radixsort(
 #ifdef _WIN64
-			(TESTBATCHSIZE) / 8, reinterpret_cast<double **>(out),
+			(RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double **>(out),
 #else
-			(TESTBATCHSIZE) / 4, reinterpret_cast<float **>(out),
+			(RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float **>(out),
 #endif
 			upLargePageSize);
 
@@ -5068,7 +5011,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 #endif
 		);
 		OutputDebugStringW(szTicksRu64Text);
-	}
+	}while(!succeeded);
 
 	// benchmark finished time
 	WritePaddedu64(szTicksRu64Text, PerfCounter100ns());
