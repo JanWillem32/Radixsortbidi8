@@ -14,7 +14,8 @@
 #include "..\..\Radixsortbidi8.hpp"
 #include <Aclapi.h>
 #include <cmath>
-#include <algorithm>// just for std::sort() (wich strictly doesn't do the same) an
+#include <algorithm>// for std::sort() (wich strictly doesn't do the same), std::stable_sort() and std::is_sorted()
+#include <execution>// for std::execution::par_unseq (std::sort(), std::stable_sort() and std::is_sorted() parameter)
 
 static_assert(!(15 & (RSBD8_TEST_BATCH_SIZE)), "RSBD8_TEST_BATCH_SIZE must be a multiple of 16");
 static_assert(!((RSBD8_TEST_BATCH_SIZE) - 1 & (RSBD8_TEST_BATCH_SIZE)), "limitation of the current implementation: RSBD8_TEST_BATCH_SIZE must be a power of two");
@@ -1092,7 +1093,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1116,7 +1117,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1182,7 +1183,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1206,7 +1207,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -1297,7 +1298,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1385,7 +1386,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -1451,7 +1452,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1475,7 +1476,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -1541,7 +1542,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1565,7 +1566,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -1656,7 +1657,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1744,7 +1745,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		//assert(std::is_sorted(reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		//assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -1983,7 +1984,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2007,7 +2008,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2073,7 +2074,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2097,7 +2098,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -2188,7 +2189,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2276,7 +2277,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -2342,7 +2343,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2366,7 +2367,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2432,7 +2433,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2456,7 +2457,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -2547,7 +2548,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2635,7 +2636,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int64_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int64_t *>(out), reinterpret_cast<std::int64_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -2701,7 +2702,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2725,7 +2726,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -2791,7 +2792,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -2815,7 +2816,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -2906,7 +2907,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -2994,7 +2995,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -3060,7 +3061,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3084,7 +3085,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3150,7 +3151,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3174,7 +3175,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -3265,7 +3266,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3353,7 +3354,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int32_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int32_t *>(out), reinterpret_cast<std::int32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -3419,7 +3420,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3443,7 +3444,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3509,7 +3510,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3533,7 +3534,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -3624,7 +3625,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -3712,7 +3713,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -3778,7 +3779,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3802,7 +3803,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -3868,7 +3869,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -3892,7 +3893,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -3983,7 +3984,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4071,7 +4072,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int16_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int16_t *>(out), reinterpret_cast<std::int16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -4137,7 +4138,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4161,7 +4162,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4227,7 +4228,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4251,7 +4252,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -4342,7 +4343,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4430,7 +4431,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::uint8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::uint8_t *>(out), reinterpret_cast<std::uint8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
@@ -4496,7 +4497,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4520,7 +4521,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 	// run an empty loop to warm up the caches first
@@ -4586,7 +4587,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		std::stable_sort(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE));
 #endif
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4610,7 +4611,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 #ifndef _DEBUG// skip in debug builds as it is way too slow
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 #endif
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -4701,7 +4702,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 	}while(!succeeded);
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4789,9 +4790,124 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(L"std::int8_t rsbd8::radixsortcopy() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 
-		assert(std::is_sorted(reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
+		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 	}while(!succeeded);
 	// two basic indirection tests, these warm up the caches differently
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+#ifdef _WIN64
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
+#endif
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64wstart{__rdtsc()};
+
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		std::stable_sort(std::execution::par_unseq, 
+#ifdef _WIN64
+			reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
+#else
+			reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / 4,
+#endif
+			indlesslambda);
+#endif
+
+		// stop measuring
+		std::uint64_t u64wstop;
+		{
+			unsigned int uAux;// unused
+			u64wstop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"std::uint64_t * std::stable_sort() test\n"
+#else
+			L"std::uint32_t * std::stable_sort() test\n"
+#endif
+		);
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	do{
@@ -4902,6 +5018,121 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		);
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	// run an empty loop to warm up the caches first
+	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
+	{
+		// filled initialization of the output part
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+		__m128 xf{_mm_undefined_ps()};
+		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
+		float *pFIout{reinterpret_cast<float *>(out)};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		do{
+			_mm_stream_ps(pFIout, xf);
+			pFIout += 4;
+		}while(--j);
+
+		// start measuring
+		SwitchToThread();// prevent context switching during the benchmark
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+#ifdef _WIN64
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
+#endif
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		std::uint64_t u64wstart{__rdtsc()};
+
+#ifndef _DEBUG// skip in debug builds as it is way too slow
+		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		std::stable_sort(std::execution::par_unseq, 
+#ifdef _WIN64
+			reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
+#else
+			reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + (RSBD8_TEST_BATCH_SIZE) / 4,
+#endif
+			indlesslambda);
+#endif
+
+		// stop measuring
+		std::uint64_t u64wstop;
+		{
+			unsigned int uAux;// unused
+			u64wstop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+			static_cast<void>(cpuInfo);
+			static_cast<void>(cpuInfo[0]);
+			static_cast<void>(cpuInfo[1]);
+			static_cast<void>(cpuInfo[2]);
+			static_cast<void>(cpuInfo[3]);
+		}
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"double * std::stable_sort() test\n"
+#else
+			L"float * std::stable_sort() test\n"
+#endif
+		);
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	do{
