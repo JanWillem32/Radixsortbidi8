@@ -21991,27 +21991,24 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
-	// 0xFFFFFFFFu is generated for the unfiltered 16-bit case, which is just under 8 GiB of input data
-	// for unfiltered 32-bit it's 2 GiB, and for unfiltered 64-bit it's .5 GiB
-	// 0xFFFFFFFFu disables 4-way multithreading on 32-bit systems, and this upper limit still fits into a std::size_t
-	static double constexpr base{// inverse cubic exponential scaling
-		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
+	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
+	// for unfiltered 16-bit it's 80 GiB, and for half-precision floating point it's 70 GiB
+	// for unfiltered 32-bit it's 5 GiB, and for float it's 4.375 GiB
+	// for unfiltered 64-bit it's 320 MiB, and for double it's 280 MiB
+	// for unfiltered 80-bit it's 131.072 MiB, and for 80-bit floating point it's 114.688 MiB
+	static double constexpr base{// inverse quartic exponential scaling
+		0x5p50 / static_cast<double>(typebitsizesqr * typebitsizesqr)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
-		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
-#if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
-		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
-#endif
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
-		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
-#endif
-		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
+		* ((isabsvalue && isfltpmode)? 15. / 16. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue != isfltpmode)? 7. / 8. : 1.)// 4 modes with around three extra filtering steps per input value
+		* (indirection? 12. : 1.)// indirection typically doubles the memory access costs, which doesn't scale linearly for the merging phase
 	};
+	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
-	// signed intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::uint_least32_t>(static_cast<std::int_least32_t>(intermediate)) + 0x80000000u)};
+	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
 }
 
 // multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
@@ -23132,39 +23129,29 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::size_t> base8waythreshold()noexcept{// TODO: this is purely 1.5 on top of the 4-way factor, adjust this formula after more benchmarking
+	std::size_t> base8waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
-	// 0xFFFFFFFFu is generated for the unfiltered 16-bit case, which is just under 8 GiB of input data
-	// for unfiltered 32-bit it's 2 GiB, and for unfiltered 64-bit it's .5 GiB
-	// 0xFFFFFFFFu disables 4-way multithreading on 32-bit systems, and this upper limit still fits into a std::size_t
-	static double constexpr base{1.5 * // inverse cubic exponential scaling
-		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
+	// for unfiltered 16-bit it's 128 GiB, and for half-precision floating point it's 112 GiB
+	// for unfiltered 32-bit it's 32 GiB, and for float it's 28 GiB
+	// for unfiltered 64-bit it's 8 GiB, and for double it's 7 GiB
+	// for unfiltered 80-bit it's 5.12 GiB, and for 80-bit floating point it's 4.48 GiB
+	static double constexpr base{// inverse square exponential scaling
+		0x1p45 / static_cast<double>(typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
-		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
-#if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
-		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
-#endif
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
-		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
-#endif
-		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
+		* ((isabsvalue && isfltpmode)? 15. / 16. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue != isfltpmode)? 7. / 8. : 1.)// 4 modes with around three extra filtering steps per input value
+		* (indirection? 12. : 1.)// indirection typically doubles the memory access costs, which doesn't scale linearly for the merging phase
 	};
+	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
-	// signed intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		intermediate
-#else// apply clamping on 32-bit systems and smaller, this will effectively disable 8-way multithreading when the limit is reached
-		std::min(intermediate, 0x7FFFFFFFp0)
-#endif
-		)) + 0x80000000u};
+	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -23685,39 +23672,29 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::size_t> base16waythreshold()noexcept{// TODO: this is purely 3 on top of the 4-way factor, adjust this formula after more benchmarking
+	std::size_t> base16waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
-	// 0xFFFFFFFFu is generated for the unfiltered 16-bit case, which is just under 8 GiB of input data
-	// for unfiltered 32-bit it's 2 GiB, and for unfiltered 64-bit it's .5 GiB
-	// 0xFFFFFFFFu disables 4-way multithreading on 32-bit systems, and this upper limit still fits into a std::size_t
-	static double constexpr base{3. * // inverse cubic exponential scaling
-		0xFFFFFFFFp0 * 4096. / static_cast<double>(typebitsize * typebitsize * typebitsize)
+	// for unfiltered 16-bit it's 256 GiB, and for half-precision floating point it's 224 GiB
+	// for unfiltered 32-bit it's 128 GiB, and for float it's 112 GiB
+	// for unfiltered 64-bit it's 64 GiB, and for double it's 56 GiB
+	// for unfiltered 80-bit it's 51.2 GiB, and for 80-bit floating point it's 44.8 GiB
+	static double constexpr base{// inverse linear scaling
+		0x1p42 / static_cast<double>(typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
-		* ((isabsvalue && isfltpmode)? 3. / 4. : 1.)// 2 modes with one extra filtering step per input value
-		* ((isabsvalue != isfltpmode)? 1. / 4. : 1.)// 4 modes with around three extra filtering steps per input value
-#if 0xFFFFFFFFFFFFFFFFu >= UINTPTR_MAX
-		* ((64 < typebitsize)? 1. / 2. : 1.)// larger types on 64-bit and smaller systems require more work
-#endif
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
-		* ((32 < typebitsize)? 1. / 2. : 1.)// large types on 32-bit and smaller systems require more work
-#endif
-		* (indirection? 1. / 2. : 1.)// indirection requires extra processing and typically doubles the memory access overhead
+		* ((isabsvalue && isfltpmode)? 15. / 16. : 1.)// 2 modes with one extra filtering step per input value
+		* ((isabsvalue != isfltpmode)? 7. / 8. : 1.)// 4 modes with around three extra filtering steps per input value
+		* (indirection? 12. : 1.)// indirection typically doubles the memory access costs, which doesn't scale linearly for the merging phase
 	};
+	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (0x80000000p0 + ((base < 0x80000000p0)? .5 : -.5))};
-	// signed intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		intermediate
-#else// apply clamping on 32-bit systems and smaller, this will effectively disable 16-way multithreading when the limit is reached
-		std::min(intermediate, 0x7FFFFFFFp0)
-#endif
-		)) + 0x80000000u};
+	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
