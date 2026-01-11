@@ -7321,16 +7321,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
 	*t = 0;// the first offset always starts at zero
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
-		t -= isdescsort * 2 - 1;
-		u -= isdescsort * 2 - 1;
+		t += 1 - isdescsort * 2;
+		u += 1 - isdescsort * 2;
 		unsigned j{256 / 2 - 1};
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-			t -= isdescsort * 2 - 1;
-			u -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
+			u += 1 - isdescsort * 2;
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -7346,8 +7346,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-			t -= isdescsort * 2 - 1;
-			u -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
+			u += 1 - isdescsort * 2;
 			offset -= difference * (isdescsort * 2 - 1);
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -7356,33 +7356,33 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			t += isdescsort * 2 - 1;// step back
 			u += isdescsort * 2 - 1;
-			unsigned j{(256 - 2) / 2};// double the number of items per loop
+			unsigned j{256 / 2 - 1};// double the number of items per loop
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
 				*t = static_cast<X>(offset);
-				u[isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd, high half
+				u[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
-				difference = static_cast<U>(t[isdescsort * -6 + 3]) + static_cast<U>(u[isdescsort * -6 + 3]);// odd
-				t[isdescsort * -6 + 3] = static_cast<X>(offset);
+				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
+				t[3 - isdescsort * 6] = static_cast<X>(offset);
 				*u = static_cast<X>(offset - 1);// even, high half
-				t += isdescsort * -4 + 2;// step forward twice
-				u += isdescsort * -4 + 2;
+				t += 2 - isdescsort * 4;// step forward twice
+				u += 2 - isdescsort * 4;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// all other modes
-			t -= isdescsort * 2 - 1;
-			u -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
+			u += 1 - isdescsort * 2;
 			unsigned j{256 - 2};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 				*t = static_cast<X>(offset);
 				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-				t -= isdescsort * 2 - 1;
-				u -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
+				u += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -7808,14 +7808,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(isrevorder){
 		t[stride] = 0;// high half, the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
-			t -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -7830,7 +7830,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				t[stride] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -7838,30 +7838,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
-				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				unsigned j{256 / 2 - 1};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};// even
 					t[stride] = static_cast<X>(offset);// high half
-					t[isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd
+					t[1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
-					difference = t[isdescsort * -6 + 3];// odd
-					t[stride + isdescsort * -6 + 3] = static_cast<X>(offset);// high half
+					difference = t[3 - isdescsort * 6];// odd
+					t[stride + 3 - isdescsort * 6] = static_cast<X>(offset);// high half
 					*t = static_cast<X>(offset - 1);// even
-					t += isdescsort * -4 + 2;// step forward twice
+					t += 2 - isdescsort * 4;// step forward twice
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}else{// all other modes
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				unsigned j{256 - 2};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
 					t[stride] = static_cast<X>(static_cast<X>(offset));// high half
 					t[isdescsort * 2 - 1] = static_cast<X>(offset - 1);
-					t -= isdescsort * 2 - 1;
+					t += 1 - isdescsort * 2;
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -7875,14 +7875,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else{// not reversed order
 		*t = 0;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
-			t -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -7897,7 +7897,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				offset -= difference * (isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -7905,30 +7905,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				t += isdescsort * 2 - 1;// step back
-				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				unsigned j{256 / 2 - 1};// double the number of items per loop
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};// even
 					*t = static_cast<X>(offset);
-					t[stride + isdescsort * -2 + 1] = static_cast<X>(offset - 1);// odd, high half
+					t[stride + 1 - isdescsort * 2] = static_cast<X>(offset - 1);// odd, high half
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
-					difference = t[isdescsort * -6 + 3];// odd
-					t[isdescsort * -6 + 3] = static_cast<X>(offset);
+					difference = t[3 - isdescsort * 6];// odd
+					t[3 - isdescsort * 6] = static_cast<X>(offset);
 					t[stride] = static_cast<X>(offset - 1);// even, high half
-					t += isdescsort * -4 + 2;// step forward twice
+					t += 2 - isdescsort * 4;// step forward twice
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
 			}else{// all other modes
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				unsigned j{256 - 2};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
 					*t = static_cast<X>(offset);
 					t[stride + isdescsort * 2 - 1] = static_cast<X>(offset - 1);// high half
-					t -= isdescsort * 2 - 1;
+					t += 1 - isdescsort * 2;
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -19233,8 +19233,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				filler = isdescsort? 0x80 : 0x7F;
-				t -= isdescsort * 2 - 1;// step back
-				u -= isdescsort * 2 - 1;// step back
+				t += 1 - isdescsort * 2;// step back
+				u += 1 - isdescsort * 2;// step back
 				unsigned j{256 / 4 - 1};// double the number of items per loop
 				do{
 					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
@@ -19242,8 +19242,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler - 0x80, length));// only 8 bits are used
 					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
 					filler += isdescsort * 2 - 1;
-					t -= isdescsort * -4 + 2;// step forward twice
-					u -= isdescsort * -4 + 2;
+					t += isdescsort * 4 - 2;// step forward twice
+					u += isdescsort * 4 - 2;
 				}while(--j);
 				pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
 				length = static_cast<U>(*t) + static_cast<U>(*u);// even
@@ -19428,15 +19428,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 				// note: regular floating-point mode is not relevant here
 				filler = isdescsort? 0x7F : 0x80;
-				t -= isdescsort * 2 - 1;
-				u -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
+				u += 1 - isdescsort * 2;
 				unsigned j{256 / 2 - 1};
 				do{
 					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 					length = static_cast<U>(*t) + static_cast<U>(*u);
-					filler -= isdescsort * 2 - 1;
-					t -= isdescsort * 2 - 1;
-					u -= isdescsort * 2 - 1;
+					filler += 1 - isdescsort * 2;
+					t += 1 - isdescsort * 2;
+					u += 1 - isdescsort * 2;
 				}while(--j);
 			}else{// unsigned or signed absolute
 				// note: both regular absolute modes are not relevant here
@@ -19450,25 +19450,25 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 						length = static_cast<U>(*t) + static_cast<U>(*u);// even
 						pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
-						length = static_cast<U>(t[isdescsort * -6 + 3]) + static_cast<U>(u[isdescsort * -6 + 3]);// odd
-						filler -= isdescsort * 2 - 1;
-						t += isdescsort * -4 + 2;// step forward twice
-						u += isdescsort * -4 + 2;
+						length = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
+						filler += 1 - isdescsort * 2;
+						t += 2 - isdescsort * 4;// step forward twice
+						u += 2 - isdescsort * 4;
 					}while(--j);
 					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
 					filler -= 0x80;// only 8 bits are used
 				}else{// all other modes
 					filler = isdescsort? 0xFF : 0;
-					t -= isdescsort * 2 - 1;
-					u -= isdescsort * 2 - 1;
+					t += 1 - isdescsort * 2;
+					u += 1 - isdescsort * 2;
 					unsigned j{256 / 2 - 1};
 					do{
 						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 						length = static_cast<U>(*t) + static_cast<U>(*u);
-						filler -= isdescsort * 2 - 1;
-						t -= isdescsort * 2 - 1;
-						u -= isdescsort * 2 - 1;
+						filler += 1 - isdescsort * 2;
+						t += 1 - isdescsort * 2;
+						u += 1 - isdescsort * 2;
 					}while(--j);
 				}
 			}
@@ -19481,24 +19481,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			// note: regular floating-point mode is not relevant here
 			filler = isdescsort? 0x7F : 0x80;
-			t -= isdescsort * 2 - 1;
+			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			do{
 				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 				length = *t;
-				filler -= isdescsort * 2 - 1;
-				t -= isdescsort * 2 - 1;
+				filler += 1 - isdescsort * 2;
+				t += 1 - isdescsort * 2;
 			}while(--j);
 			pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 			length = t[256 * (isdescsort * 2 - 1)];
-			filler -= isdescsort * 2 - 1;// only 8 bits are used
+			filler += 1 - isdescsort * 2;// only 8 bits are used
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 1;
 			do{
 				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 				length = *t;
-				filler -= isdescsort * 2 - 1;
-				t -= isdescsort * 2 - 1;
+				filler += 1 - isdescsort * 2;
+				t += 1 - isdescsort * 2;
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// note: both regular absolute modes are not relevant here
@@ -19506,27 +19506,27 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 				filler = isdescsort? 0x7F : 0x80;
 				t += isdescsort * 2 - 1;// step back
-				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				unsigned j{256 / 2 - 1};// double the number of items per loop
 				do{
 					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 					length = *t;// even
 					pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
-					length = t[isdescsort * -6 + 3];// odd
-					filler -= isdescsort * 2 - 1;
-					t += isdescsort * -4 + 2;// step forward twice
+					length = t[3 - isdescsort * 6];// odd
+					filler += 1 - isdescsort * 2;
+					t += 2 - isdescsort * 4;// step forward twice
 				}while(--j);
 				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 				length = *t;// even
 				filler -= 0x80;// only 8 bits are used
 			}else{// all other modes
 				filler = isdescsort? 0xFF : 0;
-				t -= isdescsort * 2 - 1;
+				t += 1 - isdescsort * 2;
 				unsigned j{256 - 1};
 				do{
 					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
 					length = *t;
-					filler -= isdescsort * 2 - 1;
-					t -= isdescsort * 2 - 1;
+					filler += 1 - isdescsort * 2;
+					t += 1 - isdescsort * 2;
 				}while(--j);
 			}
 		}
