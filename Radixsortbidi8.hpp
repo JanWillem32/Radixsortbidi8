@@ -18988,7 +18988,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsingleinitmtc(std::size_t count, T const input[], T pout[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
@@ -19056,6 +19058,62 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}while(i -= 8);
 }
 
+// initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
+// Do not use this function directly.
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortnoallocsingleinitmtc(std::size_t count, T const input[], X offsetscompanion[])noexcept{
+	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(offsetscompanion);
+	// unsigned counter, not zero inclusive inside the loop
+	std::size_t i{((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
+	input += count - i;
+	do{
+		U cura{input[i]};
+		U curb{input[i - 1]};
+		U curc{input[i - 2]};
+		U curd{input[i - 3]};
+		if constexpr(isabsvalue != isfltpmode){// two-register filters only
+			// register pressure performance issue on several platforms: first do the high half here
+			filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+			++offsetscompanion[cura];
+			++offsetscompanion[curb];
+			++offsetscompanion[curc];
+			++offsetscompanion[curd];
+		}
+		U cure{input[i - 4]};
+		U curf{input[i - 5]};
+		U curg{input[i - 6]};
+		U curh{input[i - 7]};
+		if constexpr(isabsvalue != isfltpmode){// two-register filters only
+			// register pressure performance issue on several platforms: do the low half here second
+			filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+		}else{
+			if constexpr(isabsvalue && isfltpmode){// one-register filters only
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+			}
+			++offsetscompanion[cura];
+			++offsetscompanion[curb];
+			++offsetscompanion[curc];
+			++offsetscompanion[curd];
+		}
+		++offsetscompanion[cure];
+		++offsetscompanion[curf];
+		++offsetscompanion[curg];
+		++offsetscompanion[curh];
+	}while(i -= 8);
+}
+
 // main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 // Do not use this function directly.
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
@@ -19064,7 +19122,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||	// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemainmtc(std::size_t count, T const psrclo[], T pdst[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
@@ -19120,6 +19180,92 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+// main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
+// Do not use this function directly.
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortnoallocsinglemainmtc(std::size_t count, T pdst[], X const offsets[], X const offsetscompanion[])noexcept{
+	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(pdst);
+	assert(offsets);
+	assert(offsetscompanion);
+	// the code here is mainly copied from generateoffsetssinglemtc()
+	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
+	// Determining the starting point depends on several factors here.
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X const *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
+		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
+	X const *u{offsetscompanion + (offsetsstride - 1)// high-to-low or low-to-high
+		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
+		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
+	U length{static_cast<U>(*t) + static_cast<U>(*u)};
+	T *pfill{pdst + count + 1};
+	int filler;
+	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	}else{// not reversed order
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			// note: regular floating-point mode is not relevant here
+			filler = isdescsort? 0x80 : 0x7F;
+			t += isdescsort * 2 - 1;
+			u += isdescsort * 2 - 1;
+			unsigned j{256 / 2 - 1};
+			do{
+				pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+				length = static_cast<U>(*t) + static_cast<U>(*u);
+				filler += isdescsort * 2 - 1;
+				t += isdescsort * 2 - 1;
+				u += isdescsort * 2 - 1;
+			}while(--j);
+		}else{// unsigned or signed absolute
+			// note: both regular absolute modes are not relevant here
+			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
+				filler = isdescsort? 0x80 : 0x7F;
+				t -= isdescsort * 2 - 1;// step back
+				u -= isdescsort * 2 - 1;// step back
+				unsigned j{256 / 4 - 1};// double the number of items per loop
+				do{
+					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+					length = static_cast<U>(*t) + static_cast<U>(*u);// even
+					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler - 0x80, length));// only 8 bits are used
+					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
+					filler += isdescsort * 2 - 1;
+					t -= isdescsort * -4 + 2;// step forward twice
+					u -= isdescsort * -4 + 2;
+				}while(--j);
+				pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+				length = static_cast<U>(*t) + static_cast<U>(*u);// even
+				filler -= 0x80;// only 8 bits are used
+			}else{// all other modes
+				filler = isdescsort? 0 : 0xFF;
+				t += isdescsort * 2 - 1;
+				u += isdescsort * 2 - 1;
+				unsigned j{256 / 2 - 1};
+				do{
+					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+					length = static_cast<U>(*t) + static_cast<U>(*u);
+					filler += isdescsort * 2 - 1;
+					t += isdescsort * 2 - 1;
+					u += isdescsort * 2 - 1;
+				}while(--j);
+			}
+		}
+	}
+	std::memset(pfill - length, filler, length);
+}
+
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 // Do not use this function directly.
 template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
@@ -19128,7 +19274,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemain(std::size_t count, T const psrclo[], T pdst[], X offsets[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != MAXSIZE_T);
@@ -19241,6 +19389,152 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+// main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
+// Do not use this function directly.
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortnoallocsinglemain(T pdst[], X const offsets[], X const offsetscompanion[], unsigned usemultithread)noexcept{
+	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
+	// do not pass a nullptr here
+	assert(pdst);
+	assert(offsets);
+	if constexpr(ismultithreadcapable) if(usemultithread) assert(offsetscompanion);
+	// the code here is mainly copied from generateoffsetssingle()
+	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
+	// Determining the starting point depends on several factors here.
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X const *t{offsets// low-to-high or high-to-low
+		+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
+	U length{*t};
+	T *pfill{pdst};
+	int filler;
+	if constexpr(ismultithreadcapable) if(usemultithread){// multi-threaded version
+		X const *u{offsetscompanion// low-to-high or high-to-low
+			+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
+			+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
+			+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
+		length += *u;
+		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		}else{// not reversed order
+			if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+				// note: regular floating-point mode is not relevant here
+				filler = isdescsort? 0x7F : 0x80;
+				t -= isdescsort * 2 - 1;
+				u -= isdescsort * 2 - 1;
+				unsigned j{256 / 2 - 1};
+				do{
+					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					length = static_cast<U>(*t) + static_cast<U>(*u);
+					filler -= isdescsort * 2 - 1;
+					t -= isdescsort * 2 - 1;
+					u -= isdescsort * 2 - 1;
+				}while(--j);
+			}else{// unsigned or signed absolute
+				// note: both regular absolute modes are not relevant here
+				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+				if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
+					filler = isdescsort? 0x7F : 0x80;
+					t += isdescsort * 2 - 1;// step back
+					u += isdescsort * 2 - 1;// step back
+					unsigned j{256 / 4 - 1};// double the number of items per loop
+					do{
+						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+						length = static_cast<U>(*t) + static_cast<U>(*u);// even
+						pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
+						length = static_cast<U>(t[isdescsort * -6 + 3]) + static_cast<U>(u[isdescsort * -6 + 3]);// odd
+						filler -= isdescsort * 2 - 1;
+						t += isdescsort * -4 + 2;// step forward twice
+						u += isdescsort * -4 + 2;
+					}while(--j);
+					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					length = static_cast<U>(*t) + static_cast<U>(*u);// even
+					filler -= 0x80;// only 8 bits are used
+				}else{// all other modes
+					filler = isdescsort? 0xFF : 0;
+					t -= isdescsort * 2 - 1;
+					u -= isdescsort * 2 - 1;
+					unsigned j{256 / 2 - 1};
+					do{
+						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+						length = static_cast<U>(*t) + static_cast<U>(*u);
+						filler -= isdescsort * 2 - 1;
+						t -= isdescsort * 2 - 1;
+						u -= isdescsort * 2 - 1;
+					}while(--j);
+				}
+			}
+		}
+		goto exit;
+	}
+	// single-threaded version
+	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	}else{// not reversed order
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			// note: regular floating-point mode is not relevant here
+			filler = isdescsort? 0x7F : 0x80;
+			t -= isdescsort * 2 - 1;
+			unsigned j{256 / 2 - 1};
+			do{
+				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				length = *t;
+				filler -= isdescsort * 2 - 1;
+				t -= isdescsort * 2 - 1;
+			}while(--j);
+			pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+			length = t[256 * (isdescsort * 2 - 1)];
+			filler -= isdescsort * 2 - 1;// only 8 bits are used
+			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
+			j = 256 / 2 - 1;
+			do{
+				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				length = *t;
+				filler -= isdescsort * 2 - 1;
+				t -= isdescsort * 2 - 1;
+			}while(--j);
+		}else{// unsigned or signed absolute
+			// note: both regular absolute modes are not relevant here
+			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
+				filler = isdescsort? 0x7F : 0x80;
+				t += isdescsort * 2 - 1;// step back
+				unsigned j{(256 - 2) / 2};// double the number of items per loop
+				do{
+					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					length = *t;// even
+					pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
+					length = t[isdescsort * -6 + 3];// odd
+					filler -= isdescsort * 2 - 1;
+					t += isdescsort * -4 + 2;// step forward twice
+				}while(--j);
+				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				length = *t;// even
+				filler -= 0x80;// only 8 bits are used
+			}else{// all other modes
+				filler = isdescsort? 0xFF : 0;
+				t -= isdescsort * 2 - 1;
+				unsigned j{256 - 1};
+				do{
+					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					length = *t;
+					filler -= isdescsort * 2 - 1;
+					t -= isdescsort * 2 - 1;
+				}while(--j);
+			}
+		}
+	}
+exit:
+	std::memset(pfill, filler, length);
+}
+
 // main part, multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
 // Do not use this function directly.
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
@@ -19249,7 +19543,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortcopynoallocsinglemtc(std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -19305,6 +19601,42 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+// main part, multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
+// Do not use this function directly.
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortcopynoallocsinglemtc(std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
+	// perform the bidirectional 8-bit fill sequence
+	radixsortnoallocsinglemainmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, output, offsets, offsetscompanion);
+}
+
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -19316,7 +19648,251 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortcopynoallocsingle1thread
+#else
+	radixsortcopynoallocsingle2thread
+#endif
+	(std::size_t count, T const input[], T output[])noexcept{
+	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multi-threading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, output, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+		i -= 7;
+		if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			do{
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			U curc{input[i + 5]};
+			U curd{input[i + 4]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: first do the high half here
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, output + i + 7,
+					curb, output + i + 6,
+					curc, output + i + 5,
+					curd, output + i + 4);
+				++offsets[cura];
+				++offsets[curb];
+				++offsets[curc];
+				++offsets[curd];
+			}
+			U cure{input[i + 3]};
+			U curf{input[i + 2]};
+			U curg{input[i + 1]};
+			U curh{input[i]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: do the low half here second
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cure, output + i + 3,
+					curf, output + i + 2,
+					curg, output + i + 1,
+					curh, output + i);
+				++offsets[cure];
+				++offsets[curf];
+				++offsets[curg];
+			}else if constexpr(isabsvalue && isfltpmode){// one-register filters only
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, output + i + 7,
+					curb, output + i + 6,
+					curc, output + i + 5,
+					curd, output + i + 4,
+					cure, output + i + 3,
+					curf, output + i + 2,
+					curg, output + i + 1,
+					curh, output + i);
+				++offsets[cura];
+				++offsets[curb];
+				++offsets[curc];
+				++offsets[curd];
+				++offsets[cure];
+				++offsets[curf];
+				++offsets[curg];
+			}else{
+				output[i + 7] = static_cast<T>(cura);
+				++offsets[cura];
+				output[i + 6] = static_cast<T>(curb);
+				++offsets[curb];
+				output[i + 5] = static_cast<T>(curc);
+				++offsets[curc];
+				output[i + 4] = static_cast<T>(curd);
+				++offsets[curd];
+				output[i + 3] = static_cast<T>(cure);
+				++offsets[cure];
+				output[i + 2] = static_cast<T>(curf);
+				++offsets[curf];
+				output[i + 1] = static_cast<T>(curg);
+				++offsets[curg];
+				output[i] = static_cast<T>(curh);
+			}
+			++offsets[curh];
+			i -= 8;
+		}while(0 <= i);
+		if(4 & i){// fill in the final four items for a remainder of 4 to 7
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			U curc{input[i + 5]};
+			U curd{input[i + 4]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, output + i + 7,
+					curb, output + i + 6,
+					curc, output + i + 5,
+					curd, output + i + 4);
+				i -= 4;// required for the "if(2 & i){" part
+				++offsets[cura];
+				++offsets[curb];
+				++offsets[curc];
+			}else{
+				output[i + 7] = static_cast<T>(cura);
+				++offsets[cura];
+				output[i + 6] = static_cast<T>(curb);
+				++offsets[curb];
+				output[i + 5] = static_cast<T>(curc);
+				++offsets[curc];
+				output[i + 4] = static_cast<T>(curd);
+				i -= 4;// required for the "if(2 & i){" part
+			}
+			++offsets[curd];
+		}
+		if(2 & i){// fill in the final two items for a remainder of 2 or 3
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, output + i + 7,
+					curb, output + i + 6);
+				++offsets[cura];
+			}else{
+				output[i + 7] = static_cast<T>(cura);
+				++offsets[cura];
+				output[i + 6] = static_cast<T>(curb);
+			}
+			++offsets[curb];
+		}
+		if(1 & i){// fill in the final item for odd counts
+			U cur{input[0]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+			}else output[0] = static_cast<T>(cur);
+			++offsets[cur];
+		}
+
+		// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		if constexpr(ismultithreadcapable){
+			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+				// reset the barrier after use, only one thread will do this
+				// no busy-wait dependency on this store, hence relaxed memory order is fine
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+			}
+			// this will just be zero if usemultithread is zero
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+		}else offsetscompanion = nullptr;
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+
+		// barrier and allareidentical value exchange with the companion thread
+		if constexpr(ismultithreadcapable){
+			allareidentical += usemultithread;// send over a 1 or a 2 when multithreading
+			while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+				spinpause();// catch up
+			}
+			std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed) - allareidentical;
+				}while(!other);
+			}
+			// only one of the two threads can set the all are identical state
+			allareidentical -= static_cast<unsigned>(other);// codes:
+			// 0: continue processing
+			// -1: input from the companion thread
+			// 1: input from this thread
+		}
+
+		if(!allareidentical)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{// perform the bidirectional 8-bit sorting sequence
+			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets, usemultithread);
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+}
+
+// radixsortcopynoalloc() function implementation template for single-part types without indirection
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocsingle1thread
@@ -19459,37 +20035,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
 		}else offsetscompanion = nullptr;
 
-		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets, offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
-
-		// barrier and allareidentical value exchange with the companion thread
-		if constexpr(ismultithreadcapable){
-			allareidentical += usemultithread;// send over a 1 or a 2 when multithreading
-			while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
-				spinpause();// catch up
-			}
-			std::uintptr_t other{atomiclightbarrier.fetch_add(allareidentical)};
-			// simply do not spin if usemultithread is zero
-			if(usemultithread > other){
-				do{
-					spinpause();
-					other = atomiclightbarrier.load(std::memory_order_relaxed) - allareidentical;
-				}while(!other);
-			}
-			// only one of the two threads can set the all are identical state
-			allareidentical -= static_cast<unsigned>(other);// codes:
-			// 0: continue processing
-			// -1: input from the companion thread
-			// 1: input from this thread
-		}
-
-		if(!allareidentical)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-		{// perform the bidirectional 8-bit sorting sequence
-			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets, usemultithread);
-		}
+		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
+		// perform the bidirectional 8-bit fill sequence
+		radixsortnoallocsinglemain<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(output, offsets, offsetscompanion, usemultithread);
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
@@ -19501,7 +20049,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -19557,6 +20107,41 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+// main part, multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
+// Do not use this function directly.
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortnoallocsinglemtc(std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
+	// perform the bidirectional 8-bit fill sequence
+	radixsortnoallocsinglemainmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsets, offsetscompanion);
+}
+
 // radixsortnoalloc() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -19568,7 +20153,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T>) &&
-	8 >= CHAR_BIT * sizeof(T),
+	8 >= CHAR_BIT * sizeof(T) &&
+	((isabsvalue && issignmode) ||// both regular absolute modes
+	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocsingle1thread
@@ -19794,7 +20381,163 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// perform the bidirectional 8-bit sorting sequence
 			radixsortnoallocsinglemain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, buffer, input, offsets, usemultithread);
 		}
-	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+	}
+}
+
+// radixsortnoalloc() function implementation template for single-part types without indirection
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortnoallocsingle1thread
+#else
+	radixsortnoallocsingle2thread
+#endif
+	(std::size_t count, T input[])noexcept{
+	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multi-threading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+		i -= 7;
+		if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			do{
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			U curc{input[i + 5]};
+			U curd{input[i + 4]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: first do the high half here
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+				++offsets[cura];
+				++offsets[curb];
+				++offsets[curc];
+				++offsets[curd];
+			}
+			U cure{input[i + 3]};
+			U curf{input[i + 2]};
+			U curg{input[i + 1]};
+			U curh{input[i]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: do the low half here second
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+			}else{
+				if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+				}
+				++offsets[cura];
+				++offsets[curb];
+				++offsets[curc];
+				++offsets[curd];
+			}
+			++offsets[cure];
+			++offsets[curf];
+			++offsets[curg];
+			++offsets[curh];
+			i -= 8;
+		}while(0 <= i);
+		if(4 & i){// fill in the final four items for a remainder of 4 to 7
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			U curc{input[i + 5]};
+			U curd{input[i + 4]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+			}
+			i -= 4;// required for the "if(2 & i){" part
+			++offsets[cura];
+			++offsets[curb];
+			++offsets[curc];
+			++offsets[curd];
+		}
+		if(2 & i){// fill in the final two items for a remainder of 2 or 3
+			U cura{input[i + 7]};
+			U curb{input[i + 6]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+			}
+			++offsets[cura];
+			++offsets[curb];
+		}
+		if(1 & i){// fill in the final item for odd counts
+			U cur{input[0]};
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+			}
+			++offsets[cur];
+		}
+
+		// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		if constexpr(ismultithreadcapable){
+			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+			}
+			// this will just be zero if usemultithread is zero
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+		}else offsetscompanion = nullptr;
+
+		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
+		// perform the bidirectional 8-bit fill sequence
+		radixsortnoallocsinglemain<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(input, offsets, offsetscompanion, usemultithread);
+	}
 }
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
@@ -20163,7 +20906,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
 		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
@@ -20437,7 +21180,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// reset the barrier after use, only one thread will do this
 					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+						reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
@@ -20520,7 +21263,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			// reset the barrier after use, only one thread will do this
 			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 		}
 		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
@@ -20794,7 +21537,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// reset the barrier after use, only one thread will do this
 					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+						reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
 					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
 				}
 				// this will just be zero if usemultithread is zero
@@ -20834,7 +21577,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				radixsortnoallocsinglemain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, buffer, input, offsets, usemultithread, varparameters...);
 			}
 		}
-	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+	}
 }
 
 // 1- to 16-way multithreading function reroutes
@@ -20942,7 +21685,63 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 #endif
-	pcall(count, input, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		pcall(count, input, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	}else pcall(count, input);// architecture: indirect calls only have a modest performance penalty on most platforms
+}
+
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<bool, T> &&
+	(std::is_unsigned_v<T> ||
+	std::is_class_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T) &&
+	!(isabsvalue && issignmode) &&// both regular absolute modes
+	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
+	void> radixsortnoallocsingle(std::size_t count, T input[])noexcept{
+	// select the smallest unsigned type for the indices
+	// architecture: this compiles into just a few conditional move instructions on most platforms
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	auto pcall{radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>};
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
+	}
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
+	}
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
+	}
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
+	}
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+		pcall = radixsortnoallocsingle1thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
+	}
+#else// multi-threading allowed
+	auto pcall{radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
+	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
+	if(0xFFu < count && 1 < std::thread::hardware_concurrency()){
+		pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
+		if constexpr(ULLONG_MAX > 0xFFu && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
+		}
+		if constexpr(ULONG_MAX > 0xFFu && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
+		}
+		if constexpr(UINT_MAX > 0xFFu && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
+		}
+		if constexpr(USHRT_MAX > 0xFFu && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
+		}
+		if constexpr(UCHAR_MAX > 0xFFu && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			pcall = radixsortnoallocsingle2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
+		}
+	}
+#endif
+	pcall(count, input);// architecture: indirect calls only have a modest performance penalty on most platforms
 }
 
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
@@ -24481,7 +25280,37 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(sortingmode::native <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))};
 	using U = helper::tounifunsigned<T>;
-	helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
+	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
+	}else helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
+}
+
+// Wrapper for the single-part radixsortnoalloc() function without indirection
+template<sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_arithmetic_v<T> ||
+	std::is_enum_v<T> ||
+	std::is_class_v<T> ||
+	std::is_union_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T),
+	void> radixsortnoalloc(std::size_t count, T input[])noexcept{
+	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
+	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
+	static bool constexpr isabsvalue{
+		(sortingmode::nativeabs <= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr issignmode{
+		(sortingmode::native <= mode && sortingmode::nativeabs >= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr isfltpmode{
+		(sortingmode::native <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))};
+	using U = helper::tounifunsigned<T>;
+	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		static_assert(false, "Unsupported combination of sorting modes.");
+	}else helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
 }
 
 // Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions without indirection
@@ -24506,8 +25335,42 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(sortingmode::native <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
 		(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))};
 	using U = helper::tounifunsigned<T>;
-	if(!movetobuffer) helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
-	else helper::radixsortcopynoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
+	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		if(!movetobuffer) helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
+		else helper::radixsortcopynoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
+	}else if(!movetobuffer) helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
+	else helper::radixsortcopynoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
+}
+
+// Wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions without indirection
+// This variant does not set the default "false" for the "movetobuffer" parameter.
+template<sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_arithmetic_v<T> ||
+	std::is_enum_v<T> ||
+	std::is_class_v<T> ||
+	std::is_union_v<T>) &&
+	8 >= CHAR_BIT * sizeof(T),
+	void> radixsortnoalloc(std::size_t count, T input[], bool movetobuffer)noexcept{
+	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
+	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
+	static bool constexpr isabsvalue{
+		(sortingmode::nativeabs <= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr issignmode{
+		(sortingmode::native <= mode && sortingmode::nativeabs >= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr isfltpmode{
+		(sortingmode::native <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))};
+	using U = helper::tounifunsigned<T>;
+
+	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		static_assert(false, "Unsupported combination of sorting modes.");
+	}else if(!movetobuffer) helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
+	else helper::radixsortcopynoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input));
 }
 
 // Wrapper to implement the radixsort() function without indirection, which only allocates some memory prior to sorting arrays
@@ -24529,7 +25392,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
-	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
+	static bool constexpr isabsvalue{
+		(sortingmode::nativeabs <= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr issignmode{
+		(sortingmode::native <= mode && sortingmode::nativeabs >= mode && (std::is_signed_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 1 & static_cast<unsigned char>(mode)))};
+	static bool constexpr isfltpmode{
+		(sortingmode::native <= mode && (std::is_floating_point_v<T> || std::is_same_v<helper::longdoubletest128, T> || std::is_same_v<helper::longdoubletest96, T> || std::is_same_v<helper::longdoubletest80, T>)) ||
+		(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))};
+	if constexpr(8 >= CHAR_BIT * sizeof(T) &&
+		!(isabsvalue && issignmode) &&// both regular absolute modes
+		!(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
+		radixsortnoalloc<direction, mode, T>(count, input);// skip buffer allocation for these single-part types
+	}else if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
 			[buffer, allocsize]
