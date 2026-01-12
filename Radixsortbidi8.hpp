@@ -246,7 +246,6 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // - TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
 //
 // ### TODO, document computer system architecture-dependent code parts and add more options
-// - TODO, the current mode for pipelining (ILP - instruction level processing) is set to mostly not need more than 15 integer registers, of which are 8 to 11 "hot" for parallel processing. This isn't a universally ideal option. To name two prominent systems, 32-bit x86 without extensions has only 7 available general-purpose registers, while ARM AArch64 (ARM64) has 31.
 // - TODO, investigate SIMD, in all of its shapes and sizes. Some experimentation has been done with x64+AVX-512 in an early version, but compared to other optimisations and strategies it never yielded much for these test functions.
 // - TODO, the current version of this library does not provide much optimisation for processing any 64-bit (or larger) types on 32-bit systems at all. This can be documented, and later on optimised.
 // - TODO, similarly, 16-bit systems still exist. (Even though these often do include a capable 32-bit capable data path line, see the history of x86 in this regard for example.) If this library can be optimised for use in a reasonably current 16-bit microcontroller, document and later on optimise for it.
@@ -3713,14 +3712,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymid, checkcarry;
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
-			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &checkcarry);
+			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
+			curmhi = __builtin_addcl(curmhi, curq, carrymid, &checkcarry);
 			static_cast<void>(checkcarry);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
 			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #elif defined(_M_IX86)
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			unsigned char checkcarry{_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi)};
+			unsigned char checkcarry{_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi)};
 			static_cast<void>(checkcarry);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
 			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
@@ -3884,26 +3883,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymida, checkcarrya;
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
-			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
+			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
+			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &checkcarrya);
 			static_cast<void>(checkcarrya);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
 			unsigned long carrymidb, checkcarryb;
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
+			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
+			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
 			static_cast<void>(checkcarryb);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
 #elif defined(_M_IX86)
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
+			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia)};
 			static_cast<void>(checkcarrya);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
+			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib)};
 			static_cast<void>(checkcarryb);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
@@ -4152,51 +4151,51 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymida, checkcarrya;
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
-			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
+			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
+			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &checkcarrya);
 			static_cast<void>(checkcarrya);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
 			unsigned long carrymidb, checkcarryb;
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
+			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
+			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
 			static_cast<void>(checkcarryb);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymidc, checkcarryc;
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			curmloc = __builtin_addcl(curmloc, curmloc, 0, &carrymidc);
-			curmhic = __builtin_addcl(curmhic, curmhic, carrymidc, &checkcarryc);
+			curmloc = __builtin_addcl(curmloc, curqc, 0, &carrymidc);
+			curmhic = __builtin_addcl(curmhic, curqc, carrymidc, &checkcarryc);
 			static_cast<void>(checkcarryc);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
 			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
 			unsigned long carrymidd, checkcarryd;
 			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			curmlod = __builtin_addcl(curmlod, curmlod, 0, &carrymidd);
-			curmhid = __builtin_addcl(curmhid, curmhid, carrymidd, &checkcarryd);
+			curmlod = __builtin_addcl(curmlod, curqd, 0, &carrymidd);
+			curmhid = __builtin_addcl(curmhid, curqd, carrymidd, &checkcarryd);
 			static_cast<void>(checkcarryd);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
 			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
 #elif defined(_M_IX86)
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
+			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia)};
 			static_cast<void>(checkcarrya);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
 			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
+			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib)};
 			static_cast<void>(checkcarryb);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(0, curmloc, curmloc, &curmloc), curmhic, curmhic, &curmhic)};
+			unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(0, curmloc, curqc, &curmloc), curmhic, curqc, &curmhic)};
 			static_cast<void>(checkcarryc);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
 			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
 			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(0, curmlod, curmlod, &curmlod), curmhid, curmhid, &curmhid)};
+			unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(0, curmlod, curqd, &curmlod), curmhid, curqd, &curmhid)};
 			static_cast<void>(checkcarryd);
 			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
 			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
@@ -8114,283 +8113,470 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 		// reverse ordering is applied here because the padding bytes could matter, hence the check above
 		if constexpr(isinputconst){
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
 			pout += count;
 			pdst += count;
-			do{
-				U curelo{input[0].signexponent};
-				std::uint_least64_t curmlo{input[0].mantissa};
-				U curehi{input[1].signexponent};
-				std::uint_least64_t curmhi{input[1].mantissa};
-				input += 2;
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, pout, pdst,
-						curmhi, curehi, pout - 1, pdst - 1);
-					pout -= 2;
-					pdst -= 2;
-				}
-				// register pressure performance issue on several platforms: first do the low half here
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pout[0].signexponent = static_cast<W>(curelo);
-					pdst[0].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pout[0].mantissa = curmlo;
-					pdst[0].mantissa = curmlo;
-				}
-				curmlo >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
-				++offsetscompanion[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the high half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pout[-1].signexponent = static_cast<W>(curehi);
-					pdst[-1].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pout[-1].mantissa = curmhi;
-					pout -= 2;
-					pdst[-1].mantissa = curmhi;
-					pdst -= 2;
-				}
-				curmhi >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsetscompanion[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				i -= 2;
-			}while(0 <= i);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				do{
+					U cure{input[0].signexponent};
+					std::uint_least64_t curm{input[0].mantissa};
+					++input;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout, pdst);
+						--pout;
+						--pdst;
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[0].signexponent = static_cast<W>(cure);
+						pdst[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[0].mantissa = curm;
+						pdst[0].mantissa = curm;
+					}
+					curm >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				do{
+					U curelo{input[0].signexponent};
+					std::uint_least64_t curmlo{input[0].mantissa};
+					U curehi{input[1].signexponent};
+					std::uint_least64_t curmhi{input[1].mantissa};
+					input += 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pout, pdst,
+							curmhi, curehi, pout - 1, pdst - 1);
+						pout -= 2;
+						pdst -= 2;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[0].signexponent = static_cast<W>(curelo);
+						pdst[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[0].mantissa = curmlo;
+						pdst[0].mantissa = curmlo;
+					}
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[-1].signexponent = static_cast<W>(curehi);
+						pdst[-1].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[-1].mantissa = curmhi;
+						pout -= 2;
+						pdst[-1].mantissa = curmhi;
+						pdst -= 2;
+					}
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					i -= 2;
+				}while(0 <= i);
+			}
 		}else{// !isinputconst
-			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
 			T *pinputlo{input}, *pinputhi{input + count};
 			T *poutputlo{pout}, *poutputhi{pout + count};
-			do{
-				U curelo{pinputlo[0].signexponent};
-				std::uint_least64_t curmlo{pinputlo[0].mantissa};
-				U curehi{pinputhi[0].signexponent};
-				std::uint_least64_t curmhi{pinputhi[0].mantissa};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, pinputhi, poutputhi,
-						curmhi, curehi, pinputlo, poutputlo);
-					--pinputhi;
-					--poutputhi;
-					++pinputlo;
-					++poutputlo;
-				}
-				// register pressure performance issue on several platforms: first do the low half here
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputhi[0].signexponent = static_cast<W>(curelo);
-					poutputhi[0].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputhi[0].mantissa = curmlo;
-					--pinputhi;
-					poutputhi[0].mantissa = curmlo;
-					--poutputhi;
-				}
-				curmlo >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
-				++offsetscompanion[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the low half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputlo[0].signexponent = static_cast<W>(curehi);
-					poutputlo[0].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputlo[0].mantissa = curmhi;
-					++pinputlo;
-					poutputlo[0].mantissa = curmhi;
-					++poutputlo;
-				}
-				curmhi >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsetscompanion[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-			}while(--i);
+			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					U curelo{pinputlo[0].signexponent};
+					std::uint_least64_t curmlo{pinputlo[0].mantissa};
+					U curehi{pinputhi[0].signexponent};
+					std::uint_least64_t curmhi{pinputhi[0].mantissa};
+					// register pressure performance issue on several platforms: first do the low half here
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, poutputhi);
+						--pinputhi;
+						--poutputhi;
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						poutputhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						poutputhi[0].mantissa = curmlo;
+						--poutputhi;
+					}
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the low half here second
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, poutputlo);
+						++pinputlo;
+						++poutputlo;
+					}
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						poutputlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmhi;
+						++pinputlo;
+						poutputlo[0].mantissa = curmhi;
+						++poutputlo;
+					}
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curelo{pinputlo[0].signexponent};
+					std::uint_least64_t curmlo{pinputlo[0].mantissa};
+					U curehi{pinputhi[0].signexponent};
+					std::uint_least64_t curmhi{pinputhi[0].mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pinputhi, poutputhi,
+							curmhi, curehi, pinputlo, poutputlo);
+						--pinputhi;
+						--poutputhi;
+						++pinputlo;
+						++poutputlo;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						poutputhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						poutputhi[0].mantissa = curmlo;
+						--poutputhi;
+					}
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the low half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						poutputlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmhi;
+						++pinputlo;
+						poutputlo[0].mantissa = curmhi;
+						++poutputlo;
+					}
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}
 		}
 	}else{// not in reverse order
 		input += count;
 		pout += count;
-		std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-		do{
-			U curehi{input[0].signexponent};
-			std::uint_least64_t curmhi{input[0].mantissa};
-			U curelo{input[-1].signexponent};
-			std::uint_least64_t curmlo{input[-1].mantissa};
-			input -= 2;
-			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					curmhi, curehi, pout,
-					curmlo, curelo, pout - 1);
-				pout -= 2;
-			}
-			unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-				pout[0].signexponent = static_cast<W>(curehi);
-			}
-			curehi >>= 8;
-			unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-			unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-			unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-			unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-			unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-			unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-			unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-				pout[0].mantissa = curmhi;
-			}
-			curmhi >>= 56;
-			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-			curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-			++offsetscompanion[curmhi0];
-			curmhi1 &= 0xFFu;
-			curmhi2 &= 0xFFu;
-			curmhi3 &= 0xFFu;
-			curmhi4 &= 0xFFu;
-			curmhi5 &= 0xFFu;
-			curmhi6 &= 0xFFu;
-			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-			++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-			// register pressure performance issue on several platforms: do the low half here second
-			unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-				pout[-1].signexponent = static_cast<W>(curelo);
-			}
-			curelo >>= 8;
-			unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-			unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-			unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-			unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-			unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-			unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-			unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-				pout[-1].mantissa = curmlo;
-				pout -= 2;
-			}
-			curmlo >>= 56;
-			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-			curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-			++offsetscompanion[curmlo0];
-			curmlo1 &= 0xFFu;
-			curmlo2 &= 0xFFu;
-			curmlo3 &= 0xFFu;
-			curmlo4 &= 0xFFu;
-			curmlo5 &= 0xFFu;
-			curmlo6 &= 0xFFu;
-			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-			++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-		}while(--i);
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+			std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+			do{
+				U cure{input[0].signexponent};
+				std::uint_least64_t curm{input[0].mantissa};
+				--input;
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout);
+					--pout;
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[0].signexponent = static_cast<W>(cure);
+				}
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[0].mantissa = curm;
+				}
+				curm >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curm0];
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+			}while(--i);
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+			do{
+				U curehi{input[0].signexponent};
+				std::uint_least64_t curmhi{input[0].mantissa};
+				U curelo{input[-1].signexponent};
+				std::uint_least64_t curmlo{input[-1].mantissa};
+				input -= 2;
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						curmhi, curehi, pout,
+						curmlo, curelo, pout - 1);
+					pout -= 2;
+				}
+				// register pressure performance issue on several platforms: do the high half here first
+				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[0].signexponent = static_cast<W>(curehi);
+				}
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[0].mantissa = curmhi;
+				}
+				curmhi >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				// register pressure performance issue on several platforms: do the low half here second
+				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[-1].signexponent = static_cast<W>(curelo);
+				}
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[-1].mantissa = curmlo;
+					pout -= 2;
+				}
+				curmlo >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+			}while(--i);
+		}
 	}
 }
 
@@ -9202,270 +9388,367 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
 		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+		if constexpr(ismultithreadcapable){
+			// architecture: limit to one at a time when there's few registers
+			if constexpr(defaultgprfilesize < gprfilesize::large) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+			else i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+		}
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
 			T const *pinput{input + count};
 			T *poutput{output};
 			T *pbuffer{buffer};
-			do{
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput - 1) + 1)};
-				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinput - 1)};
-				pinput -= 2;
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmhi, curehi, poutput, pbuffer,
-						curmlo, curelo, poutput + 1, pbuffer + 1);
-					poutput += 2;
-					pbuffer += 2;
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					--pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
+						++poutput;
+						++pbuffer;
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						++poutput;
+						pbuffer[0].mantissa = curm;
+						++pbuffer;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curehi{pinput[0].signexponent};
+					std::uint_least64_t curmhi{pinput[0].mantissa};
+					U curelo{pinput[-1].signexponent};
+					std::uint_least64_t curmlo{pinput[-1].mantissa};
+					pinput -= 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmhi, curehi, poutput, pbuffer,
+							curmlo, curelo, poutput + 1, pbuffer + 1);
+						poutput += 2;
+						pbuffer += 2;
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(curehi);
+						pbuffer[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curmhi;
+						pbuffer[0].mantissa = curmhi;
+					}
+					curmhi >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					// register pressure performance issue on several platforms: do the low half here second
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].signexponent = static_cast<W>(curelo);
+						pbuffer[1].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].mantissa = curmlo;
+						poutput += 2;
+						pbuffer[1].mantissa = curmlo;
+						pbuffer += 2;
+					}
+					curmlo >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						pbuffer[0].mantissa = curm;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
-				// register pressure performance issue on several platforms: first do the high half here
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].signexponent = static_cast<W>(curehi);
-					pbuffer[0].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].mantissa = curmhi;
-					pbuffer[0].mantissa = curmhi;
-				}
-				curmhi >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsets[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsets[256 + static_cast<std::size_t>(curmhi1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				// register pressure performance issue on several platforms: do the low half here second
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[1].signexponent = static_cast<W>(curelo);
-					pbuffer[1].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[1].mantissa = curmlo;
-					poutput += 2;
-					pbuffer[1].mantissa = curmlo;
-					pbuffer += 2;
-				}
-				curmlo >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
-				++offsets[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsets[256 + static_cast<std::size_t>(curmlo1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				i -= 2;
-			}while(0 < i);
-			if(!(1 & i)){// fill in the final item for odd counts
-				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
-				}
-				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].signexponent = static_cast<W>(cure);
-					pbuffer[0].signexponent = static_cast<W>(cure);
-				}
-				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].mantissa = curm;
-					pbuffer[0].mantissa = curm;
-				}
-				curm >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
-				else cure &= 0xFFu;
-				++offsets[curm0];
-				curm1 &= 0xFFu;
-				curm2 &= 0xFFu;
-				curm3 &= 0xFFu;
-				curm4 &= 0xFFu;
-				curm5 &= 0xFFu;
-				curm6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++offsets[256 + static_cast<std::size_t>(curm1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}else{// not in reverse order
 			T const *pinput{input};
 			T *poutput{output};
-			do{
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput + 1) + 1)};
-				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinput + 1)};
-				pinput += 2;
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, poutput,
-						curmhi, curehi, poutput + 1);
-					poutput += 2;
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					++pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
+						++poutput;
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						++poutput;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curelo{pinput[0].signexponent};
+					std::uint_least64_t curmlo{pinput[0].mantissa};
+					U curehi{pinput[1].signexponent};
+					std::uint_least64_t curmhi{pinput[1].mantissa};
+					pinput += 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, poutput,
+							curmhi, curehi, poutput + 1);
+						poutput += 2;
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curmlo;
+					}
+					curmlo >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the low half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].mantissa = curmhi;
+						poutput += 2;
+					}
+					curmhi >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].mantissa = curmlo;
-				}
-				curmlo >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsets[256 + static_cast<std::size_t>(curmlo1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the low half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[1].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[1].mantissa = curmhi;
-					poutput += 2;
-				}
-				curmhi >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsets[256 + static_cast<std::size_t>(curmhi1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				i -= 2;
-			}while(0 < i);
-			if(!(1 & i)){// fill in the final item for odd counts
-				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
-				}
-				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].signexponent = static_cast<W>(cure);
-				}
-				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					poutput[0].mantissa = curm;
-				}
-				curm >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curm0];
-				curm1 &= 0xFFu;
-				curm2 &= 0xFFu;
-				curm3 &= 0xFFu;
-				curm4 &= 0xFFu;
-				curm5 &= 0xFFu;
-				curm6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++offsets[256 + static_cast<std::size_t>(curm1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}
 
@@ -9687,99 +9970,192 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pbufferlo = buffer + stride;
 				pbufferhi = buffer + (count - stride);
 			}
-			do{
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinputlo) + 1)};
-				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinputlo)};
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinputhi) + 1)};
-				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinputhi)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, pinputhi, pbufferhi,
-						curmhi, curehi, pinputlo, pbufferlo);
-					--pinputhi;
-					--pbufferhi;
-					++pinputlo;
-					++pbufferlo;
-				}
-				// register pressure performance issue on several platforms: first do the low half here
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputhi[0].signexponent = static_cast<W>(curelo);
-					pbufferhi[0].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputhi[0].mantissa = curmlo;
-					--pinputhi;
-					pbufferhi[0].mantissa = curmlo;
-					--pbufferhi;
-				}
-				curmlo >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
-				++offsets[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsets[256 + static_cast<std::size_t>(curmlo1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the high half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputlo[0].signexponent = static_cast<W>(curehi);
-					pbufferlo[0].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pinputlo[0].mantissa = curmlo;
-					++pinputlo;
-					pbufferlo[0].mantissa = curmhi;
-					++pbufferlo;
-				}
-				curmhi >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsets[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsets[256 + static_cast<std::size_t>(curmhi1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-			}while(pinputlo < pinputhi);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					U curelo{pinputlo->signexponent};
+					std::uint_least64_t curmlo{pinputlo->mantissa};
+					U curehi{pinputhi->signexponent};
+					std::uint_least64_t curmhi{pinputhi->mantissa};
+					// register pressure performance issue on several platforms: first do the low half here
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, pbufferhi);
+						--pinputhi;
+						--pbufferhi;
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						pbufferhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						pbufferhi[0].mantissa = curmlo;
+						--pbufferhi;
+					}
+					curmlo >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, pbufferlo);
+						++pinputlo;
+						++pbufferlo;
+					}
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						pbufferlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmlo;
+						++pinputlo;
+						pbufferlo[0].mantissa = curmhi;
+						++pbufferlo;
+					}
+					curmhi >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(pinputlo < pinputhi);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curelo{pinputlo->signexponent};
+					std::uint_least64_t curmlo{pinputlo->mantissa};
+					U curehi{pinputhi->signexponent};
+					std::uint_least64_t curmhi{pinputhi->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pinputhi, pbufferhi,
+							curmhi, curehi, pinputlo, pbufferlo);
+						--pinputhi;
+						--pbufferhi;
+						++pinputlo;
+						++pbufferlo;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						pbufferhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						pbufferhi[0].mantissa = curmlo;
+						--pbufferhi;
+					}
+					curmlo >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						pbufferlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmlo;
+						++pinputlo;
+						pbufferlo[0].mantissa = curmhi;
+						++pbufferlo;
+					}
+					curmhi >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(pinputlo < pinputhi);
+			}
 			if(pinputlo == pinputhi){// fill in the final item for odd counts
 				U cure{pinputlo[0].signexponent};
 				std::uint_least64_t curm{pinputlo[0].mantissa};
@@ -9825,130 +10201,179 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			T *pinput{input};
 			T *pbuffer{buffer};
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-			do{
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput + 1) + 1)};
-				std::uint_least64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(pinput + 1)};
-				pinput += 2;
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, pbuffer,
-						curmhi, curehi, pbuffer + 1);
-					pbuffer += 2;
+			if constexpr(ismultithreadcapable){
+				// architecture: limit to one at a time when there's few registers
+				if constexpr(defaultgprfilesize < gprfilesize::large) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+				else i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+			}
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					++pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
+						++pbuffer;
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curm;
+						++pbuffer;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curelo{pinput[0].signexponent};
+					std::uint_least64_t curmlo{pinput[0].mantissa};
+					U curehi{pinput[1].signexponent};
+					std::uint_least64_t curmhi{pinput[1].mantissa};
+					pinput += 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pbuffer,
+							curmhi, curehi, pbuffer + 1);
+						pbuffer += 2;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curmlo;
+					}
+					curmlo >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsets[256 + static_cast<std::size_t>(curmlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[1].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[1].signexponent = static_cast<W>(curmhi);
+						pbuffer += 2;
+					}
+					curmhi >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsets[256 + static_cast<std::size_t>(curmhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curm;
+					}
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
-				// register pressure performance issue on several platforms: first do the low half here
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[0].signexponent = static_cast<W>(curelo);
-				}
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[0].mantissa = curmlo;
-				}
-				curmlo >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsets[256 + static_cast<std::size_t>(curmlo1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the high half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[1].signexponent = static_cast<W>(curehi);
-				}
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[1].signexponent = static_cast<W>(curmhi);
-					pbuffer += 2;
-				}
-				curmhi >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsets[256 + static_cast<std::size_t>(curmhi1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				i -= 2;
-			}while(0 < i);
-			if(!(1 & i)){// fill in the final item for odd counts
-				U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(pinput) + 1)};
-				std::uint_least64_t curm{*reinterpret_cast<std::uint_least64_t const *>(pinput)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
-				}
-				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[0].signexponent = static_cast<W>(cure);
-				}
-				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-					pbuffer[0].mantissa = curm;
-					++pbuffer;
-				}
-				curm >>= 56;
-				++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsets[curm0];
-				curm1 &= 0xFFu;
-				curm2 &= 0xFFu;
-				curm3 &= 0xFFu;
-				curm4 &= 0xFFu;
-				curm5 &= 0xFFu;
-				curm6 &= 0xFFu;
-				++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-				++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-				++offsets[256 + static_cast<std::size_t>(curm1)];
-				++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-				++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-				++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-				++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-				++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 			}
 		}
 
@@ -10040,364 +10465,567 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 64-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U curhi{input[i]};
-				U curlo{input[i - 1]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curhi, pout + i,
-						curlo, pout + i - 1);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				U curhi5{curhi >> 40};
-				U curhi6{curhi >> 48};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
-				curhi >>= 56;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				curhi5 &= 0xFFu;
-				curhi6 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				U curlo5{curlo >> 40};
-				U curlo6{curlo >> 48};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
-				curlo >>= 56;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				curlo5 &= 0xFFu;
-				curlo6 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					U cur6{cur >> 48};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 56;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U curhi{input[i]};
+					U curlo{input[i - 1]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curhi, pout + i,
+							curlo, pout + i - 1);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					U curhi0{curhi & 0xFFu};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					U curhi6{curhi >> 48};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+					curhi >>= 56;
+					++offsetscompanion[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
+					// register pressure performance issue on several platforms: do the low half here second
+					U curlo0{curlo & 0xFFu};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					U curlo6{curlo >> 48};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					curlo >>= 56;
+					++offsetscompanion[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
+				}while(i -= 2);
+			}
 		}
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 56-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U curhi{input[i]};
-				U curlo{input[i - 1]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curhi, pout + i,
-						curlo, pout + i - 1);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				U curhi5{curhi >> 40};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
-				curhi >>= 48;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				curhi5 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				U curlo5{curlo >> 40};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
-				curlo >>= 48;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				curlo5 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 48;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U curhi{input[i]};
+					U curlo{input[i - 1]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curhi, pout + i,
+							curlo, pout + i - 1);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					U curhi0{curhi & 0xFFu};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					U curhi5{curhi >> 40};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+					curhi >>= 48;
+					++offsetscompanion[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
+					// register pressure performance issue on several platforms: do the low half here second
+					U curlo0{curlo & 0xFFu};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					U curlo5{curlo >> 40};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					curlo >>= 48;
+					++offsetscompanion[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
+				}while(i -= 2);
+			}
 		}
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 48-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U curhi{input[i]};
-				U curlo{input[i - 1]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curhi, pout + i,
-						curlo, pout + i - 1);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
-				curhi >>= 40;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
-				curlo >>= 40;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 40;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U curhi{input[i]};
+					U curlo{input[i - 1]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curhi, pout + i,
+							curlo, pout + i - 1);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					U curhi0{curhi & 0xFFu};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					U curhi4{curhi >> 32};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+					curhi >>= 40;
+					++offsetscompanion[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
+					// register pressure performance issue on several platforms: do the low half here second
+					U curlo0{curlo & 0xFFu};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					U curlo4{curlo >> 32};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					curlo >>= 40;
+					++offsetscompanion[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
+				}while(i -= 2);
+			}
 		}
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 40-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U curhi{input[i]};
-				U curlo{input[i - 1]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curhi, pout + i,
-						curlo, pout + i - 1);
-				}
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
-				curhi >>= 32;
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
-				curlo >>= 32;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 32;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U curhi{input[i]};
+					U curlo{input[i - 1]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curhi, pout + i,
+							curlo, pout + i - 1);
+					}
+					U curhi0{curhi & 0xFFu};
+					U curhi1{curhi >> 8};
+					U curhi2{curhi >> 16};
+					U curhi3{curhi >> 24};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(curhi);
+					curhi >>= 32;
+					U curlo0{curlo & 0xFFu};
+					U curlo1{curlo >> 8};
+					U curlo2{curlo >> 16};
+					U curlo3{curlo >> 24};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
+					curlo >>= 32;
+					++offsetscompanion[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+					++offsetscompanion[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
+				}while(i -= 2);
+			}
 		}
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 32-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U cura{input[i]};
-				U curb{input[i - 1]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						cura, pout + i,
-						curb, pout + i - 1);
-				}
-				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> 8};
-				U cur2a{cura >> 16};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
-				cura >>= 24;
-				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> 8};
-				U cur2b{curb >> 16};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
-				curb >>= 24;
-				++offsetscompanion[cur0a];
-				cur1a &= 0xFFu;
-				cur2a &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				cur1b &= 0xFFu;
-				cur2b &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
-			}while(i -= 2);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 24;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cura{input[i]};
+					U curb{input[i - 1]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							cura, pout + i,
+							curb, pout + i - 1);
+					}
+					U cur0a{cura & 0xFFu};
+					U cur1a{cura >> 8};
+					U cur2a{cura >> 16};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+					cura >>= 24;
+					U cur0b{curb & 0xFFu};
+					U cur1b{curb >> 8};
+					U cur2b{curb >> 16};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+					curb >>= 24;
+					++offsetscompanion[cur0a];
+					cur1a &= 0xFFu;
+					cur2a &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+					++offsetscompanion[cur0b];
+					cur1b &= 0xFFu;
+					cur2b &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
+				}while(i -= 2);
+			}
 		}
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 24-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 3) / 6) * 3};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U cura{input[i]};
-				U curb{input[i - 1]};
-				U curc{input[i - 2]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						cura, pout + i,
-						curb, pout + i - 1,
-						curc, pout + i - 2);
-				}
-				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> 8};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
-				cura >>= 16;
-				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> 8};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
-				curb >>= 16;
-				U cur0c{curc & 0xFFu};
-				U cur1c{curc >> 8};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
-				curc >>= 16;
-				++offsetscompanion[cur0a];
-				cur1a &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				cur1b &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[cur0c];
-				cur1c &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
-			}while(i -= 3);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 16;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 3) / 6) * 3};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cura{input[i]};
+					U curb{input[i - 1]};
+					U curc{input[i - 2]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							cura, pout + i,
+							curb, pout + i - 1,
+							curc, pout + i - 2);
+					}
+					U cur0a{cura & 0xFFu};
+					U cur1a{cura >> 8};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+					cura >>= 16;
+					U cur0b{curb & 0xFFu};
+					U cur1b{curb >> 8};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+					curb >>= 16;
+					U cur0c{curc & 0xFFu};
+					U cur1c{curc >> 8};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+					curc >>= 16;
+					++offsetscompanion[cur0a];
+					cur1a &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+					++offsetscompanion[cur0b];
+					cur1b &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+					++offsetscompanion[cur0c];
+					cur1c &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
+				}while(i -= 3);
+			}
 		}
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 16-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 4) >> 3) * 4};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				U cura{input[i]};
-				U curb{input[i - 1]};
-				U curc{input[i - 2]};
-				U curd{input[i - 3]};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						cura, pout + i,
-						curb, pout + i - 1,
-						curc, pout + i - 2,
-						curd, pout + i - 3);
-				}
-				U cur0a{cura & 0xFFu};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
-				cura >>= 8;
-				U cur0b{curb & 0xFFu};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
-				curb >>= 8;
-				U cur0c{curc & 0xFFu};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
-				curc >>= 8;
-				U cur0d{curd & 0xFFu};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 3] = static_cast<T>(curd);
-				curd >>= 8;
-				++offsetscompanion[cur0a];
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[cur0c];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++offsetscompanion[cur0d];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curb)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curc)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curd)];
-			}while(i -= 4);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cur{input[i]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+					}
+					// register pressure performance issue on several platforms: first do the gh half here
+					U cur0{cur & 0xFFu};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					cur >>= 8;
+					++offsetscompanion[cur0];
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 4) >> 3) * 4};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					U cura{input[i]};
+					U curb{input[i - 1]};
+					U curc{input[i - 2]};
+					U curd{input[i - 3]};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							cura, pout + i,
+							curb, pout + i - 1,
+							curc, pout + i - 2,
+							curd, pout + i - 3);
+					}
+					U cur0a{cura & 0xFFu};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
+					cura >>= 8;
+					U cur0b{curb & 0xFFu};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curb);
+					curb >>= 8;
+					U cur0c{curc & 0xFFu};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+					curc >>= 8;
+					U cur0d{curd & 0xFFu};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 3] = static_cast<T>(curd);
+					curd >>= 8;
+					++offsetscompanion[cur0a];
+					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+					++offsetscompanion[cur0b];
+					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+					++offsetscompanion[cur0c];
+					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+					++offsetscompanion[cur0d];
+					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cura)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curb)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curc)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curd)];
+				}while(i -= 4);
+			}
 		}
 	}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 }
@@ -10905,559 +11533,734 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, output + i,
-							curlo, output + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 56;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, output + i,
+								curlo, output + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+						curhi >>= 56;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+						curlo >>= 56;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 56;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					U curhi6{curhi >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
-					curhi >>= 56;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					curhi6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					U curlo6{curlo >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
-					curlo >>= 56;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					curlo6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					U cur5{cur >> 40};
-					U cur6{cur >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 56;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					cur5 &= 0xFFu;
-					cur6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 56-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, output + i,
-							curlo, output + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 48;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, output + i,
+								curlo, output + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+						curhi >>= 48;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+						curlo >>= 48;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 48;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
-					curhi >>= 48;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
-					curlo >>= 48;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					U cur5{cur >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 48;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					cur5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 48-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, output + i,
-							curlo, output + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 40;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, output + i,
+								curlo, output + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+						curhi >>= 40;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+						curlo >>= 40;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 40;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
-					curhi >>= 40;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
-					curlo >>= 40;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 40;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 40-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, output + i,
-							curlo, output + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 32;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, output + i,
+								curlo, output + i - 1);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
+						curhi >>= 32;
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+						curlo >>= 32;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 32;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curhi);
-					curhi >>= 32;
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
-					curlo >>= 32;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 32;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 32-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U cura{input[i]};
-					U curb{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, output + i,
-							curb, output + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 24;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U cura{input[i]};
+						U curb{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, output + i,
+								curb, output + i - 1);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cura);
+						cura >>= 24;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curb);
+						curb >>= 24;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 24;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					U cur2a{cura >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cura);
-					cura >>= 24;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					U cur2b{curb >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curb);
-					curb >>= 24;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					cur2a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					cur2b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> 8};
-					U cur2{static_cast<unsigned>(cur) >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 24;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 24-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>(count + 1 + 3) / 6 * 3;
-				i -= 2;
-				if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 					do{
-					U cura{input[i + 2]};
-					U curb{input[i + 1]};
-					U curc{input[i]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, output + i + 2,
-							curb, output + i + 1,
-							curc, output + i);
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 16;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>(count + 1 + 3) / 6 * 3;
+					i -= 2;
+					if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						do{
+						U cura{input[i + 2]};
+						U curb{input[i + 1]};
+						U curc{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, output + i + 2,
+								curb, output + i + 1,
+								curc, output + i);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
+						curb >>= 16;
+						U cur0c{curc & 0xFFu};
+						U cur1c{curc >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
+						curc >>= 16;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[cur0c];
+						cur1c &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+						i -= 3;
+					}while(0 <= i);
+					if(2 & i){// fill in the final two items for a remainder of 2 or 3
+						U cura{input[i + 2]};
+						U curb{input[i + 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, output + i + 2,
+								curb, output + i + 1);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
+						curb >>= 16;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+					}else if(1 & i){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 16;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
-					cura >>= 16;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
-					curb >>= 16;
-					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
-					curc >>= 16;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[cur0c];
-					cur1c &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					++offsets[256 + static_cast<std::size_t>(cur1c)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-					i -= 3;
-				}while(0 <= i);
-				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					U cura{input[i + 2]};
-					U curb{input[i + 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, output + i + 2,
-							curb, output + i + 1);
-					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(cura);
-					cura >>= 16;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curb);
-					curb >>= 16;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-				}else if(1 & i){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 16;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 16-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
-				i -= 3;
-				if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 					do{
-					U cura{input[i + 3]};
-					U curb{input[i + 2]};
-					U curc{input[i + 1]};
-					U curd{input[i]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, output + i + 3,
-							curb, output + i + 2,
-							curc, output + i + 1,
-							curd, output + i);
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+						}
+						U cur0{cur & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 8;
+						++offsets[cur0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
+					i -= 3;
+					if(0 <= i)
+	#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+	#endif
+						do{
+						U cura{input[i + 3]};
+						U curb{input[i + 2]};
+						U curc{input[i + 1]};
+						U curd{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, output + i + 3,
+								curb, output + i + 2,
+								curc, output + i + 1,
+								curd, output + i);
+						}
+						U cur0a{cura & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
+						curb >>= 8;
+						U cur0c{curc & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curc);
+						curc >>= 8;
+						U cur0d{curd & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curd);
+						curd >>= 8;
+						++offsets[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[cur0c];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsets[cur0d];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(curb)];
+						++offsets[256 + static_cast<std::size_t>(curc)];
+						++offsets[256 + static_cast<std::size_t>(curd)];
+						i -= 4;
+					}while(0 <= i);
+					if(2 & i){// fill in the final two items for a remainder of 2 or 3
+						U cura{input[i + 3]};
+						U curb{input[i + 2]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, output + i + 3,
+								curb, output + i + 2);
+						}
+						U cur0a{cura & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
+						curb >>= 8;
+						++offsets[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(curb)];
 					}
-					U cur0a{cura & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
-					cura >>= 8;
-					U cur0b{curb & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
-					curb >>= 8;
-					U cur0c{curc & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curc);
-					curc >>= 8;
-					U cur0d{curd & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curd);
-					curd >>= 8;
-					++offsets[cur0a];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[cur0c];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsets[cur0d];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(curb)];
-					++offsets[256 + static_cast<std::size_t>(curc)];
-					++offsets[256 + static_cast<std::size_t>(curd)];
-					i -= 4;
-				}while(0 <= i);
-				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					U cura{input[i + 3]};
-					U curb{input[i + 2]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, output + i + 3,
-							curb, output + i + 2);
+					if(1 & i){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+						}
+						U cur0{cur & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
+						cur >>= 8;
+						++offsets[cur0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
-					cura >>= 8;
-					U cur0b{curb & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 2] = static_cast<T>(curb);
-					curb >>= 8;
-					++offsets[cur0a];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(curb)];
-				}
-				if(1 & i){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-					}
-					U cur0{cur & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0] = static_cast<T>(cur);
-					cur >>= 8;
-					++offsets[cur0];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
@@ -11671,560 +12474,735 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, buffer + i,
-							curlo, buffer + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 56;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, buffer + i,
+								curlo, buffer + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+						curhi >>= 56;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+						curlo >>= 56;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 56;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					U curhi6{curhi >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
-					curhi >>= 56;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					curhi6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					U curlo6{curlo >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
-					curlo >>= 56;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					curlo6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					U cur5{cur >> 40};
-					U cur6{cur >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 56;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					cur5 &= 0xFFu;
-					cur6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
-					++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 56-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, buffer + i,
-							curlo, buffer + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 48;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, buffer + i,
+								curlo, buffer + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+						curhi >>= 48;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+						curlo >>= 48;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 48;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
-					curhi >>= 48;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
-					curlo >>= 48;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					U cur5{cur >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 48;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					cur5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 48-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, buffer + i,
-							curlo, buffer + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 40;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, buffer + i,
+								curlo, buffer + i - 1);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+						curhi >>= 40;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+						curlo >>= 40;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 40;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
-					// register pressure performance issue on several platforms: first do the high half here
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
-					curhi >>= 40;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
-					curlo >>= 40;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					U cur4{cur >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 40;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					cur4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 40-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U curhi{input[i]};
-					U curlo{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curhi, buffer + i,
-							curlo, buffer + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 32;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U curhi{input[i]};
+						U curlo{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								curhi, buffer + i,
+								curlo, buffer + i - 1);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
+						curhi >>= 32;
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+						curlo >>= 32;
+						++offsets[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsets[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(curhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+						++offsets[256 + static_cast<std::size_t>(curlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 32;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curhi);
-					curhi >>= 32;
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
-					curlo >>= 32;
-					++offsets[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsets[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(curhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-					++offsets[256 + static_cast<std::size_t>(curlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{cur >> 8};
-					U cur2{cur >> 16};
-					U cur3{cur >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 32;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					cur3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 32-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					U cura{input[i]};
-					U curb{input[i - 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, buffer + i,
-							curb, buffer + i - 1);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 24;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						U cura{input[i]};
+						U curb{input[i - 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, buffer + i,
+								curb, buffer + i - 1);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cura);
+						cura >>= 24;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curb);
+						curb >>= 24;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						U cur2{static_cast<unsigned>(cur) >> 16};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 24;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					U cur2a{cura >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cura);
-					cura >>= 24;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					U cur2b{curb >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curb);
-					curb >>= 24;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					cur2a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					cur2b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> 8};
-					U cur2{static_cast<unsigned>(cur) >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 24;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					cur2 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 24-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 3) / 6) * 3;
-				i -= 2;
-				if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 					do{
-					U cura{input[i + 2]};
-					U curb{input[i + 1]};
-					U curc{input[i]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, buffer + i + 2,
-							curb, buffer + i + 1,
-							curc, buffer + i);
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 16;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 3) / 6) * 3;
+					i -= 2;
+					if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						do{
+						U cura{input[i + 2]};
+						U curb{input[i + 1]};
+						U curc{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, buffer + i + 2,
+								curb, buffer + i + 1,
+								curc, buffer + i);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+						curb >>= 16;
+						U cur0c{curc & 0xFFu};
+						U cur1c{curc >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
+						curc >>= 16;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[cur0c];
+						cur1c &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+						++offsets[256 + static_cast<std::size_t>(cur1c)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+						i -= 3;
+					}while(0 <= i);
+					if(2 & i){// fill in the final two items for a remainder of 2 or 3
+						U cura{input[i + 2]};
+						U curb{input[i + 1]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, buffer + i + 2,
+								curb, buffer + i + 1);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(cura);
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curb);
+						curb >>= 16;
+						++offsets[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1a)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(cur1b)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
-					cura >>= 16;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
-					curb >>= 16;
-					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
-					curc >>= 16;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[cur0c];
-					cur1c &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					++offsets[256 + static_cast<std::size_t>(cur1c)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-					i -= 3;
-				}while(0 <= i);
-				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					U cura{input[i + 2]};
-					U curb{input[i + 1]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, buffer + i + 2,
-							curb, buffer + i + 1);
+					if(1 & i){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{static_cast<unsigned>(cur) >> 8};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 16;
+						++offsets[cur0];
+						cur1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(cura);
-					cura >>= 16;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curb);
-					curb >>= 16;
-					++offsets[cur0a];
-					cur1a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					cur1b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1a)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(cur1b)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-				}
-				if(1 & i){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					U cur1{static_cast<unsigned>(cur) >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 16;
-					++offsets[cur0];
-					cur1 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 16-bit, not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
-				i -= 3;
-				if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 					do{
-					U cura{input[i + 3]};
-					U curb{input[i + 2]};
-					U curc{input[i + 1]};
-					U curd{input[i]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, buffer + i + 3,
-							curb, buffer + i + 2,
-							curc, buffer + i + 1,
-							curd, buffer + i);
+						U cur{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+						}
+						U cur0{cur & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 8;
+						++offsets[cur0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
+					i -= 3;
+					if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						do{
+						U cura{input[i + 3]};
+						U curb{input[i + 2]};
+						U curc{input[i + 1]};
+						U curd{input[i]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, buffer + i + 3,
+								curb, buffer + i + 2,
+								curc, buffer + i + 1,
+								curd, buffer + i);
+						}
+						U cur0a{cura & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+						curb >>= 8;
+						U cur0c{curc & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
+						curc >>= 8;
+						U cur0d{curd & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curd);
+						curd >>= 8;
+						++offsets[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[cur0c];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsets[cur0d];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(curb)];
+						++offsets[256 + static_cast<std::size_t>(curc)];
+						++offsets[256 + static_cast<std::size_t>(curd)];
+						i -= 4;
+					}while(0 <= i);
+					if(2 & i){// fill in the final two items for a remainder of 2 or 3
+						U cura{input[i + 3]};
+						U curb{input[i + 2]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(
+								cura, buffer + i + 3,
+								curb, buffer + i + 2);
+						}
+						U cur0a{cura & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
+						curb >>= 8;
+						++offsets[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsets[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cura)];
+						++offsets[256 + static_cast<std::size_t>(curb)];
 					}
-					U cur0a{cura & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
-					cura >>= 8;
-					U cur0b{curb & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
-					curb >>= 8;
-					U cur0c{curc & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
-					curc >>= 8;
-					U cur0d{curd & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curd);
-					curd >>= 8;
-					++offsets[cur0a];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[cur0c];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsets[cur0d];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(curb)];
-					++offsets[256 + static_cast<std::size_t>(curc)];
-					++offsets[256 + static_cast<std::size_t>(curd)];
-					i -= 4;
-				}while(0 <= i);
-				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					U cura{input[i + 3]};
-					U curb{input[i + 2]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							cura, buffer + i + 3,
-							curb, buffer + i + 2);
+					if(1 & i){// fill in the final item for odd counts
+						U cur{input[0]};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+						}
+						U cur0{cur & 0xFFu};
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
+						cur >>= 8;
+						++offsets[cur0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsets[256 + static_cast<std::size_t>(cur)];
 					}
-					U cur0a{cura & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
-					cura >>= 8;
-					U cur0b{curb & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 2] = static_cast<T>(curb);
-					curb >>= 8;
-					++offsets[cur0a];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsets[cur0b];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cura)];
-					++offsets[256 + static_cast<std::size_t>(curb)];
-				}
-				if(1 & i){// fill in the final item for odd counts
-					U cur{input[0]};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-					}
-					U cur0{cur & 0xFFu};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0] = static_cast<T>(cur);
-					cur >>= 8;
-					++offsets[cur0];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-					++offsets[256 + static_cast<std::size_t>(cur)];
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
@@ -12324,112 +13302,388 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsetscompanion);
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			pout += count - i;
-			pdst += count - i;
-			do{
-				V *plo{input[0]};
-				V *phi{input[1]};
-				input += 2;
-				pout[i] = plo;
-				pdst[i] = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				pout[i - 1] = phi;
-				pdst[i - 1] = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-				std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-				}
-				// register pressure performance issue on several platforms: first do the low half here
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				curmlo >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
-				++offsetscompanion[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the high half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				curmhi >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsetscompanion[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				i -= 2;
-			}while(0 <= i);
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				pout += count - i;
+				pdst += count - i;
+				do{
+					V *p{input[0]};
+					++input;
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					pdst[i] = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::uint64_t curm{cur.mantissa};
+					U cure{cur.signexponent};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					curm >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				pout += count - i;
+				pdst += count - i;
+				do{
+					V *plo{input[0]};
+					V *phi{input[1]};
+					input += 2;
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i] = plo;
+					pdst[i] = plo;
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					pout[i - 1] = phi;
+					pdst[i - 1] = phi;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{curlo.signexponent};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{curhi.signexponent};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					i -= 2;
+				}while(0 <= i);
+			}
 		}else{// !isinputconst
 			V **pinputlo{input}, **pinputhi{input + count};
 			V **poutputlo{pout}, **poutputhi{pout + count};
 			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					V *plo{pinputlo[0]};
+					V *phi{pinputhi[0]};
+					// register pressure performance issue on several platforms: first do the low half here
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					*pinputhi-- = plo;
+					*poutputhi-- = plo;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{curlo.signexponent};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					*pinputlo++ = phi;
+					*poutputlo++ = phi;
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{curhi.signexponent};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+					}
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					V *plo{pinputlo[0]};
+					V *phi{pinputhi[0]};
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					*pinputhi-- = plo;
+					*poutputhi-- = plo;
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					*pinputlo++ = phi;
+					*poutputlo++ = phi;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{curlo.signexponent};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{curhi.signexponent};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}
+		}
+	}else{// not in reverse order
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+			// unsigned counter, not zero inclusive inside the loop
+			std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+			input += count - i;
+			pout += count - i;
 			do{
-				V *plo{pinputlo[0]};
-				V *phi{pinputhi[0]};
-				*pinputhi-- = plo;
-				*poutputhi-- = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				*pinputlo++ = phi;
-				*poutputlo++ = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-				U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-				std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-				U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
+				V *p{input[i]};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				pout[i] = p;
+				auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				std::uint64_t curm{cur.mantissa};
+				U cure{cur.signexponent};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 				}
-				// register pressure performance issue on several platforms: first do the low half here
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
+				curm >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curm0];
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+			}while(--i);
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			// unsigned counter, not zero inclusive inside the loop
+			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+			input += count - i;
+			pout += count - i;
+			do{
+				V *phi{input[i]};
+				V *plo{input[i - 1]};
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				pout[i] = phi;
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				pout[i - 1] = plo;
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				std::uint64_t curmhi{curhi.mantissa};
+				U curehi{curhi.signexponent};
+				std::uint64_t curmlo{curlo.mantissa};
+				U curelo{curlo.signexponent};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+				}
+				// register pressure performance issue on several platforms: first do the high half here
+				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+				curmhi >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				// register pressure performance issue on several platforms: do the low half here second
 				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
 				curelo >>= 8;
 				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
@@ -12441,8 +13695,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
 				curmlo >>= 56;
 				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-				else curelo &= 0xFFu;
+				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curmlo0];
 				curmlo1 &= 0xFFu;
 				curmlo2 &= 0xFFu;
@@ -12458,115 +13711,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
 				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
 				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-				// register pressure performance issue on several platforms: do the high half here second
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				curmhi >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-				else curehi &= 0xFFu;
-				++offsetscompanion[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-			}while(--i);
+			}while(i -= 2);
 		}
-	}else{// not in reverse order
-		// unsigned counter, not zero inclusive inside the loop
-		std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-		input += count - i;
-		pout += count - i;
-		do{
-			V *phi{input[i]};
-			V *plo{input[i - 1]};
-			pout[i] = phi;
-			pout[i - 1] = plo;
-			auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-			auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-			std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-			U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-			std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-			U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
-			}
-			// register pressure performance issue on several platforms: first do the high half here
-			unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-			curehi >>= 8;
-			unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-			unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-			unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-			unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-			unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-			unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-			unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-			curmhi >>= 56;
-			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-			curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-			++offsetscompanion[curmhi0];
-			curmhi1 &= 0xFFu;
-			curmhi2 &= 0xFFu;
-			curmhi3 &= 0xFFu;
-			curmhi4 &= 0xFFu;
-			curmhi5 &= 0xFFu;
-			curmhi6 &= 0xFFu;
-			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-			++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-			// register pressure performance issue on several platforms: do the low half here second
-			unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-			curelo >>= 8;
-			unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-			unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-			unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-			unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-			unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-			unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-			unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-			curmlo >>= 56;
-			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-			curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-			++offsetscompanion[curmlo0];
-			curmlo1 &= 0xFFu;
-			curmlo2 &= 0xFFu;
-			curmlo3 &= 0xFFu;
-			curmlo4 &= 0xFFu;
-			curmlo5 &= 0xFFu;
-			curmlo6 &= 0xFFu;
-			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-			++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-		}while(i -= 2);
 	}
 }
 
@@ -13411,244 +14557,326 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::conditional_t<ismultithreadcapable, std::ptrdiff_t, std::nullptr_t> stride;
 			if constexpr(ismultithreadcapable){
-				stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+				// architecture: limit to one at a time when there's few registers
+				if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+				else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 				i -= stride;
 			}
 			if constexpr(isrevorder){// also reverse the array at the same time
 				V *const *pinput{input};
 				if constexpr(ismultithreadcapable) pinput += stride;
-				do{
-					V *plo{pinput[0]};
-					V *phi{pinput[1]};
-					pinput += 2;
-					output[i] = plo;
-					buffer[i] = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					output[i - 1] = phi;
-					buffer[i - 1] = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *p{pinput[0]};
+						++pinput;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[i] = p;
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{cur.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinput[0]};
+						V *phi{pinput[1]};
+						pinput += 2;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						output[i] = plo;
+						buffer[i] = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						output[i - 1] = phi;
+						buffer[i - 1] = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{pinput[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[0] = p;
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{cur.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-					else curelo &= 0xFFu;
-					++offsets[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsets[256 + static_cast<std::size_t>(curmlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-					else curehi &= 0xFFu;
-					++offsets[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsets[256 + static_cast<std::size_t>(curmhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{pinput[0]};
-					output[0] = p;
-					buffer[0] = p;
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
-					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}else{// not in reverse order
-				do{
-					V *plo{input[i]};
-					V *phi{input[i - 1]};
-					output[i] = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					output[i - 1] = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{cur.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{input[i]};
+						V *phi{input[i - 1]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						output[i] = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						output[i - 1] = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{cur.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-					else curelo &= 0xFFu;
-					++offsets[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsets[256 + static_cast<std::size_t>(curmlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-					else curehi &= 0xFFu;
-					++offsets[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsets[256 + static_cast<std::size_t>(curmhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-					i -= 2;
-				}while(0 < i);
-				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
-					output[0] = p;
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
-					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}
 
@@ -13917,91 +15145,170 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer + stride;
 					pbufferhi = buffer + (count - stride);
 				}
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					*pinputhi-- = plo;
-					*pbufferhi-- = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputlo++ = phi;
-					*pbufferlo++ = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{*reinterpret_cast<std::uint_least64_t const *>(&curlo)};
-					U curelo{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curlo) + 1)};
-					std::uint64_t curmhi{*reinterpret_cast<std::uint_least64_t const *>(&curhi)};
-					U curehi{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&curhi) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curelo &= 0x7Fu;
-					else curelo &= 0xFFu;
-					++offsets[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsets[256 + static_cast<std::size_t>(curmlo1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curehi &= 0x7Fu;
-					else curehi &= 0xFFu;
-					++offsets[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsets[256 + static_cast<std::size_t>(curmhi1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				}while(pinputlo < pinputhi);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+						}
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+						}
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					}while(pinputlo < pinputhi);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					}while(pinputlo < pinputhi);
+				}
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
 					V *p{pinputlo[0]};
 					// no write to input, as this is the midpoint
-					*pbufferhi = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					*pbufferhi = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
-					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
+					std::uint64_t curm{cur.mantissa};
+					U cure{cur.signexponent};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
@@ -14036,81 +15343,167 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				do{
-					V *p{input[i]};
-					buffer[i] = p;
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
-					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					i -= 2;
-				}while(0 < i);
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *phi{input[i]};
+						V *plo{input[i - 1]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						buffer[i] = phi;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+						}
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						buffer[i - 1] = plo;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+						}
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						i -= 2;
+					}while(0 < i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *phi{input[i]};
+						V *plo{input[i - 1]};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						buffer[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						buffer[i - 1] = plo;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{curhi.signexponent};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{curlo.signexponent};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						i -= 2;
+					}while(0 < i);
+				}
 				if(!(1 & i)){// fill in the final item for odd counts
 					V *p{input[0]};
-					buffer[0] = p;
 					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					buffer[0] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{*reinterpret_cast<std::uint_least64_t const *>(&cur)};
-					U cure{*reinterpret_cast<W const *>(reinterpret_cast<std::uint_least64_t const *>(&cur) + 1)};
+					std::uint64_t curm{cur.mantissa};
+					U cure{cur.signexponent};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 					}
@@ -14242,20 +15635,302 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						U cur6{cur >> 48};
+						cur >>= 56;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						cur6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *phi{input[0]};
+						V *plo{input[1]};
+						input += 2;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						pout[i] = phi;
+						pdst[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						pout[i - 1] = plo;
+						pdst[i - 1] = plo;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
+						curhi >>= 56;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
+						curlo >>= 56;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
+					}while(i -= 2);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
+						curlo >>= 56;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
+						curhi >>= 56;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						U curlo6{curlo >> 48};
+						curlo >>= 56;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						curlo6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						U curhi6{curhi >> 48};
+						curhi >>= 56;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						curhi6 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}
+			}
+		}else{// 64-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					U cur6{cur >> 48};
+					cur >>= 56;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *phi{input[0]};
-					V *plo{input[1]};
-					input += 2;
-					pout[i] = phi;
-					pdst[i] = phi;
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					pout[i - 1] = plo;
-					pdst[i - 1] = plo;
+					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i - 1] = plo;
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14310,158 +15985,283 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
-			}else{// !isinputconst
-				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					U curlo6{curlo >> 48};
-					curlo >>= 56;
-					++offsetscompanion[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					curlo6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
-					// register pressure performance issue on several platforms: do the high half here second
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					U curhi6{curhi >> 48};
-					curhi >>= 56;
-					++offsetscompanion[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					curhi6 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
-				}while(--i);
 			}
-		}else{// 64-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				pout[i] = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				pout[i - 1] = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				U curhi5{curhi >> 40};
-				U curhi6{curhi >> 48};
-				curhi >>= 56;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				curhi5 &= 0xFFu;
-				curhi6 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				U curlo5{curlo >> 40};
-				U curlo6{curlo >> 48};
-				curlo >>= 56;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				curlo5 &= 0xFFu;
-				curlo6 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
 		}
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						U cur5{cur >> 40};
+						cur >>= 48;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						cur5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *phi{input[0]};
+						V *plo{input[1]};
+						input += 2;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						pout[i] = phi;
+						pdst[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						pout[i - 1] = plo;
+						pdst[i - 1] = plo;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						curhi >>= 48;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						curlo >>= 48;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
+					}while(i -= 2);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						curlo >>= 48;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						curhi >>= 48;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						U curlo5{curlo >> 40};
+						curlo >>= 48;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						curlo5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						U curhi5{curhi >> 40};
+						curhi >>= 48;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						curhi5 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}
+			}
+		}else{// 56-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					U cur5{cur >> 40};
+					cur >>= 48;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *phi{input[0]};
-					V *plo{input[1]};
-					input += 2;
-					pout[i] = phi;
-					pdst[i] = phi;
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					pout[i - 1] = plo;
-					pdst[i - 1] = plo;
+					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i - 1] = plo;
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14510,146 +16310,259 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					U curlo5{curlo >> 40};
-					curlo >>= 48;
-					++offsetscompanion[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					curlo5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
-					// register pressure performance issue on several platforms: do the high half here second
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					U curhi5{curhi >> 40};
-					curhi >>= 48;
-					++offsetscompanion[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					curhi5 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
-				}while(--i);
 			}
-		}else{// 56-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				pout[i] = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				pout[i - 1] = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				U curhi5{curhi >> 40};
-				curhi >>= 48;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				curhi5 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				U curlo5{curlo >> 40};
-				curlo >>= 48;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				curlo5 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
 		}
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						U cur4{cur >> 32};
+						cur >>= 40;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						cur4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *phi{input[0]};
+						V *plo{input[1]};
+						input += 2;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						pout[i] = phi;
+						pdst[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						pout[i - 1] = plo;
+						pdst[i - 1] = plo;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						curhi >>= 40;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						curlo >>= 40;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
+					}while(i -= 2);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						curlo >>= 40;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						curhi >>= 40;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						U curlo4{curlo >> 32};
+						curlo >>= 40;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						curlo4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						U curhi4{curhi >> 32};
+						curhi >>= 40;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						curhi4 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}
+			}
+		}else{// 48-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					U cur4{cur >> 32};
+					cur >>= 40;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *phi{input[0]};
-					V *plo{input[1]};
-					input += 2;
-					pout[i] = phi;
-					pdst[i] = phi;
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					pout[i - 1] = plo;
-					pdst[i - 1] = plo;
+					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i - 1] = plo;
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14692,282 +16605,468 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					U curlo4{curlo >> 32};
-					curlo >>= 40;
-					++offsetscompanion[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					curlo4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
-					// register pressure performance issue on several platforms: do the high half here second
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					U curhi4{curhi >> 32};
-					curhi >>= 40;
-					++offsetscompanion[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					curhi4 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
-				}while(--i);
 			}
-		}else{// 48-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				pout[i] = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				pout[i - 1] = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				U curhi4{curhi >> 32};
-				curhi >>= 40;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				curhi4 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi)];
-				// register pressure performance issue on several platforms: do the low half here second
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				U curlo4{curlo >> 32};
-				curlo >>= 40;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				curlo4 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
 		}
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						U cur3{cur >> 24};
+						cur >>= 32;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						cur3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *phi{input[0]};
+						V *plo{input[1]};
+						input += 2;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						pout[i] = phi;
+						pdst[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						pout[i - 1] = plo;
+						pdst[i - 1] = plo;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						curhi >>= 32;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
+						// register pressure performance issue on several platforms: do the low half here second
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						curlo >>= 32;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
+					}while(i -= 2);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						curlo >>= 32;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						curhi >>= 32;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						U curlo3{curlo >> 24};
+						curlo >>= 32;
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						U curhi3{curhi >> 24};
+						curhi >>= 32;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						curlo3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						curhi3 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}
+			}
+		}else{// 40-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					U cur3{cur >> 24};
+					cur >>= 32;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *phi{input[0]};
-					V *plo{input[1]};
-					input += 2;
-					pout[i] = phi;
-					pdst[i] = phi;
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					pout[i - 1] = plo;
-					pdst[i - 1] = plo;
+					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i - 1] = plo;
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
-					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & 0xFFu};
 					U curhi1{curhi >> 8};
 					U curhi2{curhi >> 16};
 					U curhi3{curhi >> 24};
 					curhi >>= 32;
-					++offsetscompanion[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-					// register pressure performance issue on several platforms: do the low half here second
 					U curlo0{curlo & 0xFFu};
 					U curlo1{curlo >> 8};
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
 					curlo >>= 32;
+					++offsetscompanion[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
 					++offsetscompanion[curlo0];
 					curlo1 &= 0xFFu;
 					curlo2 &= 0xFFu;
 					curlo3 &= 0xFFu;
 					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
 					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
 				}while(i -= 2);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-					}
-					U curlo0{curlo & 0xFFu};
-					U curlo1{curlo >> 8};
-					U curlo2{curlo >> 16};
-					U curlo3{curlo >> 24};
-					curlo >>= 32;
-					U curhi0{curhi & 0xFFu};
-					U curhi1{curhi >> 8};
-					U curhi2{curhi >> 16};
-					U curhi3{curhi >> 24};
-					curhi >>= 32;
-					++offsetscompanion[curlo0];
-					curlo1 &= 0xFFu;
-					curlo2 &= 0xFFu;
-					curlo3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-					++offsetscompanion[curhi0];
-					curhi1 &= 0xFFu;
-					curhi2 &= 0xFFu;
-					curhi3 &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-				}while(--i);
 			}
-		}else{// 40-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				pout[i] = phi;
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				pout[i - 1] = plo;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
-				}
-				U curhi0{curhi & 0xFFu};
-				U curhi1{curhi >> 8};
-				U curhi2{curhi >> 16};
-				U curhi3{curhi >> 24};
-				curhi >>= 32;
-				U curlo0{curlo & 0xFFu};
-				U curlo1{curlo >> 8};
-				U curlo2{curlo >> 16};
-				U curlo3{curlo >> 24};
-				curlo >>= 32;
-				++offsetscompanion[curhi0];
-				curhi1 &= 0xFFu;
-				curhi2 &= 0xFFu;
-				curhi3 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-				++offsetscompanion[curlo0];
-				curlo1 &= 0xFFu;
-				curlo2 &= 0xFFu;
-				curlo3 &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
-			}while(i -= 2);
 		}
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						U cur2{cur >> 16};
+						cur >>= 24;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						cur2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *pa{input[0]};
+						V *pb{input[1]};
+						input += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						pout[i] = pa;
+						pdst[i] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						pout[i - 1] = pb;
+						pdst[i - 1] = pb;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
+						cura >>= 24;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
+						curb >>= 24;
+						++offsetscompanion[cur0a];
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
+					}while(i -= 2);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						U curlo2{curlo >> 16};
+						curlo >>= 24;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						curlo2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						U curhi2{curhi >> 16};
+						curhi >>= 24;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						curhi2 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *pa{pinputlo[0]};
+						V *pb{pinputhi[0]};
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						*pinputhi-- = pa;
+						*poutputhi-- = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						*pinputlo++ = pb;
+						*poutputlo++ = pb;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						U cur2a{cura >> 16};
+						cura >>= 24;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						U cur2b{curb >> 16};
+						curb >>= 24;
+						++offsetscompanion[cur0a];
+						cur1a &= 0xFFu;
+						cur2a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						cur1b &= 0xFFu;
+						cur2b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
+						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
+					}while(--i);
+				}
+			}
+		}else{// 32-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					U cur2{cur >> 16};
+					cur >>= 24;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *pa{input[0]};
-					V *pb{input[1]};
-					input += 2;
-					pout[i] = pa;
-					pdst[i] = pa;
+					V *pa{input[i]};
+					V *pb{input[i - 1]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					pout[i - 1] = pb;
-					pdst[i - 1] = pb;
+					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					pout[i - 1] = pb;
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14996,110 +17095,261 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
 					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
 				}while(i -= 2);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-				do{
-					V *pa{pinputlo[0]};
-					V *pb{pinputhi[0]};
-					*pinputhi-- = pa;
-					*poutputhi-- = pa;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					*pinputlo++ = pb;
-					*poutputlo++ = pb;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
-					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					U cur2a{cura >> 16};
-					cura >>= 24;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					U cur2b{curb >> 16};
-					curb >>= 24;
-					++offsetscompanion[cur0a];
-					cur1a &= 0xFFu;
-					cur2a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsetscompanion[cur0b];
-					cur1b &= 0xFFu;
-					cur2b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
-				}while(--i);
 			}
-		}else{// 32-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *pa{input[i]};
-				V *pb{input[i - 1]};
-				pout[i] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				pout[i - 1] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
-				}
-				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> 8};
-				U cur2a{cura >> 16};
-				cura >>= 24;
-				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> 8};
-				U cur2b{curb >> 16};
-				curb >>= 24;
-				++offsetscompanion[cur0a];
-				cur1a &= 0xFFu;
-				cur2a &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				cur1b &= 0xFFu;
-				cur2b &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2a)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur2b)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curb)];
-			}while(i -= 2);
 		}
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						U cur1{cur >> 8};
+						cur >>= 16;
+						++offsetscompanion[cur0];
+						cur1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 3) / 6) * 3};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *pa{input[0]};
+						V *pb{input[1]};
+						V *pc{input[2]};
+						input += 3;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						pout[i] = pa;
+						pdst[i] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						pout[i - 1] = pb;
+						pdst[i - 1] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						pout[i - 2] = pc;
+						pdst[i - 2] = pc;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						curb >>= 16;
+						U cur0c{curc & 0xFFu};
+						U cur1c{curc >> 8};
+						curc >>= 16;
+						++offsetscompanion[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[cur0c];
+						cur1c &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
+					}while(i -= 3);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						U curlo1{curlo >> 8};
+						curlo >>= 16;
+						++offsetscompanion[curlo0];
+						curlo1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						U curhi1{curhi >> 8};
+						curhi >>= 16;
+						++offsetscompanion[curhi0];
+						curhi1 &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					std::size_t i{(count + 1 + 6) / 12};// rounded up in the companion thread
+					do{
+						V *pa{pinputlo[0]};
+						V *pb{pinputhi[0]};
+						V *pc{pinputlo[1]};
+						V *pd{pinputhi[-1]};
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						pinputhi[0] = pa;
+						poutputhi[0] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						pinputlo[0] = pb;
+						poutputlo[0] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						pinputhi[1] = pc;
+						poutputhi[1] = pc;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						// register pressure performance issue on several platforms: first do the high half here
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+						}
+						U cur0a{cura & 0xFFu};
+						U cur1a{cura >> 8};
+						cura >>= 16;
+						U cur0b{curb & 0xFFu};
+						U cur1b{curb >> 8};
+						curb >>= 16;
+						U cur0c{curc & 0xFFu};
+						U cur1c{curc >> 8};
+						curc >>= 16;
+						++offsetscompanion[cur0a];
+						cur1a &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						cur1b &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[cur0c];
+						cur1c &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
+						V *pe{pinputlo[2]};
+						V *pf{pinputhi[-2]};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						pinputlo[1] = pd;
+						poutputlo[1] = pd;
+						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						pinputhi[-2] = pe;
+						pinputhi -= 3;
+						poutputhi[-2] = pe;
+						poutputhi -= 3;
+						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						pinputlo[2] = pf;
+						pinputlo += 3;
+						poutputlo[2] = pf;
+						poutputlo += 3;
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						// register pressure performance issue on several platforms: do the low half here second
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
+						}
+						U cur0d{curd & 0xFFu};
+						U cur1d{curd >> 8};
+						curd >>= 16;
+						U cur0e{cure & 0xFFu};
+						U cur1e{cure >> 8};
+						cure >>= 16;
+						U cur0f{curf & 0xFFu};
+						U cur1f{curf >> 8};
+						curf >>= 16;
+						++offsetscompanion[cur0d];
+						cur1d &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+						++offsetscompanion[cur0e];
+						cur1e &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
+						++offsetscompanion[cur0f];
+						cur1f &= 0xFFu;
+						if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1d)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curd)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1e)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(cure)];
+						++offsetscompanion[256 + static_cast<std::size_t>(cur1f)];
+						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curf)];
+					}while(--i);
+				}
+			}
+		}else{// 24-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					U cur1{cur >> 8};
+					cur >>= 16;
+					++offsetscompanion[cur0];
+					cur1 &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 3) / 6) * 3};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *pa{input[0]};
-					V *pb{input[1]};
-					V *pc{input[2]};
-					input += 3;
-					pout[i] = pa;
-					pdst[i] = pa;
+					V *pa{input[i]};
+					V *pb{input[i - 1]};
+					V *pc{input[i - 2]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					pout[i - 1] = pb;
-					pdst[i - 1] = pb;
+					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					pout[i - 2] = pc;
-					pdst[i - 2] = pc;
+					pout[i - 1] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					pout[i - 2] = pc;
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
@@ -15131,175 +17381,210 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
 					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 				}while(i -= 3);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 6) / 12};// rounded up in the companion thread
-				do{
-					V *pa{pinputlo[0]};
-					V *pb{pinputhi[0]};
-					V *pc{pinputlo[1]};
-					V *pd{pinputhi[-1]};
-					pinputhi[0] = pa;
-					poutputhi[0] = pa;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					pinputlo[0] = pb;
-					poutputlo[0] = pb;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					pinputhi[1] = pc;
-					poutputhi[1] = pc;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					// register pressure performance issue on several platforms: first do the high half here
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
-					}
-					U cur0a{cura & 0xFFu};
-					U cur1a{cura >> 8};
-					cura >>= 16;
-					U cur0b{curb & 0xFFu};
-					U cur1b{curb >> 8};
-					curb >>= 16;
-					U cur0c{curc & 0xFFu};
-					U cur1c{curc >> 8};
-					curc >>= 16;
-					++offsetscompanion[cur0a];
-					cur1a &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsetscompanion[cur0b];
-					cur1b &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsetscompanion[cur0c];
-					cur1c &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
-					V *pe{pinputlo[2]};
-					V *pf{pinputhi[-2]};
-					pinputlo[1] = pd;
-					poutputlo[1] = pd;
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					pinputhi[-2] = pe;
-					pinputhi -= 3;
-					poutputhi[-2] = pe;
-					poutputhi -= 3;
-					auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-					pinputlo[2] = pf;
-					pinputlo += 3;
-					poutputlo[2] = pf;
-					poutputlo += 3;
-					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					// register pressure performance issue on several platforms: do the low half here second
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
-					}
-					U cur0d{curd & 0xFFu};
-					U cur1d{curd >> 8};
-					curd >>= 16;
-					U cur0e{cure & 0xFFu};
-					U cur1e{cure >> 8};
-					cure >>= 16;
-					U cur0f{curf & 0xFFu};
-					U cur1f{curf >> 8};
-					curf >>= 16;
-					++offsetscompanion[cur0d];
-					cur1d &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-					++offsetscompanion[cur0e];
-					cur1e &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
-					++offsetscompanion[cur0f];
-					cur1f &= 0xFFu;
-					if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1d)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curd)];
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1e)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(cure)];
-					++offsetscompanion[256 + static_cast<std::size_t>(cur1f)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curf)];
-				}while(--i);
 			}
-		}else{// 24-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 3) / 6) * 3};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *pa{input[i]};
-				V *pb{input[i - 1]};
-				V *pc{input[i - 2]};
-				pout[i] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				pout[i - 1] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				pout[i - 2] = pc;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
-				}
-				U cur0a{cura & 0xFFu};
-				U cur1a{cura >> 8};
-				cura >>= 16;
-				U cur0b{curb & 0xFFu};
-				U cur1b{curb >> 8};
-				curb >>= 16;
-				U cur0c{curc & 0xFFu};
-				U cur1c{curc >> 8};
-				curc >>= 16;
-				++offsetscompanion[cur0a];
-				cur1a &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				cur1b &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[cur0c];
-				cur1c &= 0xFFu;
-				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1a)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1b)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curb)];
-				++offsetscompanion[256 + static_cast<std::size_t>(cur1c)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
-			}while(i -= 3);
 		}
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *p{input[0]};
+						input += 2;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						pout[i] = p;
+						pdst[i] = p;
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+						}
+						U cur0{cur & 0xFFu};
+						cur >>= 8;
+						++offsetscompanion[cur0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cur)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					// unsigned counter, not zero inclusive inside the loop
+					std::size_t i{((count + 1 + 4) >> 3) * 4};// rounded up in the companion thread
+					pout += count - i;
+					pdst += count - i;
+					do{
+						V *pa{input[0]};
+						V *pb{input[1]};
+						V *pc{input[2]};
+						V *pd{input[3]};
+						input += 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						pout[i] = pa;
+						pdst[i] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						pout[i - 1] = pb;
+						pdst[i - 1] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						pout[i - 2] = pc;
+						pdst[i - 2] = pc;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						pout[i - 3] = pd;
+						pdst[i - 3] = pd;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+						}
+						U cur0a{cura & 0xFFu};
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						curb >>= 8;
+						U cur0c{curc & 0xFFu};
+						curc >>= 8;
+						U cur0d{curd & 0xFFu};
+						curd >>= 8;
+						++offsetscompanion[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[cur0c];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsetscompanion[cur0d];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curb)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curc)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curd)];
+					}while(i -= 4);
+				}
+			}else{// !isinputconst
+				V **pinputlo{input}, **pinputhi{input + count};
+				V **poutputlo{pout}, **poutputhi{pout + count};
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*poutputhi-- = plo;
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+						}
+						U curlo0{curlo & 0xFFu};
+						curlo >>= 8;
+						++offsetscompanion[curlo0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curlo)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*poutputlo++ = phi;
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+						}
+						U curhi0{curhi & 0xFFu};
+						curhi >>= 8;
+						++offsetscompanion[curhi0];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(curhi)];
+					}while(--i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					std::size_t i{(count + 1 + 4) >> 3};// rounded up in the companion thread
+					do{
+						V *pa{pinputlo[0]};
+						V *pb{pinputhi[0]};
+						V *pc{pinputlo[1]};
+						V *pd{pinputhi[-1]};
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						pinputhi[0] = pa;
+						poutputhi[0] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						pinputlo[0] = pb;
+						poutputlo[0] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						pinputhi[-1] = pc;
+						pinputhi -= 2;
+						poutputhi[-1] = pc;
+						poutputhi -= 2;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						pinputlo[1] = pd;
+						pinputlo += 2;
+						poutputlo[1] = pd;
+						poutputlo += 2;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+						}
+						U cur0a{cura & 0xFFu};
+						cura >>= 8;
+						U cur0b{curb & 0xFFu};
+						curb >>= 8;
+						U cur0c{curc & 0xFFu};
+						curc >>= 8;
+						U cur0d{curd & 0xFFu};
+						curd >>= 8;
+						++offsetscompanion[cur0a];
+						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+						++offsetscompanion[cur0b];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+						++offsetscompanion[cur0c];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+						++offsetscompanion[cur0d];
+						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+						++offsetscompanion[256 + static_cast<std::size_t>(cura)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curb)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curc)];
+						++offsetscompanion[256 + static_cast<std::size_t>(curd)];
+					}while(--i);
+				}
+			}
+		}else{// 16-bit, not in reverse order
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 1) >> 1)};// rounded up in the companion thread
+				input += count - i;
+				pout += count - i;
+				do{
+					V *p{input[i]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					U cur0{cur & 0xFFu};
+					cur >>= 8;
+					++offsetscompanion[cur0];
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+					++offsetscompanion[256 + static_cast<std::size_t>(cur)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
 				// unsigned counter, not zero inclusive inside the loop
 				std::size_t i{((count + 1 + 4) >> 3) * 4};// rounded up in the companion thread
+				input += count - i;
 				pout += count - i;
-				pdst += count - i;
 				do{
-					V *pa{input[0]};
-					V *pb{input[1]};
-					V *pc{input[2]};
-					V *pd{input[3]};
-					input += 4;
-					pout[i] = pa;
-					pdst[i] = pa;
+					V *pa{input[i]};
+					V *pb{input[i - 1]};
+					V *pc{input[i - 2]};
+					V *pd{input[i - 3]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					pout[i - 1] = pb;
-					pdst[i - 1] = pb;
+					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					pout[i - 2] = pc;
-					pdst[i - 2] = pc;
+					pout[i - 1] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					pout[i - 3] = pd;
-					pdst[i - 3] = pd;
+					pout[i - 2] = pc;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					pout[i - 3] = pd;
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
@@ -15328,106 +17613,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++offsetscompanion[256 + static_cast<std::size_t>(curc)];
 					++offsetscompanion[256 + static_cast<std::size_t>(curd)];
 				}while(i -= 4);
-			}else{// !isinputconst
-				V **pinputlo{input}, **pinputhi{input + count};
-				V **poutputlo{pout}, **poutputhi{pout + count};
-				std::size_t i{(count + 1 + 4) >> 3};// rounded up in the companion thread
-				do{
-					V *pa{pinputlo[0]};
-					V *pb{pinputhi[0]};
-					V *pc{pinputlo[1]};
-					V *pd{pinputhi[-1]};
-					pinputhi[0] = pa;
-					poutputhi[0] = pa;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					pinputlo[0] = pb;
-					poutputlo[0] = pb;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					pinputhi[-1] = pc;
-					pinputhi -= 2;
-					poutputhi[-1] = pc;
-					poutputhi -= 2;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					pinputlo[1] = pd;
-					pinputlo += 2;
-					poutputlo[1] = pd;
-					poutputlo += 2;
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-					}
-					U cur0a{cura & 0xFFu};
-					cura >>= 8;
-					U cur0b{curb & 0xFFu};
-					curb >>= 8;
-					U cur0c{curc & 0xFFu};
-					curc >>= 8;
-					U cur0d{curd & 0xFFu};
-					curd >>= 8;
-					++offsetscompanion[cur0a];
-					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-					++offsetscompanion[cur0b];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-					++offsetscompanion[cur0c];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-					++offsetscompanion[cur0d];
-					if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-					++offsetscompanion[256 + static_cast<std::size_t>(cura)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curb)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curc)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curd)];
-				}while(--i);
 			}
-		}else{// 16-bit, not in reverse order
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 4) >> 3) * 4};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *pa{input[i]};
-				V *pb{input[i - 1]};
-				V *pc{input[i - 2]};
-				V *pd{input[i - 3]};
-				pout[i] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				pout[i - 1] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				pout[i - 2] = pc;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				pout[i - 3] = pd;
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-				}
-				U cur0a{cura & 0xFFu};
-				cura >>= 8;
-				U cur0b{curb & 0xFFu};
-				curb >>= 8;
-				U cur0c{curc & 0xFFu};
-				curc >>= 8;
-				U cur0d{curd & 0xFFu};
-				curd >>= 8;
-				++offsetscompanion[cur0a];
-				if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-				++offsetscompanion[cur0b];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-				++offsetscompanion[cur0c];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-				++offsetscompanion[cur0d];
-				if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-				++offsetscompanion[256 + static_cast<std::size_t>(cura)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curb)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curc)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curd)];
-			}while(i -= 4);
 		}
 	}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 }
@@ -16048,204 +18234,278 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::conditional_t<ismultithreadcapable, std::ptrdiff_t, std::nullptr_t> stride;
 				if constexpr(ismultithreadcapable){
-					stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					// architecture: limit to one at a time when there's few registers
+					if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 					i -= stride;
 				}
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					do{
-						V *phi{pinput[0]};
-						V *plo{pinput[1]};
-						pinput += 2;
-						output[i] = phi;
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{pinput[0]};
+							V *plo{pinput[1]};
+							pinput += 2;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							U curhi6{curhi >> 48};
+							curhi >>= 56;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							curhi6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							U curlo6{curlo >> 48};
+							curlo >>= 56;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							curlo6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						U curhi6{curhi >> 48};
-						curhi >>= 56;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						curhi6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						U curlo6{curlo >> 48};
-						curlo >>= 56;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						curlo6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[i] = p;
-						buffer[i] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						U cur6{cur >> 48};
-						cur >>= 56;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						cur6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 64-bit, not in reverse order
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						output[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							U curhi6{curhi >> 48};
+							curhi >>= 56;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							curhi6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							U curlo6{curlo >> 48};
+							curlo >>= 56;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							curlo6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						U curhi6{curhi >> 48};
-						curhi >>= 56;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						curhi6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						U curlo6{curlo >> 48};
-						curlo >>= 56;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						curlo6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						U cur6{cur >> 48};
-						cur >>= 56;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						cur6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -16261,180 +18521,246 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					do{
-						V *phi{pinput[0]};
-						V *plo{pinput[1]};
-						pinput += 2;
-						output[i] = phi;
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{pinput[0]};
+							V *plo{pinput[1]};
+							pinput += 2;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							curhi >>= 48;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							curlo >>= 48;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						curhi >>= 48;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						curlo >>= 48;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[i] = p;
-						buffer[i] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						cur >>= 48;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 56-bit, not in reverse order
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						output[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							curhi >>= 48;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							curlo >>= 48;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						curhi >>= 48;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						curlo >>= 48;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						cur >>= 48;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -16450,162 +18776,222 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					do{
-						V *phi{pinput[0]};
-						V *plo{pinput[1]};
-						pinput += 2;
-						output[i] = phi;
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{pinput[0]};
+							V *plo{pinput[1]};
+							pinput += 2;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							curhi >>= 40;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							curlo >>= 40;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						curhi >>= 40;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						curlo >>= 40;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[i] = p;
-						buffer[i] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						cur >>= 40;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 48-bit, not in reverse order
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						output[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							curhi >>= 40;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							curlo >>= 40;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						curhi >>= 40;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						curlo >>= 40;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						cur >>= 40;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -16621,140 +19007,194 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					do{
-						V *phi{pinput[0]};
-						V *plo{pinput[1]};
-						pinput += 2;
-						output[i] = phi;
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{pinput[0]};
+							V *plo{pinput[1]};
+							pinput += 2;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							curhi >>= 32;
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							curlo >>= 32;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						curhi >>= 32;
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						curlo >>= 32;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[i] = p;
-						buffer[i] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						cur >>= 32;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 40-bit, not in reverse order
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						output[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							output[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							output[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							curhi >>= 32;
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							curlo >>= 32;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						curhi >>= 32;
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						curlo >>= 32;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						cur >>= 32;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -16770,122 +19210,170 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					do{
-						V *pa{pinput[0]};
-						V *pb{pinput[1]};
-						pinput += 2;
-						output[i] = pa;
-						buffer[i] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i - 1] = pb;
-						buffer[i - 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *pa{pinput[0]};
+							V *pb{pinput[1]};
+							pinput += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i] = pa;
+							buffer[i] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i - 1] = pb;
+							buffer[i - 1] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							U cur2a{cura >> 16};
+							cura >>= 24;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							U cur2b{curb >> 16};
+							curb >>= 24;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							cur2a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							cur2b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							U cur2{static_cast<unsigned>(cur) >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						U cur2a{cura >> 16};
-						cura >>= 24;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						U cur2b{curb >> 16};
-						curb >>= 24;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						cur2a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						cur2b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[0] = p;
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						U cur2{static_cast<unsigned>(cur) >> 16};
-						cur >>= 24;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 32-bit, not in reverse order
-					do{
-						V *pa{input[i]};
-						V *pb{input[i - 1]};
-						output[i] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i - 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *pa{input[i]};
+							V *pb{input[i - 1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i - 1] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							U cur2a{cura >> 16};
+							cura >>= 24;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							U cur2b{curb >> 16};
+							curb >>= 24;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							cur2a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							cur2b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							U cur2{static_cast<unsigned>(cur) >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						U cur2a{cura >> 16};
-						cura >>= 24;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						U cur2b{curb >> 16};
-						curb >>= 24;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						cur2a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						cur2b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						U cur2{static_cast<unsigned>(cur) >> 16};
-						cur >>= 24;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -16901,200 +19389,242 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					i -= 2;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{pinput[0]};
-						V *pb{pinput[1]};
-						V *pc{pinput[2]};
-						pinput += 3;
-						output[i + 3] = pa;
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						output[i + 1] = pc;
-						buffer[i + 1] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						i -= 2;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{pinput[0]};
+							V *pb{pinput[1]};
+							V *pc{pinput[2]};
+							pinput += 3;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							buffer[i + 2] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							output[i + 1] = pc;
+							buffer[i + 1] = pc;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							U cur0c{curc & 0xFFu};
+							U cur1c{curc >> 8};
+							curc >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							cur1c &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(cur1c)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+							i -= 3;
+						}while(0 <= i);
+						if(2 & i){
+							V *pa{pinput[0]};
+							V *pb{pinput[1]};
+							pinput += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							buffer[i + 2] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> 8};
-						curc >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						cur1c &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(cur1c)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						i -= 3;
-					}while(0 <= i);
-					if(2 & i){
-						V *pa{pinput[0]};
-						V *pb{pinput[1]};
-						pinput += 2;
-						output[i + 3] = pa;
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[0] = p;
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						cur >>= 16;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 24-bit, not in reverse order
-					i -= 2;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{input[i + 2]};
-						V *pb{input[i + 1]};
-						V *pc{input[i]};
-						output[i + 2] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						output[i] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						i -= 2;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{input[i + 2]};
+							V *pb{input[i + 1]};
+							V *pc{input[i]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 2] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 1] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							output[i] = pc;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							U cur0c{curc & 0xFFu};
+							U cur1c{curc >> 8};
+							curc >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							cur1c &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(cur1c)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+							i -= 3;
+						}while(0 <= i);
+						if(2 & i){// fill in the final two items for a remainder of 2 or 3
+							V *pa{input[i + 3]};
+							V *pb{input[i + 2]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> 8};
-						curc >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						cur1c &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(cur1c)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						i -= 3;
-					}while(0 <= i);
-					if(2 & i){// fill in the final two items for a remainder of 2 or 3
-						V *pa{input[i + 3]};
-						V *pb{input[i + 2]};
-						output[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						cur >>= 16;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -17110,183 +19640,219 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){// also reverse the array at the same time
 					V *const *pinput{input};
 					if constexpr(ismultithreadcapable) pinput += stride;
-					i -= 3;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{pinput[0]};
-						V *pb{pinput[1]};
-						V *pc{pinput[2]};
-						V *pd{pinput[3]};
-						pinput += 4;
-						output[i + 3] = pa;
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						output[i + 1] = pc;
-						buffer[i + 1] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						output[i] = pd;
-						buffer[i] = pd;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							V *p{pinput[0]};
+							++pinput;
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						i -= 3;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{pinput[0]};
+							V *pb{pinput[1]};
+							V *pc{pinput[2]};
+							V *pd{pinput[3]};
+							pinput += 4;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							buffer[i + 2] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							output[i + 1] = pc;
+							buffer[i + 1] = pc;
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							output[i] = pd;
+							buffer[i] = pd;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							U cur0c{curc & 0xFFu};
+							curc >>= 8;
+							U cur0d{curd & 0xFFu};
+							curd >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[cur0d];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(curc)];
+							++offsets[256 + static_cast<std::size_t>(curd)];
+							i -= 4;
+						}while(0 <= i);
+						if(2 & i){
+							V *pa{pinput[0]};
+							V *pb{pinput[1]};
+							pinput += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							buffer[i + 2] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						U cur0c{curc & 0xFFu};
-						curc >>= 8;
-						U cur0d{curd & 0xFFu};
-						curd >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[cur0d];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(curc)];
-						++offsets[256 + static_cast<std::size_t>(curd)];
-						i -= 4;
-					}while(0 <= i);
-					if(2 & i){
-						V *pa{pinput[0]};
-						V *pb{pinput[1]};
-						pinput += 2;
-						output[i + 3] = pa;
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{pinput[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						output[0] = p;
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						cur >>= 8;
-						++offsets[cur0];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur)];
 					}
 				}else{// 16-bit, not in reverse order
-					i -= 3;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{input[i + 3]};
-						V *pb{input[i + 2]};
-						V *pc{input[i + 1]};
-						V *pd{input[i]};
-						output[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						output[i + 1] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						output[i] = pd;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						i -= 3;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{input[i + 3]};
+							V *pb{input[i + 2]};
+							V *pc{input[i + 1]};
+							V *pd{input[i]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							output[i + 1] = pc;
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							output[i] = pd;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							U cur0c{curc & 0xFFu};
+							curc >>= 8;
+							U cur0d{curd & 0xFFu};
+							curd >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[cur0d];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(curc)];
+							++offsets[256 + static_cast<std::size_t>(curd)];
+							i -= 4;
+						}while(0 <= i);
+						if(2 & i){// fill in the final two items for a remainder of 2 or 3
+							V *pa{input[i + 3]};
+							V *pb{input[i + 2]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							output[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							output[i + 2] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						U cur0c{curc & 0xFFu};
-						curc >>= 8;
-						U cur0d{curd & 0xFFu};
-						curd >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[cur0d];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(curc)];
-						++offsets[256 + static_cast<std::size_t>(curd)];
-						i -= 4;
-					}while(0 <= i);
-					if(2 & i){// fill in the final two items for a remainder of 2 or 3
-						V *pa{input[i + 3]};
-						V *pb{input[i + 2]};
-						output[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						output[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							output[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{input[0]};
-						output[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						cur >>= 8;
-						++offsets[cur0];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
@@ -17543,74 +20109,143 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						U curlo6{curlo >> 48};
-						curlo >>= 56;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						curlo6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-						// register pressure performance issue on several platforms: do the high half here second
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						U curhi6{curhi >> 48};
-						curhi >>= 56;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						curhi6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-					}while(pinputlo < pinputhi);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							U curlo6{curlo >> 48};
+							curlo >>= 56;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							curlo6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							U curhi6{curhi >> 48};
+							curhi >>= 56;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							curhi6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							U curlo6{curlo >> 48};
+							curlo >>= 56;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							curlo6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							U curhi6{curhi >> 48};
+							curhi >>= 56;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							curhi6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -17641,100 +20276,136 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 64-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							U curhi6{curhi >> 48};
+							curhi >>= 56;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							curhi6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							U curlo6{curlo >> 48};
+							curlo >>= 56;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							curlo6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							U cur6{cur >> 48};
+							cur >>= 56;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							cur6 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+							++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						U curhi6{curhi >> 48};
-						curhi >>= 56;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						curhi6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						U curlo6{curlo >> 48};
-						curlo >>= 56;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						curlo6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						U cur6{cur >> 48};
-						cur >>= 56;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						cur6 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
-						++offsets[7 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(56 == CHAR_BIT * sizeof(T)){
@@ -17752,68 +20423,131 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						curlo >>= 48;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-						// register pressure performance issue on several platforms: do the high half here second
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						curhi >>= 48;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-					}while(pinputlo < pinputhi);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							curlo >>= 48;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							curhi >>= 48;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							curlo >>= 48;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							curhi >>= 48;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -17841,91 +20575,124 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 56-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							U curhi5{curhi >> 40};
+							curhi >>= 48;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							curhi5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							U curlo5{curlo >> 40};
+							curlo >>= 48;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							curlo5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							U cur5{cur >> 40};
+							cur >>= 48;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							cur5 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+							++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						U curhi5{curhi >> 40};
-						curhi >>= 48;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						curhi5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						U curlo5{curlo >> 40};
-						curlo >>= 48;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						curlo5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						U cur5{cur >> 40};
-						cur >>= 48;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						cur5 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(48 == CHAR_BIT * sizeof(T)){
@@ -17943,57 +20710,114 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						curlo >>= 40;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-						// register pressure performance issue on several platforms: do the high half here second
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						curhi >>= 40;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-					}while(pinputlo < pinputhi);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							curlo >>= 40;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							curhi >>= 40;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							curlo >>= 40;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							curhi >>= 40;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						U cur{pinputlo[0]};
 						// no write to input, as this is the midpoint
@@ -18020,82 +20844,112 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 48-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							// register pressure performance issue on several platforms: first do the high half here
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							U curhi4{curhi >> 32};
+							curhi >>= 40;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							curhi4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
+							// register pressure performance issue on several platforms: do the low half here second
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							U curlo4{curlo >> 32};
+							curlo >>= 40;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							curlo4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							U cur4{cur >> 32};
+							cur >>= 40;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							cur4 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+							++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 						}
-						// register pressure performance issue on several platforms: first do the high half here
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						U curhi4{curhi >> 32};
-						curhi >>= 40;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						curhi4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curhi)];
-						// register pressure performance issue on several platforms: do the low half here second
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						U curlo4{curlo >> 32};
-						curlo >>= 40;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						curlo4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						U cur4{cur >> 32};
-						cur >>= 40;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						cur4 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(40 == CHAR_BIT * sizeof(T)){
@@ -18113,54 +20967,105 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
-						}
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						curlo >>= 32;
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						curhi >>= 32;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-					}while(pinputlo < pinputhi);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							curlo >>= 32;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							curhi >>= 32;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
+							}
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							curlo >>= 32;
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							curhi >>= 32;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -18182,71 +21087,98 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 40-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						buffer[i] = phi;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i - 1] = plo;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+						do{
+							V *phi{input[i]};
+							V *plo{input[i - 1]};
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							buffer[i] = phi;
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							buffer[i - 1] = plo;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							U curhi3{curhi >> 24};
+							curhi >>= 32;
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							U curlo3{curlo >> 24};
+							curlo >>= 32;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							curhi3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							curlo3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							U cur3{cur >> 24};
+							cur >>= 32;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							cur3 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+							++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U curhi0{curhi & 0xFFu};
-						U curhi1{curhi >> 8};
-						U curhi2{curhi >> 16};
-						U curhi3{curhi >> 24};
-						curhi >>= 32;
-						U curlo0{curlo & 0xFFu};
-						U curlo1{curlo >> 8};
-						U curlo2{curlo >> 16};
-						U curlo3{curlo >> 24};
-						curlo >>= 32;
-						++offsets[curhi0];
-						curhi1 &= 0xFFu;
-						curhi2 &= 0xFFu;
-						curhi3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
-						++offsets[curlo0];
-						curlo1 &= 0xFFu;
-						curlo2 &= 0xFFu;
-						curlo3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(curhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curhi)];
-						++offsets[256 + static_cast<std::size_t>(curlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{cur >> 8};
-						U cur2{cur >> 16};
-						U cur3{cur >> 24};
-						cur >>= 32;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						cur3 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(32 == CHAR_BIT * sizeof(T)){
@@ -18264,48 +21196,93 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					do{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						*pinputhi-- = pa;
-						*pbufferhi-- = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						*pinputlo++ = pb;
-						*pbufferlo++ = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
-						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						U cur2a{cura >> 16};
-						cura >>= 24;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						U cur2b{curb >> 16};
-						curb >>= 24;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						cur2a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						cur2b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-					}while(pinputlo < pinputhi);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						do{
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							U curlo2{curlo >> 16};
+							curlo >>= 24;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							curlo2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							U curhi2{curhi >> 16};
+							curhi >>= 24;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							curhi2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						do{
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							*pinputhi-- = pa;
+							*pbufferhi-- = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							*pinputlo++ = pb;
+							*pbufferlo++ = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							U cur2a{cura >> 16};
+							cura >>= 24;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							U cur2b{curb >> 16};
+							curb >>= 24;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							cur2a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							cur2b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -18324,62 +21301,86 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 32-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *pa{input[i]};
-						V *pb{input[i - 1]};
-						buffer[i] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						buffer[i - 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+						do{
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							U cur2{cur >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+						do{
+							V *pa{input[i]};
+							V *pb{input[i - 1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							buffer[i] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							buffer[i - 1] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							U cur2a{cura >> 16};
+							cura >>= 24;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							U cur2b{curb >> 16};
+							curb >>= 24;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							cur2a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							cur2b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
+							++offsets[3 * 256 + static_cast<std::size_t>(curb)];
+							i -= 2;
+						}while(0 < i);
+						if(!(1 & i)){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							U cur2{static_cast<unsigned>(cur) >> 16};
+							cur >>= 24;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							cur2 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+							++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						U cur2a{cura >> 16};
-						cura >>= 24;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						U cur2b{curb >> 16};
-						curb >>= 24;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						cur2a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						cur2b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2a)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2b)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curb)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						U cur2{static_cast<unsigned>(cur) >> 16};
-						cur >>= 24;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						cur2 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(24 == CHAR_BIT * sizeof(T)){
@@ -18393,206 +21394,248 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 6) / 12)};
+						// architecture: limit to one at a time when there's few registers
+						std::ptrdiff_t stride;
+						if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2);
+						else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 6) / 12);
 						initialcount = count - stride + 1;
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					initialcount %= 6;
-					if(4 & initialcount){// possibly initialise with 4 entries before the loop below
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
-						V *pd{pinputhi[-1]};
-						pinputhi[0] = pa;
-						pbufferhi[0] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						pinputlo[0] = pb;
-						pbufferlo[0] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						pinputhi[1] = pc;
-						pinputhi -= 2;
-						pbufferhi[1] = pc;
-						pbufferhi -= 2;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						pinputlo[-1] = pd;
-						pinputlo += 2;
-						pbufferlo[-1] = pd;
-						pbufferlo += 2;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> 8};
-						curc >>= 16;
-						U cur0d{curd & 0xFFu};
-						U cur1d{curd >> 8};
-						curd >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						cur1c &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[cur0d];
-						cur1d &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(cur1c)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						++offsets[256 + static_cast<std::size_t>(cur1d)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curd)];
-					}else if(2 & initialcount){// possibly initialise with 2 entries before the loop below
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						*pinputhi-- = pa;
-						*pbufferhi-- = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						*pinputlo++ = pb;
-						*pbufferlo++ = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
-						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					}
-					if(5 <= count)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
-						V *pd{pinputhi[-1]};
-						pinputhi[0] = pa;
-						pbufferhi[0] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						pinputlo[0] = pb;
-						pbufferlo[0] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						pinputhi[1] = pc;
-						pbufferhi[1] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						// register pressure performance issue on several platforms: first do the high half here
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							U curlo1{curlo >> 8};
+							curlo >>= 16;
+							++offsets[curlo0];
+							curlo1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							U curhi1{curhi >> 8};
+							curhi >>= 16;
+							++offsets[curhi0];
+							curhi1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						initialcount %= 6;
+						if(4 & initialcount){// possibly initialise with 4 entries before the loop below
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							V *pc{pinputlo[1]};
+							V *pd{pinputhi[-1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							pinputhi[0] = pa;
+							pbufferhi[0] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							pinputlo[0] = pb;
+							pbufferlo[0] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							pinputhi[1] = pc;
+							pinputhi -= 2;
+							pbufferhi[1] = pc;
+							pbufferhi -= 2;
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							pinputlo[-1] = pd;
+							pinputlo += 2;
+							pbufferlo[-1] = pd;
+							pbufferlo += 2;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							U cur0c{curc & 0xFFu};
+							U cur1c{curc >> 8};
+							curc >>= 16;
+							U cur0d{curd & 0xFFu};
+							U cur1d{curd >> 8};
+							curd >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							cur1c &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[cur0d];
+							cur1d &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(cur1c)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+							++offsets[256 + static_cast<std::size_t>(cur1d)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curd)];
+						}else if(2 & initialcount){// possibly initialise with 2 entries before the loop below
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							*pinputhi-- = pa;
+							*pbufferhi-- = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							*pinputlo++ = pb;
+							*pbufferlo++ = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> 8};
-						curc >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						cur1c &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(cur1c)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						V *pe{pinputlo[2]};
-						V *pf{pinputhi[-2]};
-						pinputlo[1] = pd;
-						pbufferlo[1] = pd;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						pinputhi[-2] = pe;
-						pinputhi -= 3;
-						pbufferhi[-2] = pe;
-						pbufferhi -= 3;
-						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-						pinputlo[2] = pf;
-						pinputlo += 3;
-						pbufferlo[2] = pf;
-						pbufferlo += 3;
-						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-						// register pressure performance issue on several platforms: do the low half here second
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
-						}
-						U cur0d{curd & 0xFFu};
-						U cur1d{curd >> 8};
-						curd >>= 16;
-						U cur0e{cure & 0xFFu};
-						U cur1e{cure >> 8};
-						cure >>= 16;
-						U cur0f{curf & 0xFFu};
-						U cur1f{curf >> 8};
-						curf >>= 16;
-						++offsets[cur0d];
-						cur1d &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[cur0e];
-						cur1e &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
-						++offsets[cur0f];
-						cur1f &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1d)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curd)];
-						++offsets[256 + static_cast<std::size_t>(cur1e)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[256 + static_cast<std::size_t>(cur1f)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curf)];
-					}while(pinputlo < pinputhi);
+						if(5 <= count)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							V *pc{pinputlo[1]};
+							V *pd{pinputhi[-1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							pinputhi[0] = pa;
+							pbufferhi[0] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							pinputlo[0] = pb;
+							pbufferlo[0] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							pinputhi[1] = pc;
+							pbufferhi[1] = pc;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							// register pressure performance issue on several platforms: first do the high half here
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							U cur0c{curc & 0xFFu};
+							U cur1c{curc >> 8};
+							curc >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							cur1c &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(cur1c)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+							V *pe{pinputlo[2]};
+							V *pf{pinputhi[-2]};
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							pinputlo[1] = pd;
+							pbufferlo[1] = pd;
+							auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+							pinputhi[-2] = pe;
+							pinputhi -= 3;
+							pbufferhi[-2] = pe;
+							pbufferhi -= 3;
+							auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+							pinputlo[2] = pf;
+							pinputlo += 3;
+							pbufferlo[2] = pf;
+							pbufferlo += 3;
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+							U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+							// register pressure performance issue on several platforms: do the low half here second
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
+							}
+							U cur0d{curd & 0xFFu};
+							U cur1d{curd >> 8};
+							curd >>= 16;
+							U cur0e{cure & 0xFFu};
+							U cur1e{cure >> 8};
+							cure >>= 16;
+							U cur0f{curf & 0xFFu};
+							U cur1f{curf >> 8};
+							curf >>= 16;
+							++offsets[cur0d];
+							cur1d &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[cur0e];
+							cur1e &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cure &= 0x7Fu;
+							++offsets[cur0f];
+							cur1f &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curf &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1d)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curd)];
+							++offsets[256 + static_cast<std::size_t>(cur1e)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cure)];
+							++offsets[256 + static_cast<std::size_t>(cur1f)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curf)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -18608,99 +21651,120 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 24-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 3) / 6) * 3;
-					i -= 2;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 						do{
-						V *pa{input[i + 2]};
-						V *pb{input[i + 1]};
-						V *pc{input[i]};
-						buffer[i + 2] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						buffer[i + 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						buffer[i] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{cur >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 3) / 6) * 3;
+						i -= 2;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{input[i + 2]};
+							V *pb{input[i + 1]};
+							V *pc{input[i]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							buffer[i + 2] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							buffer[i + 1] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							buffer[i] = pc;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							U cur0c{curc & 0xFFu};
+							U cur1c{curc >> 8};
+							curc >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							cur1c &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(cur1c)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curc)];
+							i -= 3;
+						}while(0 <= i);
+						if(2 & i){// fill in the final two items for a remainder of 2 or 3
+							V *pa{input[i + 2]};
+							V *pb{input[i + 1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							buffer[i + 2] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							buffer[i + 1] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							U cur1a{cura >> 8};
+							cura >>= 16;
+							U cur0b{curb & 0xFFu};
+							U cur1b{curb >> 8};
+							curb >>= 16;
+							++offsets[cur0a];
+							cur1a &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							cur1b &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1a)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(cur1b)];
+							++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						U cur0c{curc & 0xFFu};
-						U cur1c{curc >> 8};
-						curc >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						cur1c &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(cur1c)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curc)];
-						i -= 3;
-					}while(0 <= i);
-					if(2 & i){// fill in the final two items for a remainder of 2 or 3
-						V *pa{input[i + 2]};
-						V *pb{input[i + 1]};
-						buffer[i + 2] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						buffer[i + 1] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							U cur1{static_cast<unsigned>(cur) >> 8};
+							cur >>= 16;
+							++offsets[cur0];
+							cur1 &= 0xFFu;
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur1)];
+							++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						U cur1a{cura >> 8};
-						cura >>= 16;
-						U cur0b{curb & 0xFFu};
-						U cur1b{curb >> 8};
-						curb >>= 16;
-						++offsets[cur0a];
-						cur1a &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						cur1b &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1a)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(cur1b)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						U cur1{static_cast<unsigned>(cur) >> 8};
-						cur >>= 16;
-						++offsets[cur0];
-						cur1 &= 0xFFu;
-						if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cur1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else if constexpr(16 == CHAR_BIT * sizeof(T)){
@@ -18712,95 +21776,131 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3)};
+						// architecture: limit to one at a time when there's few registers
+						std::ptrdiff_t stride;
+						if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2);
+						else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3);
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
 						pbufferhi = buffer + (count - stride);
 					}
-					if(2 & count + 1){// possibly initialise with 2 entries before the loop below
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						*pinputhi-- = pa;
-						*pbufferhi-- = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						*pinputlo++ = pb;
-						*pbufferlo++ = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
-						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-					}
-					if(3 <= count)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
-						V *pd{pinputhi[-1]};
-						pinputhi[0] = pa;
-						pbufferhi[0] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						pinputlo[0] = pb;
-						pbufferlo[0] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						pinputhi[-1] = pc;
-						pinputhi -= 2;
-						pbufferhi[-1] = pc;
-						pbufferhi -= 2;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						pinputlo[1] = pd;
-						pinputlo += 2;
-						pbufferlo[1] = pd;
-						pbufferlo += 2;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							V *plo{pinputlo[0]};
+							V *phi{pinputhi[0]};
+							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							*pinputhi-- = plo;
+							*pbufferhi-- = plo;
+							U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
+							}
+							// register pressure performance issue on several platforms: first do the low half here
+							U curlo0{curlo & 0xFFu};
+							curlo >>= 8;
+							++offsets[curlo0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curlo)];
+							// register pressure performance issue on several platforms: do the high half here second
+							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							*pinputlo++ = phi;
+							*pbufferlo++ = phi;
+							U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
+							}
+							U curhi0{curhi & 0xFFu};
+							curhi >>= 8;
+							++offsets[curhi0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curhi &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(curhi)];
+						}while(pinputlo < pinputhi);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if(2 & count + 1){// possibly initialise with 2 entries before the loop below
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							*pinputhi-- = pa;
+							*pbufferhi-- = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							*pinputlo++ = pb;
+							*pbufferlo++ = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						U cur0c{curc & 0xFFu};
-						curc >>= 8;
-						U cur0d{curd & 0xFFu};
-						curd >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[cur0d];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(curc)];
-						++offsets[256 + static_cast<std::size_t>(curd)];
-					}while(pinputlo < pinputhi);
+						if(3 <= count)
+	#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+	#endif
+							do{
+							V *pa{pinputlo[0]};
+							V *pb{pinputhi[0]};
+							V *pc{pinputlo[1]};
+							V *pd{pinputhi[-1]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							pinputhi[0] = pa;
+							pbufferhi[0] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							pinputlo[0] = pb;
+							pbufferlo[0] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							pinputhi[-1] = pc;
+							pinputhi -= 2;
+							pbufferhi[-1] = pc;
+							pbufferhi -= 2;
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							pinputlo[1] = pd;
+							pinputlo += 2;
+							pbufferlo[1] = pd;
+							pbufferlo += 2;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							U cur0c{curc & 0xFFu};
+							curc >>= 8;
+							U cur0d{curd & 0xFFu};
+							curd >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[cur0d];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(curc)];
+							++offsets[256 + static_cast<std::size_t>(curd)];
+						}while(pinputlo < pinputhi);
+					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -18813,89 +21913,107 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 16-bit, not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
-					i -= 3;
-					if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 						do{
-						V *pa{input[i + 3]};
-						V *pb{input[i + 2]};
-						V *pc{input[i + 1]};
-						V *pd{input[i]};
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						buffer[i + 1] = pc;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						buffer[i] = pd;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							V *p{input[i]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[i] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cur)];
+						}while(0 <= --i);
+					}else{// architecture: do not limit as much when there's a reasonable amount of registers
+						if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 4) >> 3) * 4;
+						i -= 3;
+						if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+							[[likely]]
+#endif
+							do{
+							V *pa{input[i + 3]};
+							V *pb{input[i + 2]};
+							V *pc{input[i + 1]};
+							V *pd{input[i]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							buffer[i + 2] = pb;
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							buffer[i + 1] = pc;
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							buffer[i] = pd;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							U cur0c{curc & 0xFFu};
+							curc >>= 8;
+							U cur0d{curd & 0xFFu};
+							curd >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[cur0c];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
+							++offsets[cur0d];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
+							++offsets[256 + static_cast<std::size_t>(curc)];
+							++offsets[256 + static_cast<std::size_t>(curd)];
+							i -= 4;
+						}while(0 <= i);
+						if(2 & i){// fill in the final two items for a remainder of 2 or 3
+							V *pa{input[i + 3]};
+							V *pb{input[i + 2]};
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							buffer[i + 3] = pa;
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							buffer[i + 2] = pb;
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+							}
+							U cur0a{cura & 0xFFu};
+							cura >>= 8;
+							U cur0b{curb & 0xFFu};
+							curb >>= 8;
+							++offsets[cur0a];
+							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
+							++offsets[cur0b];
+							if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
+							++offsets[256 + static_cast<std::size_t>(cura)];
+							++offsets[256 + static_cast<std::size_t>(curb)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						U cur0c{curc & 0xFFu};
-						curc >>= 8;
-						U cur0d{curd & 0xFFu};
-						curd >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[cur0c];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curc &= 0x7Fu;
-						++offsets[cur0d];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curd &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-						++offsets[256 + static_cast<std::size_t>(curc)];
-						++offsets[256 + static_cast<std::size_t>(curd)];
-						i -= 4;
-					}while(0 <= i);
-					if(2 & i){// fill in the final two items for a remainder of 2 or 3
-						V *pa{input[i + 3]};
-						V *pb{input[i + 2]};
-						buffer[i + 3] = pa;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						buffer[i + 2] = pb;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+						if(1 & i){// fill in the final item for odd counts
+							V *p{input[0]};
+							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							buffer[0] = p;
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+							}
+							U cur0{cur & 0xFFu};
+							cur >>= 8;
+							++offsets[cur0];
+							++offsets[256 + static_cast<std::size_t>(cur)];
 						}
-						U cur0a{cura & 0xFFu};
-						cura >>= 8;
-						U cur0b{curb & 0xFFu};
-						curb >>= 8;
-						++offsets[cur0a];
-						if constexpr(isabsvalue && issignmode && isfltpmode) cura &= 0x7Fu;
-						++offsets[cur0b];
-						if constexpr(isabsvalue && issignmode && isfltpmode) curb &= 0x7Fu;
-						++offsets[256 + static_cast<std::size_t>(cura)];
-						++offsets[256 + static_cast<std::size_t>(curb)];
-					}
-					if(1 & i){// fill in the final item for odd counts
-						V *p{input[0]};
-						buffer[0] = p;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-						}
-						U cur0{cur & 0xFFu};
-						cur >>= 8;
-						++offsets[cur0];
-						++offsets[256 + static_cast<std::size_t>(cur)];
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
@@ -18999,63 +22117,85 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	assert(offsetscompanion);
 	// unsigned counter, not zero inclusive inside the loop
-	std::size_t i{((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
+	// architecture: limit to two at a time when there's few registers
+	std::size_t i{(defaultgprfilesize < gprfilesize::large)? ((count + 1 + 2) >> 2) * 2 : ((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
 	input += count - i;
 	pout += count - i;
-	do{
-		U cura{input[i]};
-		U curb{input[i - 1]};
-		U curc{input[i - 2]};
-		U curd{input[i - 3]};
-		if constexpr(isabsvalue != isfltpmode){// two-register filters only
-			// register pressure performance issue on several platforms: first do the high half here
-			filterinput<isabsvalue, issignmode, isfltpmode, T>(
-				cura, pout + i,
-				curb, pout + i - 1,
-				curc, pout + i - 2,
-				curd, pout + i - 3);
-			++offsetscompanion[cura];
-			++offsetscompanion[curb];
-			++offsetscompanion[curc];
-			++offsetscompanion[curd];
-		}
-		U cure{input[i - 4]};
-		U curf{input[i - 5]};
-		U curg{input[i - 6]};
-		U curh{input[i - 7]};
-		if constexpr(isabsvalue != isfltpmode){// two-register filters only
-			// register pressure performance issue on several platforms: do the low half here second
-			filterinput<isabsvalue, issignmode, isfltpmode, T>(
-				cure, pout + i - 4,
-				curf, pout + i - 5,
-				curg, pout + i - 6,
-				curh, pout + i - 7);
-			++offsetscompanion[cure];
-			++offsetscompanion[curf];
-			++offsetscompanion[curg];
-			++offsetscompanion[curh];
-		}else{
-			pout[i] = static_cast<T>(cura);
-			pout[i - 1] = static_cast<T>(curb);
-			pout[i - 2] = static_cast<T>(curc);
-			pout[i - 3] = static_cast<T>(curd);
-			pout[i - 4] = static_cast<T>(cure);
-			pout[i - 5] = static_cast<T>(curf);
-			pout[i - 6] = static_cast<T>(curg);
-			pout[i - 7] = static_cast<T>(curh);
-			if constexpr(isabsvalue && isfltpmode){// one-register filters only
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		do{
+			U cura{input[i]};
+			U curb{input[i - 1]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: first do the high half here
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, pout + i,
+					curb, pout + i - 1);
+			}else{
+				pout[i] = static_cast<T>(cura);
+				pout[i - 1] = static_cast<T>(curb);
+				if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+				}
 			}
 			++offsetscompanion[cura];
 			++offsetscompanion[curb];
-			++offsetscompanion[curc];
-			++offsetscompanion[curd];
-			++offsetscompanion[cure];
-			++offsetscompanion[curf];
-			++offsetscompanion[curg];
-			++offsetscompanion[curh];
-		}
-	}while(i -= 8);
+		}while(i -= 2);
+	}else{// architecture: do not limit as much when there's a reasonable amount of registers
+		do{
+			U cura{input[i]};
+			U curb{input[i - 1]};
+			U curc{input[i - 2]};
+			U curd{input[i - 3]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: first do the high half here
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cura, pout + i,
+					curb, pout + i - 1,
+					curc, pout + i - 2,
+					curd, pout + i - 3);
+				++offsetscompanion[cura];
+				++offsetscompanion[curb];
+				++offsetscompanion[curc];
+				++offsetscompanion[curd];
+			}
+			U cure{input[i - 4]};
+			U curf{input[i - 5]};
+			U curg{input[i - 6]};
+			U curh{input[i - 7]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				// register pressure performance issue on several platforms: do the low half here second
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					cure, pout + i - 4,
+					curf, pout + i - 5,
+					curg, pout + i - 6,
+					curh, pout + i - 7);
+				++offsetscompanion[cure];
+				++offsetscompanion[curf];
+				++offsetscompanion[curg];
+				++offsetscompanion[curh];
+			}else{
+				pout[i] = static_cast<T>(cura);
+				pout[i - 1] = static_cast<T>(curb);
+				pout[i - 2] = static_cast<T>(curc);
+				pout[i - 3] = static_cast<T>(curd);
+				pout[i - 4] = static_cast<T>(cure);
+				pout[i - 5] = static_cast<T>(curf);
+				pout[i - 6] = static_cast<T>(curg);
+				pout[i - 7] = static_cast<T>(curh);
+				if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+				}
+				++offsetscompanion[cura];
+				++offsetscompanion[curb];
+				++offsetscompanion[curc];
+				++offsetscompanion[curd];
+				++offsetscompanion[cure];
+				++offsetscompanion[curf];
+				++offsetscompanion[curg];
+				++offsetscompanion[curh];
+			}
+		}while(i -= 8);
+	}
 }
 
 // initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
@@ -19699,128 +22839,155 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
 		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-		i -= 7;
-		if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 			do{
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: first do the high half here
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, output + i + 7,
-					curb, output + i + 6,
-					curc, output + i + 5,
-					curd, output + i + 4);
-				++offsets[cura];
+				U cura{input[i]};
+				U curb{input[i - 1]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i,
+						curb, output + i - 1);
+					++offsets[cura];
+				}else{
+					output[i] = static_cast<T>(cura);
+					++offsets[cura];
+					output[i - 1] = static_cast<T>(curb);
+				}
 				++offsets[curb];
-				++offsets[curc];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+				}else output[0] = static_cast<T>(cur);
+				++offsets[cur];
+			}
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+			i -= 7;
+			if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				do{
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: first do the high half here
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i + 7,
+						curb, output + i + 6,
+						curc, output + i + 5,
+						curd, output + i + 4);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				U cure{input[i + 3]};
+				U curf{input[i + 2]};
+				U curg{input[i + 1]};
+				U curh{input[i]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: do the low half here second
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cure, output + i + 3,
+						curf, output + i + 2,
+						curg, output + i + 1,
+						curh, output + i);
+					++offsets[cure];
+					++offsets[curf];
+					++offsets[curg];
+				}else if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i + 7,
+						curb, output + i + 6,
+						curc, output + i + 5,
+						curd, output + i + 4,
+						cure, output + i + 3,
+						curf, output + i + 2,
+						curg, output + i + 1,
+						curh, output + i);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+					++offsets[cure];
+					++offsets[curf];
+					++offsets[curg];
+				}else{
+					output[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					output[i + 6] = static_cast<T>(curb);
+					++offsets[curb];
+					output[i + 5] = static_cast<T>(curc);
+					++offsets[curc];
+					output[i + 4] = static_cast<T>(curd);
+					++offsets[curd];
+					output[i + 3] = static_cast<T>(cure);
+					++offsets[cure];
+					output[i + 2] = static_cast<T>(curf);
+					++offsets[curf];
+					output[i + 1] = static_cast<T>(curg);
+					++offsets[curg];
+					output[i] = static_cast<T>(curh);
+				}
+				++offsets[curh];
+				i -= 8;
+			}while(0 <= i);
+			if(4 & i){// fill in the final four items for a remainder of 4 to 7
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i + 7,
+						curb, output + i + 6,
+						curc, output + i + 5,
+						curd, output + i + 4);
+					i -= 4;// required for the "if(2 & i){" part
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+				}else{
+					output[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					output[i + 6] = static_cast<T>(curb);
+					++offsets[curb];
+					output[i + 5] = static_cast<T>(curc);
+					++offsets[curc];
+					output[i + 4] = static_cast<T>(curd);
+					i -= 4;// required for the "if(2 & i){" part
+				}
 				++offsets[curd];
 			}
-			U cure{input[i + 3]};
-			U curf{input[i + 2]};
-			U curg{input[i + 1]};
-			U curh{input[i]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: do the low half here second
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cure, output + i + 3,
-					curf, output + i + 2,
-					curg, output + i + 1,
-					curh, output + i);
-				++offsets[cure];
-				++offsets[curf];
-				++offsets[curg];
-			}else if constexpr(isabsvalue && isfltpmode){// one-register filters only
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, output + i + 7,
-					curb, output + i + 6,
-					curc, output + i + 5,
-					curd, output + i + 4,
-					cure, output + i + 3,
-					curf, output + i + 2,
-					curg, output + i + 1,
-					curh, output + i);
-				++offsets[cura];
+			if(2 & i){// fill in the final two items for a remainder of 2 or 3
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i + 7,
+						curb, output + i + 6);
+					++offsets[cura];
+				}else{
+					output[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					output[i + 6] = static_cast<T>(curb);
+				}
 				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
-				++offsets[cure];
-				++offsets[curf];
-				++offsets[curg];
-			}else{
-				output[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				output[i + 6] = static_cast<T>(curb);
-				++offsets[curb];
-				output[i + 5] = static_cast<T>(curc);
-				++offsets[curc];
-				output[i + 4] = static_cast<T>(curd);
-				++offsets[curd];
-				output[i + 3] = static_cast<T>(cure);
-				++offsets[cure];
-				output[i + 2] = static_cast<T>(curf);
-				++offsets[curf];
-				output[i + 1] = static_cast<T>(curg);
-				++offsets[curg];
-				output[i] = static_cast<T>(curh);
+				}
+			if(1 & i){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+				}else output[0] = static_cast<T>(cur);
+				++offsets[cur];
 			}
-			++offsets[curh];
-			i -= 8;
-		}while(0 <= i);
-		if(4 & i){// fill in the final four items for a remainder of 4 to 7
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, output + i + 7,
-					curb, output + i + 6,
-					curc, output + i + 5,
-					curd, output + i + 4);
-				i -= 4;// required for the "if(2 & i){" part
-				++offsets[cura];
-				++offsets[curb];
-				++offsets[curc];
-			}else{
-				output[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				output[i + 6] = static_cast<T>(curb);
-				++offsets[curb];
-				output[i + 5] = static_cast<T>(curc);
-				++offsets[curc];
-				output[i + 4] = static_cast<T>(curd);
-				i -= 4;// required for the "if(2 & i){" part
-			}
-			++offsets[curd];
-		}
-		if(2 & i){// fill in the final two items for a remainder of 2 or 3
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, output + i + 7,
-					curb, output + i + 6);
-				++offsets[cura];
-			}else{
-				output[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				output[i + 6] = static_cast<T>(curb);
-			}
-			++offsets[curb];
-		}
-		if(1 & i){// fill in the final item for odd counts
-			U cur{input[0]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
-			}else output[0] = static_cast<T>(cur);
-			++offsets[cur];
 		}
 
 		// barrier and pointer exchange with the companion thread
@@ -19941,76 +23108,103 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
 		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-		i -= 7;
-		if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 			do{
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: first do the high half here
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-				++offsets[cura];
+				U cura{input[i]};
+				U curb{input[i - 1]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, output + i,
+						curb, output + i - 1);
+					++offsets[cura];
+				}else{
+					output[i] = static_cast<T>(cura);
+					++offsets[cura];
+					output[i - 1] = static_cast<T>(curb);
+				}
 				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output);
+				}else output[0] = static_cast<T>(cur);
+				++offsets[cur];
 			}
-			U cure{input[i + 3]};
-			U curf{input[i + 2]};
-			U curg{input[i + 1]};
-			U curh{input[i]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: do the low half here second
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
-			}else{
-				if constexpr(isabsvalue && isfltpmode){// one-register filters only
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+			i -= 7;
+			if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				do{
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: first do the high half here
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				U cure{input[i + 3]};
+				U curf{input[i + 2]};
+				U curg{input[i + 1]};
+				U curh{input[i]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: do the low half here second
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+				}else{
+					if constexpr(isabsvalue && isfltpmode){// one-register filters only
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+					}
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				++offsets[cure];
+				++offsets[curf];
+				++offsets[curg];
+				++offsets[curh];
+				i -= 8;
+			}while(0 <= i);
+			if(4 & i){// fill in the final four items for a remainder of 4 to 7
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				i -= 4;// required for the "if(2 & i){" part
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 				}
 				++offsets[cura];
 				++offsets[curb];
 				++offsets[curc];
 				++offsets[curd];
 			}
-			++offsets[cure];
-			++offsets[curf];
-			++offsets[curg];
-			++offsets[curh];
-			i -= 8;
-		}while(0 <= i);
-		if(4 & i){// fill in the final four items for a remainder of 4 to 7
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			i -= 4;// required for the "if(2 & i){" part
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+			if(2 & i){// fill in the final two items for a remainder of 2 or 3
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+				}
+				++offsets[cura];
+				++offsets[curb];
 			}
-			++offsets[cura];
-			++offsets[curb];
-			++offsets[curc];
-			++offsets[curd];
-		}
-		if(2 & i){// fill in the final two items for a remainder of 2 or 3
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+			if(1 & i){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+				}
+				++offsets[cur];
 			}
-			++offsets[cura];
-			++offsets[curb];
-		}
-		if(1 & i){// fill in the final item for odd counts
-			U cur{input[0]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-			}
-			++offsets[cur];
 		}
 
 		// barrier and pointer exchange with the companion thread
@@ -20204,128 +23398,155 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
 		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-		i -= 7;
-		if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 			do{
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: first do the high half here
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, buffer + i + 7,
-					curb, buffer + i + 6,
-					curc, buffer + i + 5,
-					curd, buffer + i + 4);
-				++offsets[cura];
+				U cura{input[i]};
+				U curb{input[i - 1]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, buffer + i,
+						curb, buffer + i - 1);
+					++offsets[cura];
+				}else{
+					buffer[i] = static_cast<T>(cura);
+					++offsets[cura];
+					buffer[i - 1] = static_cast<T>(curb);
+				}
 				++offsets[curb];
-				++offsets[curc];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+				}else buffer[0] = static_cast<T>(cur);
+				++offsets[cur];
+			}
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+			i -= 7;
+			if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				do{
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: first do the high half here
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, buffer + i + 7,
+						curb, buffer + i + 6,
+						curc, buffer + i + 5,
+						curd, buffer + i + 4);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				U cure{input[i + 3]};
+				U curf{input[i + 2]};
+				U curg{input[i + 1]};
+				U curh{input[i]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: do the low half here second
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cure, buffer + i + 3,
+						curf, buffer + i + 2,
+						curg, buffer + i + 1,
+						curh, buffer + i);
+					++offsets[cure];
+					++offsets[curf];
+					++offsets[curg];
+				}else if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, buffer + i + 7,
+						curb, buffer + i + 6,
+						curc, buffer + i + 5,
+						curd, buffer + i + 4,
+						cure, buffer + i + 3,
+						curf, buffer + i + 2,
+						curg, buffer + i + 1,
+						curh, buffer + i);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+					++offsets[cure];
+					++offsets[curf];
+					++offsets[curg];
+				}else{
+					buffer[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					buffer[i + 6] = static_cast<T>(curb);
+					++offsets[curb];
+					buffer[i + 5] = static_cast<T>(curc);
+					++offsets[curc];
+					buffer[i + 4] = static_cast<T>(curd);
+					++offsets[curd];
+					buffer[i + 3] = static_cast<T>(cure);
+					++offsets[cure];
+					buffer[i + 2] = static_cast<T>(curf);
+					++offsets[curf];
+					buffer[i + 1] = static_cast<T>(curg);
+					++offsets[curg];
+					buffer[i] = static_cast<T>(curh);
+				}
+				++offsets[curh];
+				i -= 8;
+			}while(0 <= i);
+			if(4 & i){// fill in the final four items for a remainder of 4 to 7
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, buffer + i + 7,
+						curb, buffer + i + 6,
+						curc, buffer + i + 5,
+						curd, buffer + i + 4);
+					i -= 4;// required for the "if(2 & i){" part
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+				}else{
+					buffer[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					buffer[i + 6] = static_cast<T>(curb);
+					++offsets[curb];
+					buffer[i + 5] = static_cast<T>(curc);
+					++offsets[curc];
+					buffer[i + 4] = static_cast<T>(curd);
+					i -= 4;// required for the "if(2 & i){" part
+				}
 				++offsets[curd];
 			}
-			U cure{input[i + 3]};
-			U curf{input[i + 2]};
-			U curg{input[i + 1]};
-			U curh{input[i]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: do the low half here second
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cure, buffer + i + 3,
-					curf, buffer + i + 2,
-					curg, buffer + i + 1,
-					curh, buffer + i);
-				++offsets[cure];
-				++offsets[curf];
-				++offsets[curg];
-			}else if constexpr(isabsvalue && isfltpmode){// one-register filters only
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, buffer + i + 7,
-					curb, buffer + i + 6,
-					curc, buffer + i + 5,
-					curd, buffer + i + 4,
-					cure, buffer + i + 3,
-					curf, buffer + i + 2,
-					curg, buffer + i + 1,
-					curh, buffer + i);
-				++offsets[cura];
+			if(2 & i){// fill in the final two items for a remainder of 2 or 3
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						cura, buffer + i + 7,
+						curb, buffer + i + 6);
+					++offsets[cura];
+				}else{
+					buffer[i + 7] = static_cast<T>(cura);
+					++offsets[cura];
+					buffer[i + 6] = static_cast<T>(curb);
+				}
 				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
-				++offsets[cure];
-				++offsets[curf];
-				++offsets[curg];
-			}else{
-				buffer[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				buffer[i + 6] = static_cast<T>(curb);
-				++offsets[curb];
-				buffer[i + 5] = static_cast<T>(curc);
-				++offsets[curc];
-				buffer[i + 4] = static_cast<T>(curd);
-				++offsets[curd];
-				buffer[i + 3] = static_cast<T>(cure);
-				++offsets[cure];
-				buffer[i + 2] = static_cast<T>(curf);
-				++offsets[curf];
-				buffer[i + 1] = static_cast<T>(curg);
-				++offsets[curg];
-				buffer[i] = static_cast<T>(curh);
 			}
-			++offsets[curh];
-			i -= 8;
-		}while(0 <= i);
-		if(4 & i){// fill in the final four items for a remainder of 4 to 7
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, buffer + i + 7,
-					curb, buffer + i + 6,
-					curc, buffer + i + 5,
-					curd, buffer + i + 4);
-				i -= 4;// required for the "if(2 & i){" part
-				++offsets[cura];
-				++offsets[curb];
-				++offsets[curc];
-			}else{
-				buffer[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				buffer[i + 6] = static_cast<T>(curb);
-				++offsets[curb];
-				buffer[i + 5] = static_cast<T>(curc);
-				++offsets[curc];
-				buffer[i + 4] = static_cast<T>(curd);
-				i -= 4;// required for the "if(2 & i){" part
+			if(1 & i){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
+				}else buffer[0] = static_cast<T>(cur);
+				++offsets[cur];
 			}
-			++offsets[curd];
-		}
-		if(2 & i){// fill in the final two items for a remainder of 2 or 3
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(
-					cura, buffer + i + 7,
-					curb, buffer + i + 6);
-				++offsets[cura];
-			}else{
-				buffer[i + 7] = static_cast<T>(cura);
-				++offsets[cura];
-				buffer[i + 6] = static_cast<T>(curb);
-			}
-			++offsets[curb];
-		}
-		if(1 & i){// fill in the final item for odd counts
-			U cur{input[0]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
-			}else buffer[0] = static_cast<T>(cur);
-			++offsets[cur];
 		}
 
 		// barrier and pointer exchange with the companion thread
@@ -20444,76 +23665,97 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		X offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-		if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-		i -= 7;
-		if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 			do{
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: first do the high half here
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-				++offsets[cura];
-				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
-			}
-			U cure{input[i + 3]};
-			U curf{input[i + 2]};
-			U curg{input[i + 1]};
-			U curh{input[i]};
-			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				// register pressure performance issue on several platforms: do the low half here second
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
-			}else{
-				if constexpr(isabsvalue && isfltpmode){// one-register filters only
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+				U cura{input[i]};
+				U curb{input[i - 1]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 				}
 				++offsets[cura];
 				++offsets[curb];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+				}
+				++offsets[cur];
+			}
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+			i -= 7;
+			if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				do{
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: first do the high half here
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				U cure{input[i + 3]};
+				U curf{input[i + 2]};
+				U curg{input[i + 1]};
+				U curh{input[i]};
+				if constexpr(isabsvalue != isfltpmode){// two-register filters only
+					// register pressure performance issue on several platforms: do the low half here second
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+				}else{
+					if constexpr(isabsvalue && isfltpmode){// one-register filters only
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+					}
+					++offsets[cura];
+					++offsets[curb];
+					++offsets[curc];
+					++offsets[curd];
+				}
+				++offsets[cure];
+				++offsets[curf];
+				++offsets[curg];
+				++offsets[curh];
+				i -= 8;
+			}while(0 <= i);
+			if(4 & i){// fill in the final four items for a remainder of 4 to 7
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				U curc{input[i + 5]};
+				U curd{input[i + 4]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+				}
+				i -= 4;// required for the "if(2 & i){" part
+				++offsets[cura];
+				++offsets[curb];
 				++offsets[curc];
 				++offsets[curd];
 			}
-			++offsets[cure];
-			++offsets[curf];
-			++offsets[curg];
-			++offsets[curh];
-			i -= 8;
-		}while(0 <= i);
-		if(4 & i){// fill in the final four items for a remainder of 4 to 7
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			U curc{input[i + 5]};
-			U curd{input[i + 4]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+			if(2 & i){// fill in the final two items for a remainder of 2 or 3
+				U cura{input[i + 7]};
+				U curb{input[i + 6]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+				}
+				++offsets[cura];
+				++offsets[curb];
 			}
-			i -= 4;// required for the "if(2 & i){" part
-			++offsets[cura];
-			++offsets[curb];
-			++offsets[curc];
-			++offsets[curd];
-		}
-		if(2 & i){// fill in the final two items for a remainder of 2 or 3
-			U cura{input[i + 7]};
-			U curb{input[i + 6]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+			if(1 & i){// fill in the final item for odd counts
+				U cur{input[0]};
+				if constexpr(isabsvalue || isfltpmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+				}
+				++offsets[cur];
 			}
-			++offsets[cura];
-			++offsets[curb];
-		}
-		if(1 & i){// fill in the final item for odd counts
-			U cur{input[0]};
-			if constexpr(isabsvalue || isfltpmode){
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-			}
-			++offsets[cur];
 		}
 
 		// barrier and pointer exchange with the companion thread
@@ -20556,95 +23798,114 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	assert(offsetscompanion);
 	// unsigned counter, not zero inclusive inside the loop
-	std::size_t i{((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
+	// architecture: limit to two at a time when there's few registers
+	std::size_t i{(defaultgprfilesize < gprfilesize::large)? ((count + 1 + 2) >> 2) * 2 : ((count + 1 + 8) >> 4) * 8};// rounded up in the 
 	input += count - i;
 	pout += count - i;
-	do{
-		V *pa{input[i]};
-		V *pb{input[i - 1]};
-		V *pc{input[i - 2]};
-		V *pd{input[i - 3]};
-		if constexpr(isabsvalue != isfltpmode){// two-register filters only
-			pout[i] = pa;
+	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		do{
+			V *pa{input[i]};
+			V *pb{input[i - 1]};
 			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			pout[i - 1] = pb;
+			pout[i] = pa;
 			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			pout[i - 2] = pc;
-			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-			pout[i - 3] = pd;
-			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+			pout[i - 1] = pb;
 			U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 			U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-			U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-			U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-			// register pressure performance issue on several platforms: first do the high half here
-			filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
-			++offsetscompanion[cura];
-			++offsetscompanion[curb];
-			++offsetscompanion[curc];
-			++offsetscompanion[curd];
-		}
-		V *pe{input[i - 4]};
-		V *pf{input[i - 5]};
-		V *pg{input[i - 6]};
-		V *ph{input[i - 7]};
-		if constexpr(isabsvalue != isfltpmode){// two-register filters only
-			pout[i - 4] = pe;
-			auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-			pout[i - 5] = pf;
-			auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-			pout[i - 6] = pg;
-			auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-			pout[i - 7] = ph;
-			auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-			U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-			U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-			U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-			U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-			// register pressure performance issue on several platforms: do the low half here second
-			filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
-			++offsetscompanion[cure];
-			++offsetscompanion[curf];
-			++offsetscompanion[curg];
-			++offsetscompanion[curh];
-		}else{
-			pout[i] = pa;
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			pout[i - 1] = pb;
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			pout[i - 2] = pc;
-			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-			pout[i - 3] = pd;
-			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-			pout[i - 4] = pe;
-			auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-			pout[i - 5] = pf;
-			auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-			pout[i - 6] = pg;
-			auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-			pout[i - 7] = ph;
-			auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-			U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-			U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-			U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-			U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-			U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-			U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-			U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-			if constexpr(isabsvalue && isfltpmode){// one-register filters only
-				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+			if constexpr(isabsvalue || isfltpmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 			}
 			++offsetscompanion[cura];
 			++offsetscompanion[curb];
-			++offsetscompanion[curc];
-			++offsetscompanion[curd];
-			++offsetscompanion[cure];
-			++offsetscompanion[curf];
-			++offsetscompanion[curg];
-			++offsetscompanion[curh];
-		}
-	}while(i -= 8);
+		}while(i -= 2);
+	}else{// architecture: do not limit as much when there's a reasonable amount of registers
+		do{
+			V *pa{input[i]};
+			V *pb{input[i - 1]};
+			V *pc{input[i - 2]};
+			V *pd{input[i - 3]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				pout[i] = pa;
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				pout[i - 1] = pb;
+				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				pout[i - 2] = pc;
+				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				pout[i - 3] = pd;
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				// register pressure performance issue on several platforms: first do the high half here
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+				++offsetscompanion[cura];
+				++offsetscompanion[curb];
+				++offsetscompanion[curc];
+				++offsetscompanion[curd];
+			}
+			V *pe{input[i - 4]};
+			V *pf{input[i - 5]};
+			V *pg{input[i - 6]};
+			V *ph{input[i - 7]};
+			if constexpr(isabsvalue != isfltpmode){// two-register filters only
+				auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+				pout[i - 4] = pe;
+				auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+				pout[i - 5] = pf;
+				auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+				pout[i - 6] = pg;
+				auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+				pout[i - 7] = ph;
+				U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+				U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+				U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+				U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+				// register pressure performance issue on several platforms: do the low half here second
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+				++offsetscompanion[cure];
+				++offsetscompanion[curf];
+				++offsetscompanion[curg];
+				++offsetscompanion[curh];
+			}else{
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				pout[i] = pa;
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				pout[i - 1] = pb;
+				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				pout[i - 2] = pc;
+				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				pout[i - 3] = pd;
+				auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+				pout[i - 4] = pe;
+				auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+				pout[i - 5] = pf;
+				auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+				pout[i - 6] = pg;
+				auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+				pout[i - 7] = ph;
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+				U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+				U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+				U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+				if constexpr(isabsvalue && isfltpmode){// one-register filters only
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+				}
+				++offsetscompanion[cura];
+				++offsetscompanion[curb];
+				++offsetscompanion[curc];
+				++offsetscompanion[curd];
+				++offsetscompanion[cure];
+				++offsetscompanion[curf];
+				++offsetscompanion[curg];
+				++offsetscompanion[curh];
+			}
+		}while(i -= 8);
+	}
 }
 
 // main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
@@ -21012,149 +24273,179 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-			i -= 7;
-			if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 				do{
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				V *pc{input[i + 5]};
-				V *pd{input[i + 4]};
-				if constexpr(isabsvalue != isfltpmode){// two-register filters only
-					output[i + 7] = pa;
+					V *pa{input[i]};
+					V *pb{input[i - 1]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					output[i + 6] = pb;
+					output[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					output[i + 5] = pc;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					output[i + 4] = pd;
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					output[i - 1] = pb;
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					// register pressure performance issue on several platforms: first do the high half here
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					}
 					++offsets[cura];
 					++offsets[curb];
-					++offsets[curc];
-					++offsets[curd];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					output[0] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					++offsets[cur];
 				}
-				V *pe{input[i + 3]};
-				V *pf{input[i + 2]};
-				V *pg{input[i + 1]};
-				V *ph{input[i]};
-				if constexpr(isabsvalue != isfltpmode){// two-register filters only
-					output[i + 3] = pe;
-					auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-					output[i + 2] = pf;
-					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					output[i + 1] = pg;
-					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-					output[i] = ph;
-					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-					// register pressure performance issue on several platforms: do the low half here second
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
-					++offsets[cure];
-					++offsets[curf];
-					++offsets[curg];
-					++offsets[curh];
-				}else{
-					output[i + 7] = pa;
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+				i -= 7;
+				if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					do{
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					V *pc{input[i + 5]};
+					V *pd{input[i + 4]};
+					if constexpr(isabsvalue != isfltpmode){// two-register filters only
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						output[i + 7] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						output[i + 6] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						output[i + 5] = pc;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						output[i + 4] = pd;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						// register pressure performance issue on several platforms: first do the high half here
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+						++offsets[cura];
+						++offsets[curb];
+						++offsets[curc];
+						++offsets[curd];
+					}
+					V *pe{input[i + 3]};
+					V *pf{input[i + 2]};
+					V *pg{input[i + 1]};
+					V *ph{input[i]};
+					if constexpr(isabsvalue != isfltpmode){// two-register filters only
+						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						output[i + 3] = pe;
+						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						output[i + 2] = pf;
+						auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+						output[i + 1] = pg;
+						auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+						output[i] = ph;
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+						U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+						U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+						// register pressure performance issue on several platforms: do the low half here second
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+						++offsets[cure];
+						++offsets[curf];
+						++offsets[curg];
+						++offsets[curh];
+					}else{
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						output[i + 7] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						output[i + 6] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						output[i + 5] = pc;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						output[i + 4] = pd;
+						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						output[i + 3] = pe;
+						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						output[i + 2] = pf;
+						auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+						output[i + 1] = pg;
+						auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+						output[i] = ph;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+						U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+						U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+						if constexpr(isabsvalue && isfltpmode){// one-register filters only
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+						}
+						++offsets[cura];
+						++offsets[curb];
+						++offsets[curc];
+						++offsets[curd];
+						++offsets[cure];
+						++offsets[curf];
+						++offsets[curg];
+						++offsets[curh];
+					}
+					i -= 8;
+				}while(0 <= i);
+				if(4 & i){// fill in the final four items for a remainder of 4 to 7
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					V *pc{input[i + 5]};
+					V *pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					output[i + 6] = pb;
+					output[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					output[i + 5] = pc;
+					output[i + 6] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					output[i + 4] = pd;
+					output[i + 5] = pc;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					output[i + 3] = pe;
-					auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-					output[i + 2] = pf;
-					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					output[i + 1] = pg;
-					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-					output[i] = ph;
-					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+					output[i + 4] = pd;
+					i -= 4;// required for the "if(2 & i){" part
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-					if constexpr(isabsvalue && isfltpmode){// one-register filters only
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 					}
 					++offsets[cura];
 					++offsets[curb];
 					++offsets[curc];
 					++offsets[curd];
-					++offsets[cure];
-					++offsets[curf];
-					++offsets[curg];
-					++offsets[curh];
 				}
-				i -= 8;
-			}while(0 <= i);
-			if(4 & i){// fill in the final four items for a remainder of 4 to 7
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				V *pc{input[i + 5]};
-				V *pd{input[i + 4]};
-				output[i + 7] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				output[i + 6] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				output[i + 5] = pc;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				output[i + 4] = pd;
-				i -= 4;// required for the "if(2 & i){" part
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+				if(2 & i){// fill in the final two items for a remainder of 2 or 3
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					output[i + 7] = pa;
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					output[i + 6] = pb;
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					}
+					++offsets[cura];
+					++offsets[curb];
 				}
-				++offsets[cura];
-				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
-			}
-			if(2 & i){// fill in the final two items for a remainder of 2 or 3
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				output[i + 7] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				output[i + 6] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+				if(1 & i){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					output[0] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					++offsets[cur];
 				}
-				++offsets[cura];
-				++offsets[curb];
-			}
-			if(1 & i){// fill in the final item for odd counts
-				V *p{input[0]};
-				output[0] = p;
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-				}
-				++offsets[cur];
 			}
 
 			// barrier and pointer exchange with the companion thread
@@ -21369,149 +24660,179 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
-			i -= 7;
-			if(0 <= i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 				do{
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				V *pc{input[i + 5]};
-				V *pd{input[i + 4]};
-				if constexpr(isabsvalue != isfltpmode){// two-register filters only
-					buffer[i + 7] = pa;
+					V *pa{input[i]};
+					V *pb{input[i - 1]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					buffer[i + 6] = pb;
+					buffer[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					buffer[i + 5] = pc;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					buffer[i + 4] = pd;
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					buffer[i - 1] = pb;
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					// register pressure performance issue on several platforms: first do the high half here
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					}
 					++offsets[cura];
 					++offsets[curb];
-					++offsets[curc];
-					++offsets[curd];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					buffer[0] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					++offsets[cur];
 				}
-				V *pe{input[i + 3]};
-				V *pf{input[i + 2]};
-				V *pg{input[i + 1]};
-				V *ph{input[i]};
-				if constexpr(isabsvalue != isfltpmode){// two-register filters only
-					buffer[i + 3] = pe;
-					auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-					buffer[i + 2] = pf;
-					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					buffer[i + 1] = pg;
-					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-					buffer[i] = ph;
-					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-					// register pressure performance issue on several platforms: do the low half here second
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
-					++offsets[cure];
-					++offsets[curf];
-					++offsets[curg];
-					++offsets[curh];
-				}else{
-					buffer[i + 7] = pa;
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 8) >> 4) * 8;
+				i -= 7;
+				if(0 <= i)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					do{
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					V *pc{input[i + 5]};
+					V *pd{input[i + 4]};
+					if constexpr(isabsvalue != isfltpmode){// two-register filters only
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						buffer[i + 7] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						buffer[i + 6] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						buffer[i + 5] = pc;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						buffer[i + 4] = pd;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						// register pressure performance issue on several platforms: first do the high half here
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+						++offsets[cura];
+						++offsets[curb];
+						++offsets[curc];
+						++offsets[curd];
+					}
+					V *pe{input[i + 3]};
+					V *pf{input[i + 2]};
+					V *pg{input[i + 1]};
+					V *ph{input[i]};
+					if constexpr(isabsvalue != isfltpmode){// two-register filters only
+						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						buffer[i + 3] = pe;
+						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						buffer[i + 2] = pf;
+						auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+						buffer[i + 1] = pg;
+						auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+						buffer[i] = ph;
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+						U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+						U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+						// register pressure performance issue on several platforms: do the low half here second
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
+						++offsets[cure];
+						++offsets[curf];
+						++offsets[curg];
+						++offsets[curh];
+					}else{
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						buffer[i + 7] = pa;
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						buffer[i + 6] = pb;
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						buffer[i + 5] = pc;
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						buffer[i + 4] = pd;
+						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						buffer[i + 3] = pe;
+						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						buffer[i + 2] = pf;
+						auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+						buffer[i + 1] = pg;
+						auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+						buffer[i] = ph;
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
+						U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
+						U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+						if constexpr(isabsvalue && isfltpmode){// one-register filters only
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+						}
+						++offsets[cura];
+						++offsets[curb];
+						++offsets[curc];
+						++offsets[curd];
+						++offsets[cure];
+						++offsets[curf];
+						++offsets[curg];
+						++offsets[curh];
+					}
+					i -= 8;
+				}while(0 <= i);
+				if(4 & i){// fill in the final four items for a remainder of 4 to 7
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					V *pc{input[i + 5]};
+					V *pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					buffer[i + 6] = pb;
+					buffer[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					buffer[i + 5] = pc;
+					buffer[i + 6] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					buffer[i + 4] = pd;
+					buffer[i + 5] = pc;
 					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					buffer[i + 3] = pe;
-					auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
-					buffer[i + 2] = pf;
-					auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
-					buffer[i + 1] = pg;
-					auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
-					buffer[i] = ph;
-					auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+					buffer[i + 4] = pd;
+					i -= 4;// required for the "if(2 & i){" part
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
 					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-					U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-					U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-					U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
-					if constexpr(isabsvalue && isfltpmode){// one-register filters only
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 					}
 					++offsets[cura];
 					++offsets[curb];
 					++offsets[curc];
 					++offsets[curd];
-					++offsets[cure];
-					++offsets[curf];
-					++offsets[curg];
-					++offsets[curh];
 				}
-				i -= 8;
-			}while(0 <= i);
-			if(4 & i){// fill in the final four items for a remainder of 4 to 7
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				V *pc{input[i + 5]};
-				V *pd{input[i + 4]};
-				buffer[i + 7] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				buffer[i + 6] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				buffer[i + 5] = pc;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				buffer[i + 4] = pd;
-				i -= 4;// required for the "if(2 & i){" part
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
+				if(2 & i){// fill in the final two items for a remainder of 2 or 3
+					V *pa{input[i + 7]};
+					V *pb{input[i + 6]};
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					buffer[i + 7] = pa;
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					buffer[i + 6] = pb;
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+					}
+					++offsets[cura];
+					++offsets[curb];
 				}
-				++offsets[cura];
-				++offsets[curb];
-				++offsets[curc];
-				++offsets[curd];
-			}
-			if(2 & i){// fill in the final two items for a remainder of 2 or 3
-				V *pa{input[i + 7]};
-				V *pb{input[i + 6]};
-				buffer[i + 7] = pa;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				buffer[i + 6] = pb;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
+				if(1 & i){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					buffer[0] = p;
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					if constexpr(isabsvalue || isfltpmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
+					}
+					++offsets[cur];
 				}
-				++offsets[cura];
-				++offsets[curb];
-			}
-			if(1 & i){// fill in the final item for odd counts
-				V *p{input[0]};
-				buffer[0] = p;
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				if constexpr(isabsvalue || isfltpmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
-				}
-				++offsets[cur];
 			}
 
 			// barrier and pointer exchange with the companion thread
@@ -22807,7 +26128,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
 // multithreading companion function for radixsortcopynoallocmulti() and radixsortnoallocmulti()
@@ -23950,7 +27271,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -24493,7 +27814,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX))) - PTRDIFF_MIN)};
+	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
