@@ -235,7 +235,7 @@ rsbd8::helper:: is the underlying namespace for helper functions and constants. 
 ```C++
 <typename T, typename U, typename V, typename W, typename X, typename M>
 ```
-These are the basic 4 placeholders for types.
+These are the basic placeholders for types.
 T is used for the main input type, or the primary type being referred to.
 U is the deferred type, for example the unsigned variant of T, or an unsigned general utility type that is larger than T.
 V is always used as the class type of input and output arrays when dealing with indirection.
