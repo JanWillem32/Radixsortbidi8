@@ -7973,6 +7973,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
+	if constexpr (1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps;
 	if constexpr(issignmode){// start off with signed handling on the top
@@ -8022,6 +8023,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
+	if constexpr (1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps;
 	if(usemultithread){
