@@ -18,7 +18,6 @@
 #include <execution>// for std::execution::par_unseq (std::sort(), std::stable_sort() and std::is_sorted() parameter)
 
 static_assert(!(15 & (RSBD8_TEST_BATCH_SIZE)), "RSBD8_TEST_BATCH_SIZE must be a multiple of 16");
-static_assert(!((RSBD8_TEST_BATCH_SIZE) - 1 & (RSBD8_TEST_BATCH_SIZE)), "limitation of the current implementation: RSBD8_TEST_BATCH_SIZE must be a power of two");
 static_assert(PTRDIFF_MAX >= (RSBD8_TEST_BATCH_SIZE), "limitation of the current implementation: RSBD8_TEST_BATCH_SIZE must be les than or equal to PTRDIFF_MAX");
 
 // disable warning messages for this file only:
@@ -4870,7 +4869,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 #ifndef _DEBUG// skip in debug builds as it is way too slow
 		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, 
+		std::stable_sort(std::execution::par_unseq,
 #ifdef _WIN64
 			reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
 #else
@@ -5095,7 +5094,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 #ifndef _DEBUG// skip in debug builds as it is way too slow
 		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, 
+		std::stable_sort(std::execution::par_unseq,
 #ifdef _WIN64
 			reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
 #else
