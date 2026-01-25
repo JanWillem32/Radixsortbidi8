@@ -32,9 +32,9 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Helper constants and functions
 - Concurrency tools
 - General purpose register count constant
-- Utility structures to generate tests for the often padded 80-bit long double types
+- Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
 - Endianess detection
-- Utility structures to generate tests for 64- or 128-bit types
+- Utility structures to provide piecewise support and tests for 64- or 128-bit types
 - Utility templates to call the getter function
 - Utility templates to split off the first parameter
 - Utility template to retrieve the data sources from classes

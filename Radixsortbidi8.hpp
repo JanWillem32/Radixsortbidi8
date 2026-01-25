@@ -39,9 +39,9 @@
 // - Helper constants and functions
 // - Concurrency tools
 // - General purpose register count constant
-// - Utility structures to generate tests for the often padded 80-bit long double types
+// - Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
 // - Endianess detection
-// - Utility structures to generate tests for 64- or 128-bit types
+// - Utility structures to provide piecewise support and tests for 64- or 128-bit types
 // - Utility templates to call the getter function
 // - Utility templates to split off the first parameter
 // - Utility template to retrieve the data sources from classes
@@ -726,7 +726,7 @@ gprfilesize constexpr defaultgprfilesize{
 #endif
 };
 
-// Utility structures to generate tests for the often padded 80-bit long double types
+// Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
@@ -1120,7 +1120,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	return{{0, 0x8000u}};
 }
 
-// Utility structures to generate tests for 64- or 128-bit types
+// Utility structures to provide piecewise support and tests for 64- or 128-bit types
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// disable the 64-bit struct on 64-bit and larger systems
 // This one can be big-, mixed- and little-endian.
@@ -8046,7 +8046,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
-	if constexpr (1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
+	if constexpr(1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps;
 	if constexpr(issignmode){// start off with signed handling on the top
@@ -8096,7 +8096,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
-	if constexpr (1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
+	if constexpr(1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
 	unsigned skipsteps;
 	if(usemultithread){
@@ -8167,9 +8167,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // Function implementation templates for multi-part types
 
-// initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
+// initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-// Do not use this function directly.
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -8655,9 +8654,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
+// main part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-// Do not use this function directly.
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -8906,7 +8904,6 @@ handletop8:
 }
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types without indirection
-// Do not use this function directly.
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -9325,8 +9322,7 @@ handletop8:
 	}
 }
 
-// multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -9426,7 +9422,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -9437,7 +9433,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -9895,8 +9891,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -9995,7 +9990,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -10005,7 +10000,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -10039,7 +10034,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pbufferlo = buffer;
 				pbufferhi = buffer + count;
 			}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-				std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+				std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 				pinputlo = input + stride;
 				pinputhi = input + (count - stride);
 				pbufferlo = buffer + stride;
@@ -10520,8 +10515,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-// initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
-// Do not use this function directly.
+// initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -11105,8 +11099,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 }
 
-// main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -11249,7 +11242,6 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 }
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for multi-part types without indirection
-// Do not use this function directly.
 template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -11465,8 +11457,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 	}
 }
 
-// multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -11568,7 +11559,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -11579,7 +11570,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -12408,8 +12399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -12510,7 +12500,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -12520,7 +12510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -13350,9 +13340,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-// initialisation part, multi-threading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
+// initialisation part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-// Do not use this function directly.
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -13799,9 +13788,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
+// main part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-// Do not use this function directly.
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -14013,7 +14001,7 @@ handletop16:
 					}
 				}
 handletop8:
-				if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
 					do{// fill the array, two at a time
 						V *pa{psrchi[0]};
@@ -14063,7 +14051,6 @@ handletop8:
 }
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
-// Do not use this function directly.
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -14260,7 +14247,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			{
 handletop16:
 				if constexpr(ismultithreadcapable){
-					if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
 						while(0 <= --j){// fill the array, two at a time
 							V *pa{psrclo[0]};
@@ -14381,7 +14368,7 @@ handletop16:
 			}
 handletop8:
 			if constexpr(ismultithreadcapable){
-				if constexpr (defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, two at a time
 						V *pa{psrclo[0]};
@@ -14475,8 +14462,7 @@ handletop8:
 	}
 }
 
-// multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -14613,7 +14599,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -14624,7 +14610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -15065,8 +15051,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -15202,7 +15187,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -15212,7 +15197,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -15254,7 +15239,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer;
 					pbufferhi = buffer + count;
 				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-					std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+					std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 					pinputlo = input + stride;
 					pinputhi = input + (count - stride);
 					pbufferlo = buffer + stride;
@@ -15730,8 +15715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-// initialisation part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
-// Do not use this function directly.
+// initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -17733,8 +17717,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 }
 
-// main part, multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -17908,7 +17891,6 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 }
 
 // main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
-// Do not use this function directly.
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -18181,8 +18163,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 	}
 }
 
-// multi-threading companion for the radixsortcopynoallocmulti2thread() function implementation template for multi-part types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -18297,7 +18278,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -18308,7 +18289,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -20050,8 +20031,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// multi-threading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -20165,7 +20145,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -20175,7 +20155,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -20218,7 +20198,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+						std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
@@ -20532,7 +20512,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+						std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
@@ -20819,7 +20799,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+						std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
@@ -21076,7 +21056,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+						std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
@@ -21305,7 +21285,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::ptrdiff_t stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+						std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
 						pinputlo = input + stride;
 						pinputhi = input + (count - stride);
 						pbufferlo = buffer + stride;
@@ -22213,8 +22193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 // Function implementation templates for single-part types
 
-// initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
+// initialisation part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22313,8 +22292,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
+// initialisation part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22369,8 +22347,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}while(i -= 8);
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22435,8 +22412,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22522,7 +22498,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
 template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22645,7 +22620,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-// Do not use this function directly.
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22672,7 +22646,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	U length{*t};
 	T *pfill{pdst};
 	int filler;
-	if constexpr(ismultithreadcapable) if(usemultithread){// multi-threaded version
+	if constexpr(ismultithreadcapable) if(usemultithread){// multithreaded version
 		X const *u{offsetscompanion// low-to-high or high-to-low
 			+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 			+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -22790,8 +22764,7 @@ exit:
 	std::memset(pfill, filler, length);
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22856,8 +22829,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -22918,7 +22890,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -22928,7 +22900,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23187,7 +23159,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -23197,7 +23169,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23350,8 +23322,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// main part, multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -23416,8 +23387,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortnoallocsingle() function implementation template for single-part types without indirection
 template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -23477,7 +23447,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -23487,7 +23457,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23746,7 +23716,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -23755,7 +23725,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23897,8 +23867,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 }
 
-// initialisation part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
-// Do not use this function directly.
+// initialisation part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -24023,8 +23992,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// main part, multi-threading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
-// Do not use this function directly.
+// main part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -24099,7 +24067,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
-// Do not use this function directly.
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -24242,8 +24209,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// multi-threading companion for the radixsortcopynoallocsingle() function implementation template for single-part types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortcopynoallocsingle() function implementation template for single-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -24343,7 +24309,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -24353,7 +24319,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -24629,8 +24595,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
-// multi-threading companion for the radixsortnoallocsingle() function implementation template for single-part types with indirection
-// Do not use this function directly.
+// multithreading companion for the radixsortnoallocsingle() function implementation template for single-part types with indirection
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -24730,7 +24695,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	static bool constexpr ismultithreadcapable{false};
 #endif
 	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multi-threading if there is more than one hardware thread
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
 	// do not pass a nullptr here, even though it's safe if count is 0
@@ -24740,7 +24705,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
 		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multi-threading here
+		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -27720,7 +27685,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -27744,7 +27709,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// no indirect secondary call
 			static auto constexpr pcall{radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 #endif
-			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -27759,7 +27724,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
-						usemultithread = 1;
+						finalcount = halfcount;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
@@ -27768,11 +27733,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				pcall(count >> usemultithread, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+				pcall(finalcount, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
-			if(usemultithread){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
 				std::future<void> asynchandle;
@@ -27839,7 +27804,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -27863,7 +27828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// no indirect secondary call
 			static auto constexpr pcall{radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X, true>};
 #endif
-			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -27878,7 +27843,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
-						usemultithread = 1;
+						finalcount = halfcount;
 						movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
@@ -27887,11 +27852,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				pcall(count >> usemultithread, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+				pcall(finalcount, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
-			if(usemultithread){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that input and buffer were swapped in the initial phase
 				T *tmp{input};
@@ -28694,7 +28659,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -28737,8 +28702,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// process the top third (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, thirdcounttop, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
 						}catch(...){// std::async may fail gracefully here
-							// given the absolute rarity of this case, simply process this part in the current thread
 							assert(false);
+							// given the absolute rarity of this case, simply process this part in the current thread
 							pcall(thirdcounttop, input + twothirdscount, output + twothirdscount, buffer + twothirdscount);
 						}
 					}catch(...){// std::async may fail gracefully here
@@ -28750,7 +28715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
-			if(finalcount != count){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
 				std::future<void> asynchandle;
@@ -28810,7 +28775,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -28853,8 +28818,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// process the top third (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, thirdcounttop, input + twothirdscount, buffer + twothirdscount, movetobuffer);
 						}catch(...){// std::async may fail gracefully here
-							// given the absolute rarity of this case, simply process this part in the current thread
 							assert(false);
+							// given the absolute rarity of this case, simply process this part in the current thread
 							pcall(thirdcounttop, input + twothirdscount, buffer + twothirdscount, movetobuffer);
 						}
 					}catch(...){// std::async may fail gracefully here
@@ -28866,7 +28831,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
-			if(finalcount != count){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that input and buffer were swapped in the initial phase
 				T *tmp{input};
@@ -28941,7 +28906,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -28969,9 +28934,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 				}
 #else// no indirect secondary call
-				static constexpr auto pcall{radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
+				static auto constexpr pcall{radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
 #endif
-				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
 					std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -28986,7 +28951,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
-							usemultithread = 1;
+							finalcount = halfcount;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -28995,11 +28960,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 					// process the lower half (rounded down) here
-					pcall(count >> usemultithread, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+					pcall(finalcount, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
-				if(usemultithread){// conditionally enable multi-threading here
+				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that output and buffer were swapped in the initial phase
 					std::future<void> asynchandle;
@@ -29086,7 +29051,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -29114,9 +29079,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 				}
 #else// no indirect secondary call
-				static constexpr auto pcall{radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
+				static auto constexpr pcall{radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>};
 #endif
-				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
 					std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -29131,7 +29096,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
-							usemultithread = 1;
+							finalcount = halfcount;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -29140,11 +29105,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 					// process the lower half (rounded down) here
-					pcall(count >> usemultithread, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+					pcall(finalcount, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
-				if(usemultithread){// conditionally enable multi-threading here
+				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that input and buffer were swapped in the initial phase
 					T *tmp{input};
@@ -29163,8 +29128,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
-				return;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
+				return;
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -29230,7 +29195,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -29263,7 +29228,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
-					unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
 						std::future<void> asynchandle;
 						static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -29276,18 +29241,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount);
-								usemultithread = 1;
+								finalcount = halfcount;
 								std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 							}
 						}
 						// process the lower half (rounded down) here
-						pcall(count >> usemultithread, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+						pcall(finalcount, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 					}
 
 					// merging phase
-					if(usemultithread){// conditionally enable multi-threading here
+					if(finalcount != count){// conditionally enable multithreading here
 						// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 						// note that output and buffer were swapped in the initial phase
 						std::future<void> asynchandle;
@@ -29381,7 +29346,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -29414,7 +29379,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
-					unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
 						std::future<void> asynchandle;
 						static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -29427,18 +29392,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer);
-								usemultithread = 1;
+								finalcount = halfcount;
 								movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 							}
 						}
 						// process the lower half (rounded down) here
-						pcall(count >> usemultithread, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+						pcall(finalcount, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 					}
 
 					// merging phase
-					if(usemultithread){// conditionally enable multi-threading here
+					if(finalcount != count){// conditionally enable multithreading here
 						// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 						// note that input and buffer were swapped in the initial phase
 						T *tmp{input};
@@ -29840,7 +29805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -29864,7 +29829,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// no indirect secondary call
 			static auto constexpr pcall{radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 #endif
-			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -29879,7 +29844,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
-						usemultithread = 1;
+						finalcount = halfcount;
 						std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
@@ -29888,11 +29853,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				pcall(count >> usemultithread, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+				pcall(finalcount, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
-			if(usemultithread){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
 				std::future<void> asynchandle;
@@ -29906,8 +29871,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 			}
-			return;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
+			return;
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -29958,7 +29923,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -29982,7 +29947,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// no indirect secondary call
 			static auto constexpr pcall{radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, true, vararguments...>};
 #endif
-			unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
 				std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -29997,7 +29962,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
-						usemultithread = 1;
+						finalcount = halfcount;
 						movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
@@ -30006,11 +29971,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 				// process the lower half (rounded down) here
-				pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+				pcall(finalcount, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 			}
 
 			// merging phase
-			if(usemultithread){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that input and buffer were swapped in the initial phase
 				V **tmp{input};
@@ -30029,8 +29994,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 			}
-			return;
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
+			return;
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -30570,7 +30535,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -30613,8 +30578,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// process the top third (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, thirdcounttop, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, varparameters...);
 						}catch(...){// std::async may fail gracefully here
-							// given the absolute rarity of this case, simply process this part in the current thread
 							assert(false);
+							// given the absolute rarity of this case, simply process this part in the current thread
 							pcall(thirdcounttop, input + twothirdscount, output + twothirdscount, buffer + twothirdscount, varparameters...);
 						}
 					}catch(...){// std::async may fail gracefully here
@@ -30626,7 +30591,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
-			if(finalcount != count){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
 				std::future<void> asynchandle;
@@ -30685,7 +30650,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			// initial phase with regular sorting of both halves
 			// select the smallest unsigned type for the indices
@@ -30728,8 +30693,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// process the top third (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, thirdcounttop, input + twothirdscount, buffer + twothirdscount, movetobuffer, varparameters...);
 						}catch(...){// std::async may fail gracefully here
-							// given the absolute rarity of this case, simply process this part in the current thread
 							assert(false);
+							// given the absolute rarity of this case, simply process this part in the current thread
 							pcall(thirdcounttop, input + twothirdscount, buffer + twothirdscount, movetobuffer, varparameters...);
 						}
 					}catch(...){// std::async may fail gracefully here
@@ -30741,7 +30706,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
-			if(finalcount != count){// conditionally enable multi-threading here
+			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that input and buffer were swapped in the initial phase
 				V **tmp{input};
@@ -30815,7 +30780,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -30843,9 +30808,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 				}
 #else// no indirect secondary call
-				static constexpr auto pcall{radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
+				static auto constexpr pcall{radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
 #endif
-				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
 					std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -30860,7 +30825,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
-							usemultithread = 1;
+							finalcount = halfcount;
 							std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -30869,11 +30834,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 					// process the lower half (rounded down) here
-					pcall(count >> usemultithread, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+					pcall(finalcount, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
-				if(usemultithread){// conditionally enable multi-threading here
+				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that output and buffer were swapped in the initial phase
 					std::future<void> asynchandle;
@@ -30887,8 +30852,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, output, buffer, varparameters...);
 				}
-				return;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
+				return;
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -30959,7 +30924,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -30989,7 +30954,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// no indirect secondary call
 				static auto constexpr pcall{radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>};
 #endif
-				unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
 					std::future<void> asynchandle;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -31004,7 +30969,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
-							usemultithread = 1;
+							finalcount = halfcount;
 							movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 						}catch(...){// std::async may fail gracefully here
 							assert(false);
@@ -31013,11 +30978,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 					// process the lower half (rounded down) here
-					pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+					pcall(finalcount, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 				}
 
 				// merging phase
-				if(usemultithread){// conditionally enable multi-threading here
+				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that input and buffer were swapped in the initial phase
 					V **tmp{input};
@@ -31036,8 +31001,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					mergehalvesmain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>(count, input, buffer, varparameters...);
 				}
-				return;
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
+				return;
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -31108,7 +31073,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortcopynoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -31141,7 +31106,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
-					unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
 						std::future<void> asynchandle;
 						static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -31154,18 +31119,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
-								usemultithread = 1;
+								finalcount = halfcount;
 								std::swap(output, buffer);// swap the buffer pointers for the lower half processing
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 							}
 						}
 						// process the lower half (rounded down) here
-						pcall(count >> usemultithread, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+						pcall(finalcount, input, output, buffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 					}
 
 					// merging phase
-					if(usemultithread){// conditionally enable multi-threading here
+					if(finalcount != count){// conditionally enable multithreading here
 						// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 						// note that output and buffer were swapped in the initial phase
 						std::future<void> asynchandle;
@@ -31264,7 +31229,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// TODO: fine-tune, right now the threshold is set to the 8-bit limit (the minimum for an 8-bit type is 15)
 	auto pcall{radixsortnoallocmulti2thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>};
 	if(0xFFu < count){
-		unsigned reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
+		unsigned const reportedcores{std::thread::hardware_concurrency()};// when this is 0, assume single-core
 		if(1 < reportedcores){// 2-way limit
 			static std::size_t constexpr limit4way{base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
 			if(3 < reportedcores
@@ -31297,7 +31262,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
-					unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
 						std::future<void> asynchandle;
 						static std::size_t constexpr limit16way{base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
@@ -31310,18 +31275,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcall, (count + 1) >> 1, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
-								usemultithread = 1;
+								finalcount = halfcount;
 								movetobuffer = !movetobuffer;// swap the buffer pointers for the lower half processing
 							}catch(...){// std::async may fail gracefully here
 								assert(false);
 							}
 						}
 						// process the lower half (rounded down) here
-						pcall(count >> usemultithread, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
+						pcall(finalcount, input, buffer, movetobuffer, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 					}
 
 					// merging phase
-					if(usemultithread){// conditionally enable multi-threading here
+					if(finalcount != count){// conditionally enable multithreading here
 						// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 						// note that input and buffer were swapped in the initial phase
 						V **tmp{input};
@@ -31452,7 +31417,7 @@ template<auto memberptr>
 struct memberptrsplitter{
 	template<typename C, typename M>
 	static constexpr C *classgrabber(M C:: *in)noexcept{static_cast<void>(in); return{};}
-	static constexpr auto classptr{classgrabber(memberptr)};
+	static auto constexpr classptr{classgrabber(memberptr)};
 	using classtype = std::remove_pointer_t<decltype(classptr)>;
 };
 
