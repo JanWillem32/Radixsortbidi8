@@ -9,6 +9,69 @@ Implemented function optimisations include the ability to skip sorting steps, us
 Radix sort in general can be used to sort all array sizes, but is more efficient when applied to somewhat larger arrays compared to other efficient (and stable) comparison-based methods, like introsort.
 See "Performance tests" for more details about array sizes, types and achievable improvements in speed when sorting large arrays with this library.
 
+## Table of contents (searchable)
+### Documentation block:
+- MIT License
+- Radixsortbidi8
+- Table of contents
+- Examples of using the 4 templates with simple arrays as input
+- Examples of using the 4 templates with input from indirection
+- Examples of using the 4 templates with input from modified indirection
+- Bonus example of the longest regular item, with complete decoration of the template
+- The 4 main sorting template functions that are implemented here
+- Modes of operation for the template functions
+- Miscellaneous notes
+- Naming and tooling conventions used in this library
+- Notes on ongoing research and development
+- Extended filtering information for each of the 8 main modes
+- Performance tests
+### Compiler configuration block:
+- Per-compiler function attributes
+- Include statements and the last checks for compatibility
+### Internal functions implementation block (rsbd8::helper namespace):
+- Helper constants and functions
+- Concurrency tools
+- General purpose register count constant
+- Utility structures to generate tests for the often padded 80-bit long double types
+- Endianess detection
+- Utility structures to generate tests for 64- or 128-bit types
+- Utility templates to call the getter function
+- Utility templates to split off the first parameter
+- Utility template to retrieve the data sources from classes
+- Utility templates to get either the member object type or the member function return type
+- Utility template to pick an unsigned type of the lowest rank with the same size
+- Utility templates to use bit carry operations for the operators less than, and less than or equal
+- Utility template of bit scan forward
+- Utility templates of rotate left or right by a compile-time constant amount
+- Helper functions to implement the 8 main modes
+- Helper functions to implement the offset transforms
+- Function implementation templates for multi-part types
+- Function implementation templates for single-part types
+- 1- to 16-way multithreading function reroutes
+- Reroutes to the 1- or 2-thread functions for single-part types
+- Reroutes to the 1- or 2-thread functions (variants without indirection)
+- Reroutes to the 1- or 2-thread functions (variants with indirection)
+- Functions to establish the initial treshold for beyond 2-way multithreading
+- Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
+- Helper functions for merging the halves from multithreading inputs without indirection
+- Up to 4-way multithreading functions without indirection
+- Helper functions for merging the thirds from multithreading inputs without indirection
+- Up to 6-way multithreading functions without indirection
+- Up to 8-way multithreading functions without indirection
+- Up to 16-way multithreading functions without indirection
+- Helper functions for merging the halves from multithreading inputs with indirection
+- Up to 4-way multithreading functions with indirection
+- Helper functions for merging the thirds from multithreading inputs with indirection
+- Up to 6-way multithreading functions with indirection
+- Up to 8-way multithreading functions with indirection
+- Up to 16-way multithreading functions with indirection
+### User-facing (inline) functions block (rsbd8 namespace):
+- Definition of the GetOffsetOf and getoffsetof templates
+- Generic large array allocation and deallocation functions
+- Wrapper template functions for the main sorting functions in this library
+### Ending:
+- Library finalisation
+
 ## Examples of using the 4 templates with simple arrays as input (automatically deduced template parameters are omitted here):
 The rsbd8::radixsort() and rsbd8::radixsortcopy() template wrapper functions (typically) merely allocate memory prior to using the actual sorting functions.
 No intermediate buffer array is required when any variant of rsbd8::radixsortcopynoalloc() is used for sorting 8-bit types.
