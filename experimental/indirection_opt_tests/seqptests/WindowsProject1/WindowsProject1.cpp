@@ -5,13 +5,13 @@
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // WindowsProject1.cpp : Defines the entry point for the application.
-// the test batch size for the performance tests (8 GiB default)
-#define RSBD8_TEST_BATCH_SIZE 8uz * 1024 * 1024 * 1024
-// the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled by uncommenting the following line
+// the test batch size for the performance tests (1 GiB default)
+#define RSBD8_TEST_BATCH_SIZE 4096uz * 1024 * 1024
+// the entire benchmarks for the external std::sort() and std::stable_sort() calls can be disabled by uncommenting the following line
 //#define RSBD8_DISABLE_BENCHMARK_EXTERNAL
-// the maximum and minimum number of threads to use for the performance tests can optionally be set here by uncommenting the following lines
-//#define RSBD8_THREAD_MAXIMUM 99
-//#define RSBD8_THREAD_MINIMUM 1
+#define RSBD8_DEBUG_IND 1
+#define RSBD8_THREAD_MAXIMUM 4
+#define RSBD8_THREAD_MINIMUM 4
 
 #include "pch.h"
 #include "..\..\Radixsortbidi8.hpp"
@@ -675,7 +675,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
 		std::uint64_t *pFIin{reinterpret_cast<std::uint64_t *>(in)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 8};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 8};
 		do{
 			*pFIin++ = static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 60
 				| static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 30
@@ -684,7 +684,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	}
 
 	bool succeeded;// used to check for successful sorting, or repeat runs if needed
-
+/*
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	do{
@@ -693,7 +693,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -780,7 +780,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -866,7 +866,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -953,7 +953,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1040,7 +1040,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1130,7 +1130,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1221,7 +1221,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1310,7 +1310,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1399,7 +1399,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1489,7 +1489,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1580,7 +1580,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1669,7 +1669,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1757,7 +1757,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1844,7 +1844,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -1931,7 +1931,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2021,7 +2021,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2112,7 +2112,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2201,7 +2201,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2290,7 +2290,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2380,7 +2380,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2471,7 +2471,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2560,7 +2560,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2649,7 +2649,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2739,7 +2739,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2830,7 +2830,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -2919,7 +2919,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3008,7 +3008,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3098,7 +3098,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3189,7 +3189,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3278,7 +3278,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3367,7 +3367,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3457,7 +3457,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3548,7 +3548,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3637,7 +3637,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3726,7 +3726,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3816,7 +3816,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3907,7 +3907,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -3996,7 +3996,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4085,7 +4085,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4175,7 +4175,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4266,7 +4266,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4355,7 +4355,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4444,7 +4444,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4534,7 +4534,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4625,7 +4625,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4714,7 +4714,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4794,99 +4794,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(std::execution::par_unseq, reinterpret_cast<std::int8_t *>(out), reinterpret_cast<std::int8_t *>(out) + (RSBD8_TEST_BATCH_SIZE)));
 	}while(!succeeded);
-	// basic indirection tests, these warm up the caches differently
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		rsbd8::helper::longdoubletest128 const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in)};
-		rsbd8::helper::longdoubletest128 const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128 const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128), sizeof(void *)), reinterpret_cast<rsbd8::helper::longdoubletest128 **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"encapsulated long double, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
+	// two basic indirection tests, these warm up the caches differently
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -4896,7 +4804,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -4915,9 +4823,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
+#ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(double), sizeof(void *))};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
+#endif
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
@@ -4958,7 +4872,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 #ifndef _DEBUG// skip in debug builds as it is way too slow
 		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(double), sizeof(void *)), indlesslambda);
+		std::stable_sort(std::execution::par_unseq, 
+#ifdef _WIN64
+			reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
+#else
+			reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / 4,
+#endif
+			indlesslambda);
 #endif
 
 		// stop measuring
@@ -4980,11 +4900,17 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"double, indirect std::stable_sort() test\n");
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"std::uint64_t * std::stable_sort() test\n"
+#else
+			L"std::uint32_t * std::stable_sort() test\n"
+#endif
+		);
 		OutputDebugStringW(szTicksRu64Text);
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
+*/	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
 	do{
 		// filled initialization of the output part
@@ -4992,7 +4918,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -5009,239 +4935,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64wstart{__rdtsc()};
+		std::uint64_t u64start{__rdtsc()};
 
+#ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(double), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(double), sizeof(void *)), reinterpret_cast<double **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(float), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-#ifndef _DEBUG// skip in debug builds as it is way too slow
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(float), sizeof(void *)), indlesslambda);
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
 #endif
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float, indirect std::stable_sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
-		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(float), sizeof(void *))};
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(float), sizeof(void *)), reinterpret_cast<float **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -5262,25 +4969,10 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"float, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5292,12 +4984,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
-		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
+		succeeded = rsbd8::radixsort(
+#ifdef _WIN64
+			(RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<std::uint64_t **>(out),
+#else
+			(RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<std::uint32_t **>(out),
+#endif
+			upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -5318,137 +5011,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *)), reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"half, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"std::uint64_t * rsbd8::radixsort() test\n"
+#else
+			L"std::uint32_t * rsbd8::radixsort() test\n"
+#endif
+		);
 		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
-		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *)), reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"mini, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
+	}while(!succeeded);/*
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	// run an empty loop to warm up the caches first
 	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
@@ -5458,7 +5029,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -5477,9 +5048,15 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
+#ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
+#endif
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
@@ -5520,7 +5097,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 #ifndef _DEBUG// skip in debug builds as it is way too slow
 		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *)), indlesslambda);
+		std::stable_sort(std::execution::par_unseq, 
+#ifdef _WIN64
+			reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + (RSBD8_TEST_BATCH_SIZE) / 8,
+#else
+			reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + (RSBD8_TEST_BATCH_SIZE) / 4,
+#endif
+			indlesslambda);
 #endif
 
 		// stop measuring
@@ -5542,7 +5125,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::uint64_t, indirect std::stable_sort() test\n"	);
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"double * std::stable_sort() test\n"
+#else
+			L"float * std::stable_sort() test\n"
+#endif
+		);
 		OutputDebugStringW(szTicksRu64Text);
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
@@ -5554,7 +5143,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		__m128 xf{_mm_undefined_ps()};
 		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
 		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
+		std::uint32_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
 		do{
 			_mm_stream_ps(pFIout, xf);
 			pFIout += 4;
@@ -5571,146 +5160,20 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			static_cast<void>(cpuInfo[2]);
 			static_cast<void>(cpuInfo[3]);
 		}
-		std::uint64_t u64start{__rdtsc()};
+		std::uint64_t u64wstart{__rdtsc()};
 
+#ifdef _WIN64
 		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *)), reinterpret_cast<std::uint64_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint64_t, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 8};
+#else
 		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::uint32_t i{(RSBD8_TEST_BATCH_SIZE) / 4};
+#endif
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-#ifndef _DEBUG// skip in debug builds as it is way too slow
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *)), indlesslambda);
-#endif
 
 		// stop measuring
 		std::uint64_t u64wstop;
@@ -5731,26 +5194,10 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		OutputDebugStringW(L"std::uint32_t, indirect std::stable_sort() test\n"	);
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
+		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
+		//OutputDebugStringW(szTicksRu64Text);
+		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
 		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
 		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
@@ -5762,12 +5209,13 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
-		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
+		succeeded = rsbd8::radixsort(
+#ifdef _WIN64
+			(RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double **>(out),
+#else
+			(RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float **>(out),
+#endif
+			upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -5788,424 +5236,16 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
 		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
 		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *)), reinterpret_cast<std::uint32_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint32_t, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(
+#ifdef _WIN64
+			L"double * rsbd8::radixsort() test\n"
+#else
+			L"float * rsbd8::radixsort() test\n"
+#endif
+		);
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
-		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-#ifndef _DEBUG// skip in debug builds as it is way too slow
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t **>(out), reinterpret_cast<std::uint16_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *)), indlesslambda);
-#endif
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint16_t, indirect std::stable_sort() test\n"	);
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
-		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *)), reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint16_t, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
-		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-#ifndef _DEBUG// skip in debug builds as it is way too slow
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t **>(out), reinterpret_cast<std::uint8_t **>(out) + (RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *)), indlesslambda);
-#endif
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint8_t, indirect std::stable_sort() test\n"	);
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	// run an empty loop to warm up the caches first
-	// this acts as a dumb copy loop to the memory at the out pointer for the one next sorting section as well
-	do{
-		// filled initialization of the output part
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-		__m128 xf{_mm_undefined_ps()};
-		xf = _mm_cmp_ps(xf, xf, _CMP_NLT_US);// set all bits (even works if xf happens to contain NaN), even for code at the SSE2-level, avoid all the floating-point comparison intrinsics of emmintrin.h and earlier, as these will in many cases force the left and right argument to swap or use extra instructions to deal with NaN and not encode to assembly as expected, see immintrin.h for more details
-		float *pFIout{reinterpret_cast<float *>(out)};
-		std::size_t j{(RSBD8_TEST_BATCH_SIZE) / 16};
-		do{
-			_mm_stream_ps(pFIout, xf);
-			pFIout += 4;
-		}while(--j);
-
-		// start measuring
-		SwitchToThread();// prevent context switching during the benchmark
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
-		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		//OutputDebugStringW(L"warming up caches, ignore this benchmark\n");
-		//OutputDebugStringW(szTicksRu64Text);
-		// warning! requires a copy of the data at the out pointer here, the in pointer isn't used
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *)), reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-			static_cast<void>(cpuInfo);
-			static_cast<void>(cpuInfo[0]);
-			static_cast<void>(cpuInfo[1]);
-			static_cast<void>(cpuInfo[2]);
-			static_cast<void>(cpuInfo[3]);
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint8_t, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-
+*/
 	// benchmark finished time
 	WritePaddedu64(szTicksRu64Text, PerfCounter100ns());
 	*reinterpret_cast<std::uint64_t UNALIGNED*>(szTicksRu64Text + 20) = static_cast<std::uint64_t>(L'\n') << 32 | static_cast<std::uint64_t>(L'b') << 16 | static_cast<std::uint64_t>(L' ');// the last wchar_t is correctly set to zero here

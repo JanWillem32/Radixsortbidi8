@@ -1,0 +1,36 @@
+Optimisation experiment, using 4 replacement functions inside utilityx64.asm for the main sorting loops to see if the cache miss bottleneck for sorting with indirection can be improved somehow. This was done by converting C++ code to assembly code, and then adding prefeteching options in further tests.
+In the end, a 3.4% or 1.6% improvement just isn't significantly better. Analysis shows that uncached reads from indirection are hurting performance for these functions. For the 2 thread version just over 5% of total execution time is spent waiting on each of the 8 indirect memory fetch instructions per loop, so more than 40% in total. (This includes run-time initialisation time, so the figure for just the 2 functions is even worse, and it shows.)
+Further multithreading doesn't improve things at all. Again, the uncached reads from indirection are very slow, and the two threads running one merging loop each can only do one value at a time.
+
+2 threads (only the two main sorting functions):
+00000054 162.54508972  [1568] std::uint64_t * rsbd8::radixsort() test
+regular C++
+00000055 162.54519653  [1568]          73608257840
+asm function, no prefeteching
+00000003  37.97644043  [3080]          73592778536
+asm function, single-line non-temporal prefeteching
+00000003  35.91518021 [11452]          73798761110
+asm function, single-line T0 prefeteching
+00000003  35.77819824 [15400]          73364168164
+asm function, 512-byte non-temporal prefeteching
+00000003  35.41279221  [6460]          71991558326
+asm function, 512-byte T0 prefeteching (the version currently in the utilityx64.asm file)
+00000003  35.14228821  [9936]          71169156945
+
+73608257840/71169156945=
+1.034271881243
+
+
+4 threads (the two main sorting functions and the two merging functions):
+00000054 193.86128235 [19016] std::uint64_t * rsbd8::radixsort() test
+regular C++
+00000055 193.86140442 [19016]         125457768736
+asm function, no prefeteching
+00000003  52.54914093 [14120]         124674525832
+asm function, single-line T0 prefeteching
+00000003  52.26706696  [3252]         124133562842
+asm function, 512-byte T0 prefeteching (the version currently in the utilityx64.asm file)
+00000003  52.26370239 [18604]         123531242870
+
+125457768736/123531242870=
+1.015595454407
