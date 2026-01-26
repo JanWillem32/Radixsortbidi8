@@ -25648,7 +25648,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// for unfiltered 64-bit it's 320 MiB, and for double it's 280 MiB
 	// for unfiltered 80-bit it's 131.072 MiB, and for 80-bit floating point it's 114.688 MiB
 	static double constexpr base{// inverse quintic exponential scaling
-		0x5p43 / static_cast<double>(typebitsize * typebitsizesqr * typebitsizesqr)
+		0x5p53 / static_cast<double>(typebitsize * typebitsizesqr * typebitsizesqr)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
 		* ((isabsvalue && isfltpmode)? 15. / 16. : 1.)// 2 modes with one extra filtering step per input value
@@ -25675,14 +25675,15 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<longdoubletest128, T> ||
 		std::is_same_v<longdoubletest96, T> ||
 		std::is_same_v<longdoubletest80, T>)? 80 : CHAR_BIT * sizeof(T)};
-	static std::size_t constexpr typebitsizecub{typebitsize * typebitsize * typebitsize};
-	static std::size_t constexpr typebitsizeset{typebitsizecub * typebitsizecub};
-	// for unfiltered 16-bit it's 32 TiB, and for half-precision floating point it's 28 TiB
-	// for unfiltered 32-bit it's 16 GiB, and for float it's 14 GiB
+	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
+	static std::size_t constexpr typebitsizecub{typebitsize * typebitsizesqr};
+	static std::size_t constexpr typebitsizequt{typebitsizesqr * typebitsizesqr};
+	// for unfiltered 16-bit it's 8 TiB, and for half-precision floating point it's 7 TiB
+	// for unfiltered 32-bit it's 8 GiB, and for float it's 7 GiB
 	// for unfiltered 64-bit it's 8 MiB, and for double it's 7 MiB
-	// for unfiltered 80-bit it's 703.687 KiB, and for 80-bit floating point it's 615.727 KiB
-	static double constexpr base{// inverse duodecic exponential scaling
-		0x1p92 / static_cast<double>(typebitsizeset * typebitsizeset)
+	// for unfiltered 80-bit it's 879.609 KiB, and for 80-bit floating point it's 769.658 KiB
+	static double constexpr base{// inverse unodecic exponential scaling
+		0x1p86 / static_cast<double>(typebitsizecub * typebitsizequt * typebitsizequt)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
 		* (isrevorder? 7. / 8. : 1.)// reverse ordering requires more memory work in the initial sorting phase
 		* ((isabsvalue && isfltpmode)? 15. / 16. : 1.)// 2 modes with one extra filtering step per input value
