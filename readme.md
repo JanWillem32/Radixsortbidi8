@@ -257,7 +257,7 @@ This last combination is very uncommon, but could be useful in some rare cases.
 ```C++
 myclass collA[]{{1, "first"}, {1, "second"}, {-5, "third"}, {2, "fourth"}};// list construct
 myclass *pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
-rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::dscfwdorder>(4, pcollA, psomeunusedbuffer);
+rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::sortingdirection::dscfwdorder>(4, pcollA, psomeunusedbuffer);
 ```
 Members of "pcollA" will then get sorted according to their value "keyorder", in reverse order, while keeping the same array order.
 Pointers will in this case point to: {2, "fourth"}, {1, "first"}, {1, "second"}, {-5, "third"}.

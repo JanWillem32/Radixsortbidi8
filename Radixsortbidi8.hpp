@@ -250,7 +250,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // ### To give an example of isdescsort = true, isrevorder = false, as it's a bit tricky to imagine without a reference:
 // myclass collA[]{{1, "first"}, {1, "second"}, {-5, "third"}, {2, "fourth"}};// list construct
 // myclass *pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
-// rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::dscfwdorder>(4, pcollA, psomeunusedbuffer);
+// rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::sortingdirection::dscfwdorder>(4, pcollA, psomeunusedbuffer);
 // Members of "pcollA" will then get sorted according to their value "keyorder", in reverse order, while keeping the same array order.
 // Pointers will in this case point to: {2, "fourth"}, {1, "first"}, {1, "second"}, {-5, "third"}.
 // That is different from fully reversing the order when using this line instead of the above:
