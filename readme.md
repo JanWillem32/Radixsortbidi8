@@ -45,8 +45,12 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Utility templates of rotate left or right by a compile-time constant amount
 - Helper functions to implement the 8 main modes
 - Helper functions to implement the offset transforms
-- Function implementation templates for multi-part types
-- Function implementation templates for single-part types
+- Function implementation templates for 80-bit-based long double types without indirection
+- Function implementation templates for 80-bit-based long double types with indirection
+- Function implementation templates for multi-part types without indirection
+- Function implementation templates for multi-part types with indirection
+- Function implementation templates for single-part types without indirection
+- Function implementation templates for single-part types with indirection
 - 1- to 16-way multithreading function reroutes
 - Reroutes to the 1- or 2-thread functions for single-part types
 - Reroutes to the 1- or 2-thread functions (variants without indirection)

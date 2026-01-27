@@ -52,8 +52,12 @@
 // - Utility templates of rotate left or right by a compile-time constant amount
 // - Helper functions to implement the 8 main modes
 // - Helper functions to implement the offset transforms
-// - Function implementation templates for multi-part types
-// - Function implementation templates for single-part types
+// - Function implementation templates for 80-bit-based long double types without indirection
+// - Function implementation templates for 80-bit-based long double types with indirection
+// - Function implementation templates for multi-part types without indirection
+// - Function implementation templates for multi-part types with indirection
+// - Function implementation templates for single-part types without indirection
+// - Function implementation templates for single-part types with indirection
 // - 1- to 16-way multithreading function reroutes
 // - Reroutes to the 1- or 2-thread functions for single-part types
 // - Reroutes to the 1- or 2-thread functions (variants without indirection)
@@ -8264,7 +8268,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{skipsteps, paritybool};// paritybool will be 1 for when the swap count is odd
 }
 
-// Function implementation templates for multi-part types
+// Function implementation templates for 80-bit-based long double types without indirection
 
 // initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
@@ -10613,6 +10617,2347 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
+
+// Function implementation templates for 80-bit-based long double types with indirection
+
+// initialisation part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = decltype(T::signexponent);
+	using U =
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
+#endif
+		unsigned
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		>
+#endif
+		;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pout);
+	if(isinputconst) assert(pdst);
+	assert(offsetscompanion);
+	if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isinputconst){
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+				pout += count - i;
+				pdst += count - i;
+				do{
+					V *p{input[0]};
+					++input;
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					pout[i] = p;
+					pdst[i] = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::uint64_t curm{cur.mantissa};
+					U cure{static_cast<U>(cur.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					curm >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+				}while(0 <= --i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				// unsigned counter, not zero inclusive inside the loop
+				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+				pout += count - i;
+				pdst += count - i;
+				do{
+					V *plo{input[0]};
+					V *phi{input[1]};
+					input += 2;
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					pout[i] = plo;
+					pdst[i] = plo;
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					pout[i - 1] = phi;
+					pdst[i - 1] = phi;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{static_cast<U>(curlo.signexponen)};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{static_cast<U>(curhi.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					i -= 2;
+				}while(0 <= i);
+			}
+		}else{// !isinputconst
+			V **pinputlo{input}, **pinputhi{input + count};
+			V **poutputlo{pout}, **poutputhi{pout + count};
+			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+				do{
+					V *plo{pinputlo[0]};
+					V *phi{pinputhi[0]};
+					// register pressure performance issue on several platforms: first do the low half here
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					*pinputhi-- = plo;
+					*poutputhi-- = plo;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{static_cast<U>(curlo.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					*pinputlo++ = phi;
+					*poutputlo++ = phi;
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{static_cast<U>(curhi.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+					}
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}else{// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					V *plo{pinputlo[0]};
+					V *phi{pinputhi[0]};
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					*pinputhi-- = plo;
+					*poutputhi-- = plo;
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					*pinputlo++ = phi;
+					*poutputlo++ = phi;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					std::uint64_t curmlo{curlo.mantissa};
+					U curelo{static_cast<U>(curlo.signexponent)};
+					std::uint64_t curmhi{curhi.mantissa};
+					U curehi{static_cast<U>(curhi.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+					curmlo >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmlo0];
+					curmlo1 &= 0xFFu;
+					curmlo2 &= 0xFFu;
+					curmlo3 &= 0xFFu;
+					curmlo4 &= 0xFFu;
+					curmlo5 &= 0xFFu;
+					curmlo6 &= 0xFFu;
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+					curmhi >>= 56;
+					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+					++offsetscompanion[curmhi0];
+					curmhi1 &= 0xFFu;
+					curmhi2 &= 0xFFu;
+					curmhi3 &= 0xFFu;
+					curmhi4 &= 0xFFu;
+					curmhi5 &= 0xFFu;
+					curmhi6 &= 0xFFu;
+					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				}while(--i);
+			}
+		}
+	}else{// not in reverse order
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+			// unsigned counter, not zero inclusive inside the loop
+			std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
+			input += count - i;
+			pout += count - i;
+			do{
+				V *p{input[i]};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				pout[i] = p;
+				auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				std::uint64_t curm{cur.mantissa};
+				U cure{static_cast<U>(cur.signexponent)};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+				}
+				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+				cure >>= 8;
+				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+				unsigned curm1{static_cast<unsigned>(curm >> 8)};
+				unsigned curm2{static_cast<unsigned>(curm >> 16)};
+				unsigned curm3{static_cast<unsigned>(curm >> 24)};
+				unsigned curm4{static_cast<unsigned>(curm >> 32)};
+				unsigned curm5{static_cast<unsigned>(curm >> 40)};
+				unsigned curm6{static_cast<unsigned>(curm >> 48)};
+				curm >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
+				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curm0];
+				curm1 &= 0xFFu;
+				curm2 &= 0xFFu;
+				curm3 &= 0xFFu;
+				curm4 &= 0xFFu;
+				curm5 &= 0xFFu;
+				curm6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
+			}while(--i);
+		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+			// unsigned counter, not zero inclusive inside the loop
+			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+			input += count - i;
+			pout += count - i;
+			do{
+				V *phi{input[i]};
+				V *plo{input[i - 1]};
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				pout[i] = phi;
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				pout[i - 1] = plo;
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				std::uint64_t curmhi{curhi.mantissa};
+				U curehi{static_cast<U>(curhi.signexponent)};
+				std::uint64_t curmlo{curlo.mantissa};
+				U curelo{static_cast<U>(curlo.signexponent)};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+				}
+				// register pressure performance issue on several platforms: first do the high half here
+				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+				curmhi >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
+				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= 0xFFu;
+				curmhi2 &= 0xFFu;
+				curmhi3 &= 0xFFu;
+				curmhi4 &= 0xFFu;
+				curmhi5 &= 0xFFu;
+				curmhi6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
+				// register pressure performance issue on several platforms: do the low half here second
+				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+				curmlo >>= 56;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
+				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= 0xFFu;
+				curmlo2 &= 0xFFu;
+				curmlo3 &= 0xFFu;
+				curmlo4 &= 0xFFu;
+				curmlo5 &= 0xFFu;
+				curmlo6 &= 0xFFu;
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
+			}while(i -= 2);
+		}
+	}
+}
+
+// main part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = decltype(T::signexponent);
+	using U =
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
+#endif
+		unsigned
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		>
+#endif
+		;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsetscompanion);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	V **psrchi;
+	if constexpr(isrevorder){
+		psrchi = pdstnext + count;
+	}else{
+		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if(80 / 8 - 2 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop16;// rare, but possible
+	if(80 / 8 - 2 < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+	shifter *= 8;
+	for(;;){
+		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				psrchi -= 2;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}while(--j);
+		}else{// architecture: limit to four at a time when there's a decent amount of registers
+			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+			do{// fill the array, four at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				V *pc{psrchi[-2]};
+				V *pd{psrchi[-3]};
+				psrchi -= 4;
+				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+				std::size_t offsetb{poffset[curb]--};
+				std::size_t offsetc{poffset[curc]--};
+				std::size_t offsetd{poffset[curd]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}while(--j);
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrchi = pdst;
+			std::uintptr_t old{atomiclightbarrier.fetch_add(~static_cast<std::uintptr_t>(0))};
+			pdst = pdstnext;
+			pdstnext = psrchi;
+			psrchi += count;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~static_cast<std::uintptr_t>(0) == old);
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+			}
+		}
+		// handle the top two parts differently
+		if(80 - 16 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+			if(80 - 16 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+handletop16:
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						psrchi -= 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+					do{// fill the array, four at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						V *pc{psrchi[-2]};
+						V *pd{psrchi[-3]};
+						psrchi -= 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
+						std::size_t offsetc{offsetscompanion[curc + (80 - 16) * 256 / 8]--};
+						std::size_t offsetd{offsetscompanion[curd + (80 - 16) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}while(--j);
+				}
+				if(1 == runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					break;
+				{
+					std::uintptr_t old{atomiclightbarrier.fetch_add(~static_cast<std::uintptr_t>(0))};
+					// swap the pointers for the next round, data is moved on each iteration
+					psrchi = pdst;
+					pdst = pdstnext;
+					// unused: pdstnext = psrchi;
+					psrchi += count;
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(!old) do{
+							spinpause();
+						}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					}else{// detect exceptions
+						if(!old) do{
+							spinpause();
+							old = atomiclightbarrier.load(std::memory_order_relaxed);
+						}while(~static_cast<std::uintptr_t>(0) == old);
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+					}
+				}
+handletop8:
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
+					do{// fill the array, two at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						psrchi -= 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}while(--j);
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+					do{// fill the array, four at a time
+						V *pa{psrchi[0]};
+						V *pb{psrchi[-1]};
+						V *pc{psrchi[-2]};
+						V *pd{psrchi[-3]};
+						psrchi -= 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
+						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
+						std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
+						std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}while(--j);
+				}
+				break;// no further processing beyond the top part
+			}
+		}
+	}
+}
+
+// main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
+	using U =
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
+#endif
+		unsigned
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		>
+#endif
+		;// assume zero-extension to be basically free for U on basically all modern machines
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	assert(count && count != MAXSIZE_T);
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsets);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	V **psrclo;
+	if constexpr(isrevorder){
+		psrclo = pdstnext;
+	}else{
+		psrclo = const_cast<V **>(input);// psrclo will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if(80 / 8 - 2 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+	goto handletop16;// rare, but possible
+	if(80 / 8 - 2 < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+	goto handletop8;// rare, but possible
+	shifter *= 8;
+	for(;;){
+		if constexpr(ismultithreadcapable){
+			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+			}else{// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					std::size_t offsetc{poffset[curc]++};
+					std::size_t offsetd{poffset[curd]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+					std::size_t offsetb{poffset[curb]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::uintptr_t old;
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			pdst = pdstnext;
+			pdstnext = psrclo;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if constexpr(ismultithreadcapable){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(!old) do{
+						spinpause();
+					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				}else{// detect exceptions
+					if(!old) do{
+						spinpause();
+						old = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(~static_cast<std::uintptr_t>(0) == old);
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+				}
+			}
+		}
+		// handle the top two parts differently
+		if(80 - 16 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+			if(80 - 16 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+handletop16:
+				if constexpr(ismultithreadcapable){
+					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, two at a time
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							psrclo += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+						}
+					}else{// architecture: limit to four at a time when there's a decent amount of registers
+						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+						while(0 <= --j){// fill the array, four at a time
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							V *pc{psrclo[2]};
+							V *pd{psrclo[3]};
+							psrclo += 4;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+							auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
+							std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+							pdst[offsetc] = pc;
+							pdst[offsetd] = pd;
+						}
+						if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+							V *pa{psrclo[0]};
+							V *pb{psrclo[1]};
+							psrclo += 2;
+							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
+							pdst[offseta] = pa;
+							pdst[offsetb] = pb;
+						}
+					}
+					if(!(1 & count)){// fill in the final item for odd counts
+						V *p{psrclo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						pdst[offset] = p;
+					}
+				}else{// !ismultithreadcapable
+					V *const *psrchi{psrclo + count};
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto[curlo, curhi]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+						std::size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *p{*psrclo};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
+						pdst[offset] = p;
+					}
+				}
+			}
+			if(1 == runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+				[[unlikely]]
+#endif
+				break;
+			{
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+				[[maybe_unused]]
+#endif
+				std::uintptr_t old;
+				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+				// swap the pointers for the next round, data is moved on each iteration
+				psrclo = pdst;
+				pdst = pdstnext;
+				// unused: pdstnext = psrclo;
+				if constexpr(ismultithreadcapable){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(!old) do{
+							spinpause();
+						}while(atomiclightbarrier.load(std::memory_order_relaxed));
+					}else{// detect exceptions
+						if(!old) do{
+							spinpause();
+							old = atomiclightbarrier.load(std::memory_order_relaxed);
+						}while(~static_cast<std::uintptr_t>(0) == old);
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+					}
+				}
+			}
+handletop8:
+			if constexpr(ismultithreadcapable){
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, two at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
+				}else{// architecture: limit to four at a time when there's a decent amount of registers
+					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+					while(0 <= --j){// fill the array, four at a time
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						V *pc{psrclo[2]};
+						V *pd{psrclo[3]};
+						psrclo += 4;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
+						std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+						pdst[offsetc] = pc;
+						pdst[offsetd] = pd;
+					}
+					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+						V *pa{psrclo[0]};
+						V *pb{psrclo[1]};
+						psrclo += 2;
+						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
+						pdst[offseta] = pa;
+						pdst[offsetb] = pb;
+					}
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					V *p{psrclo[0]};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}else{// !ismultithreadcapable
+				V *const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+					std::size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *p{*psrclo};
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}
+			break;// no further processing beyond the top part
+		}
+	}
+}
+
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortcopynoallocmulti2threadmtc(std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X>(count, input, output, buffer, offsetscompanion, varparameters...);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << 80 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			pdst = output;
+			pdstnext = buffer;
+		}
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+	}
+}
+
+// radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortcopynoallocmulti1thread
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = decltype(T::signexponent);
+	using U =
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
+#endif
+		unsigned
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		>
+#endif
+		;// assume zero-extension to be basically free for U on basically all modern machines
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		{// scope atomicguard, so it's always destructed before asynchandle
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+					atomicvarwrapper>,// may throw, so set up the guard
+				std::nullptr_t> atomicguard{atomiclightbarrier};
+			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, std::ptrdiff_t, std::nullptr_t> stride;
+			if constexpr(ismultithreadcapable){
+				// architecture: limit to one at a time when there's few registers
+				if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+				else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+				i -= stride;
+			}
+			if constexpr(isrevorder){// also reverse the array at the same time
+				V *const *pinput{input};
+				if constexpr(ismultithreadcapable) pinput += stride;
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *p{pinput[0]};
+						++pinput;
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[i] = p;
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinput[0]};
+						V *phi{pinput[1]};
+						pinput += 2;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						output[i] = plo;
+						buffer[i] = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						output[i - 1] = phi;
+						buffer[i - 1] = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{pinput[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[0] = p;
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}
+				}
+			}else{// not in reverse order
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{input[i]};
+						V *phi{input[i - 1]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						output[i] = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						output[i - 1] = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						output[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}
+				}
+			}
+
+			// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			if constexpr(ismultithreadcapable){
+				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+					// detect exceptions
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+					}
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				// this will just be zero if usemultithread is zero
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+			}else offsetscompanion = nullptr;
+
+			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
+
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+			// no exception detection required here
+			if constexpr(ismultithreadcapable){
+				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+					spinpause();// catch up
+				}
+				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+					}while(!other);
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				other += compound;// combine
+				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+			}
+
+			// perform the bidirectional 8-bit sorting sequence
+			// flip the relevant bits inside runsteps first
+			if(runsteps ^= (1u << 80 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				if(paritybool){// swap if the count of sorting actions to do is odd
+					pdst = output;
+					pdstnext = buffer;
+				}
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+			}
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+}
+
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void> radixsortnoallocmulti2threadmtc(std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << 80 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		V **psrclo{input}, **pdst{buffer};
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			psrclo = buffer;
+			pdst = input;
+		}
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+	}
+}
+
+// radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
+// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
+	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	64 == LDBL_MANT_DIG &&
+	16384 == LDBL_MAX_EXP &&
+	128 >= CHAR_BIT * sizeof(long double) &&
+	64 < CHAR_BIT * sizeof(long double)),
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortnoallocmulti1thread
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	using W = decltype(T::signexponent);
+	using U =
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
+#endif
+		unsigned
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+		>
+#endif
+		;// assume zero-extension to be basically free for U on basically all modern machines
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		{// scope atomicguard, so it's always destructed before asynchandle
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+					atomicvarwrapper>,// may throw, so set up the guard
+				std::nullptr_t> atomicguard{atomiclightbarrier};
+			if constexpr(isrevorder){// also reverse the array at the same time
+				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+				if constexpr(!ismultithreadcapable){
+					pinputlo = input;
+					pinputhi = input + count;
+					pbufferlo = buffer;
+					pbufferhi = buffer + count;
+				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
+					std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+					pinputlo = input + stride;
+					pinputhi = input + (count - stride);
+					pbufferlo = buffer + stride;
+					pbufferhi = buffer + (count - stride);
+				}
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+						}
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+						}
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					}while(pinputlo < pinputhi);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+					}while(pinputlo < pinputhi);
+				}
+				if(pinputlo == pinputhi){// fill in the final item for odd counts
+					V *p{pinputlo[0]};
+					// no write to input, as this is the midpoint
+					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					*pbufferhi = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					std::uint64_t curm{cur.mantissa};
+					U cure{static_cast<U>(cur.signexponent)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+					unsigned curm1{static_cast<unsigned>(curm >> 8)};
+					unsigned curm2{static_cast<unsigned>(curm >> 16)};
+					unsigned curm3{static_cast<unsigned>(curm >> 24)};
+					unsigned curm4{static_cast<unsigned>(curm >> 32)};
+					unsigned curm5{static_cast<unsigned>(curm >> 40)};
+					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					curm >>= 56;
+					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= 0xFFu;
+					curm2 &= 0xFFu;
+					curm3 &= 0xFFu;
+					curm4 &= 0xFFu;
+					curm5 &= 0xFFu;
+					curm6 &= 0xFFu;
+					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+					++offsets[256 + static_cast<std::size_t>(curm1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+				}
+			}else{// not in reverse order
+				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
+					do{
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
+				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+					do{
+						V *phi{input[i]};
+						V *plo{input[i - 1]};
+						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						buffer[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						buffer[i - 1] = plo;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
+						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
+						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+						curmhi >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
+						curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= 0xFFu;
+						curmhi2 &= 0xFFu;
+						curmhi3 &= 0xFFu;
+						curmhi4 &= 0xFFu;
+						curmhi5 &= 0xFFu;
+						curmhi6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
+						++offsets[256 + static_cast<std::size_t>(curmhi1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
+						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
+						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+						curmlo >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
+						curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= 0xFFu;
+						curmlo2 &= 0xFFu;
+						curmlo3 &= 0xFFu;
+						curmlo4 &= 0xFFu;
+						curmlo5 &= 0xFFu;
+						curmlo6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
+						++offsets[256 + static_cast<std::size_t>(curmlo1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}
+				}
+			}
+
+			// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			if constexpr(ismultithreadcapable){
+				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+					// detect exceptions
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+					}
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				// this will just be zero if usemultithread is zero
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+			}else offsetscompanion = nullptr;
+
+			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+			// no exception detection required here
+			if constexpr(ismultithreadcapable){
+				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+					spinpause();// catch up
+				}
+				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+					}while(!other);
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				other += compound;// combine
+				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+			}
+
+			// perform the bidirectional 8-bit sorting sequence
+			// flip the relevant bits inside runsteps first
+			if(runsteps ^= (1u << 80 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+				V **psrclo{input}, **pdst{buffer};
+				if(paritybool){// swap if the count of sorting actions to do is odd
+					psrclo = buffer;
+					pdst = input;
+				}
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+			}
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+}
+
+// Function implementation templates for multi-part types without indirection
 
 // initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
@@ -13439,2342 +15784,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-// initialisation part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
-// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	using W = decltype(T::signexponent);
-	using U =
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
-#endif
-		unsigned
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		>
-#endif
-		;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
-	// do not pass a nullptr here
-	assert(input);
-	assert(pout);
-	if(isinputconst) assert(pdst);
-	assert(offsetscompanion);
-	if constexpr(isrevorder){// also reverse the array at the same time
-		if constexpr(isinputconst){
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
-				pout += count - i;
-				pdst += count - i;
-				do{
-					V *p{input[0]};
-					++input;
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					pout[i] = p;
-					pdst[i] = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{cur.mantissa};
-					U cure{static_cast<U>(cur.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
-				}while(0 <= --i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				// unsigned counter, not zero inclusive inside the loop
-				std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-				pout += count - i;
-				pdst += count - i;
-				do{
-					V *plo{input[0]};
-					V *phi{input[1]};
-					input += 2;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					pout[i] = plo;
-					pdst[i] = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					pout[i - 1] = phi;
-					pdst[i - 1] = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponen)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-					i -= 2;
-				}while(0 <= i);
-			}
-		}else{// !isinputconst
-			V **pinputlo{input}, **pinputhi{input + count};
-			V **poutputlo{pout}, **poutputhi{pout + count};
-			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					// register pressure performance issue on several platforms: first do the low half here
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
-					}
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
-					}
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponent)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-					curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= 0xFFu;
-					curmlo2 &= 0xFFu;
-					curmlo3 &= 0xFFu;
-					curmlo4 &= 0xFFu;
-					curmlo5 &= 0xFFu;
-					curmlo6 &= 0xFFu;
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-					curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= 0xFFu;
-					curmhi2 &= 0xFFu;
-					curmhi3 &= 0xFFu;
-					curmhi4 &= 0xFFu;
-					curmhi5 &= 0xFFu;
-					curmhi6 &= 0xFFu;
-					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}
-		}
-	}else{// not in reverse order
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{(count + 1 + 1) >> 1};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *p{input[i]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				pout[i] = p;
-				auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				std::uint64_t curm{cur.mantissa};
-				U cure{static_cast<U>(cur.signexponent)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-				}
-				unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				curm >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(cure0)];
-				cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsetscompanion[curm0];
-				curm1 &= 0xFFu;
-				curm2 &= 0xFFu;
-				curm3 &= 0xFFu;
-				curm4 &= 0xFFu;
-				curm5 &= 0xFFu;
-				curm6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(cure)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curm)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curm1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curm2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curm3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curm4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curm5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curm6)];
-			}while(--i);
-		}else{// architecture: do not limit as much when there's a reasonable amount of registers
-			// unsigned counter, not zero inclusive inside the loop
-			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
-			input += count - i;
-			pout += count - i;
-			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				pout[i] = phi;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				pout[i - 1] = plo;
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-				std::uint64_t curmhi{curhi.mantissa};
-				U curehi{static_cast<U>(curhi.signexponent)};
-				std::uint64_t curmlo{curlo.mantissa};
-				U curelo{static_cast<U>(curlo.signexponent)};
-				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
-				}
-				// register pressure performance issue on several platforms: first do the high half here
-				unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				curmhi >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curehi0)];
-				curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsetscompanion[curmhi0];
-				curmhi1 &= 0xFFu;
-				curmhi2 &= 0xFFu;
-				curmhi3 &= 0xFFu;
-				curmhi4 &= 0xFFu;
-				curmhi5 &= 0xFFu;
-				curmhi6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmhi6)];
-				// register pressure performance issue on several platforms: do the low half here second
-				unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				curmlo >>= 56;
-				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curelo0)];
-				curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-				++offsetscompanion[curmlo0];
-				curmlo1 &= 0xFFu;
-				curmlo2 &= 0xFFu;
-				curmlo3 &= 0xFFu;
-				curmlo4 &= 0xFFu;
-				curmlo5 &= 0xFFu;
-				curmlo6 &= 0xFFu;
-				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[256 + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
-			}while(i -= 2);
-		}
-	}
-}
-
-// main part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
-// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	using W = decltype(T::signexponent);
-	using U =
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
-#endif
-		unsigned
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		>
-#endif
-		;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
-	// do not pass a nullptr here
-	assert(input);
-	assert(pdst);
-	assert(pdstnext);
-	assert(offsetscompanion);
-	assert(runsteps);
-	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi;
-	if constexpr(isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
-	}
-	// skip a step if possible
-	runsteps >>= shifter;
-	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
-	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if(80 / 8 - 2 == shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
-		goto handletop16;// rare, but possible
-	if(80 / 8 - 2 < shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
-		goto handletop8;// rare, but possible
-	shifter *= 8;
-	for(;;){
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
-			do{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				psrchi -= 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
-				std::size_t offsetb{poffset[curb]--};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-			}while(--j);
-		}else{// architecture: limit to four at a time when there's a decent amount of registers
-			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-			do{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
-				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
-				std::size_t offsetb{poffset[curb]--};
-				std::size_t offsetc{poffset[curc]--};
-				std::size_t offsetd{poffset[curd]--};
-				pdst[offseta] = pa;
-				pdst[offsetb] = pb;
-				pdst[offsetc] = pc;
-				pdst[offsetd] = pd;
-			}while(--j);
-		}
-		runsteps >>= 1;
-		if(!runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			break;
-		{
-			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-			shifter += 8;
-			poffset += 256;
-			// swap the pointers for the next round, data is moved on each iteration
-			psrchi = pdst;
-			std::uintptr_t old{atomiclightbarrier.fetch_add(~static_cast<std::uintptr_t>(0))};
-			pdst = pdstnext;
-			pdstnext = psrchi;
-			psrchi += count;
-			// skip a step if possible
-			runsteps >>= index;
-			shifter += index * 8;
-			poffset += static_cast<std::size_t>(index) * 256;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-				if(!old) do{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}else{// detect exceptions
-				if(!old) do{
-					spinpause();
-					old = atomiclightbarrier.load(std::memory_order_relaxed);
-				}while(~static_cast<std::uintptr_t>(0) == old);
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
-			}
-		}
-		// handle the top two parts differently
-		if(80 - 16 <= shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-		{
-			if(80 - 16 == shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-			{
-handletop16:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						V *pc{psrchi[-2]};
-						V *pd{psrchi[-3]};
-						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
-						std::size_t offsetc{offsetscompanion[curc + (80 - 16) * 256 / 8]--};
-						std::size_t offsetd{offsetscompanion[curd + (80 - 16) * 256 / 8]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}while(--j);
-				}
-				if(1 == runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
-#endif
-					break;
-				{
-					std::uintptr_t old{atomiclightbarrier.fetch_add(~static_cast<std::uintptr_t>(0))};
-					// swap the pointers for the next round, data is moved on each iteration
-					psrchi = pdst;
-					pdst = pdstnext;
-					// unused: pdstnext = psrchi;
-					psrchi += count;
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-						if(!old) do{
-							spinpause();
-						}while(atomiclightbarrier.load(std::memory_order_relaxed));
-					}else{// detect exceptions
-						if(!old) do{
-							spinpause();
-							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(~static_cast<std::uintptr_t>(0) == old);
-						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
-					}
-				}
-handletop8:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						V *pc{psrchi[-2]};
-						V *pd{psrchi[-3]};
-						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
-						std::size_t offsetc{offsetscompanion[curc + (80 - 8) * 256 / 8]--};
-						std::size_t offsetd{offsetscompanion[curd + (80 - 8) * 256 / 8]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}while(--j);
-				}
-				break;// no further processing beyond the top part
-			}
-		}
-	}
-}
-
-// main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for 80-bit-based long double types with indirection
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>;
-	using U =
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
-#endif
-		unsigned
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		>
-#endif
-		;// assume zero-extension to be basically free for U on basically all modern machines
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
-	// do not pass a nullptr here
-	assert(input);
-	assert(pdst);
-	assert(pdstnext);
-	assert(offsets);
-	assert(runsteps);
-	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo;
-	if constexpr(isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<V **>(input);// psrclo will never be written to
-	}
-	// skip a step if possible
-	runsteps >>= shifter;
-	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
-	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
-		spinpause();// catch up until the other thread releases the barrier
-	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if(80 / 8 - 2 == shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
-	goto handletop16;// rare, but possible
-	if(80 / 8 - 2 < shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-		[[unlikely]]
-#endif
-	goto handletop8;// rare, but possible
-	shifter *= 8;
-	for(;;){
-		if constexpr(ismultithreadcapable){
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-				}
-			}else{// architecture: limit to four at a time when there's a decent amount of registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
-					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					std::size_t offsetc{poffset[curc]++};
-					std::size_t offsetd{poffset[curd]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-					pdst[offsetc] = pc;
-					pdst[offsetd] = pd;
-				}
-				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-				}
-			}
-			if(!(1 & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
-				std::size_t offset{poffset[cur]};
-				pdst[offset] = p;
-			}
-		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
-			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
-				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
-				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
-				pdst[offsetlo] = plo;
-				pdst[offsethi] = phi;
-			}while(psrclo < psrchi);
-			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
-				std::size_t offset{poffset[cur]};
-				pdst[offset] = p;
-			}
-		}
-		runsteps >>= 1;
-		if(!runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			break;
-		{
-			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-			shifter += 8;
-			poffset += 256;
-			// swap the pointers for the next round, data is moved on each iteration
-			psrclo = pdst;
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::uintptr_t old;
-			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
-			pdst = pdstnext;
-			pdstnext = psrclo;
-			// skip a step if possible
-			runsteps >>= index;
-			shifter += index * 8;
-			poffset += static_cast<std::size_t>(index) * 256;
-			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-					if(!old) do{
-						spinpause();
-					}while(atomiclightbarrier.load(std::memory_order_relaxed));
-				}else{// detect exceptions
-					if(!old) do{
-						spinpause();
-						old = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(~static_cast<std::uintptr_t>(0) == old);
-					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
-				}
-			}
-		}
-		// handle the top two parts differently
-		if(80 - 16 <= shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-		{
-			if(80 - 16 == shifter)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-			{
-handletop16:
-				if constexpr(ismultithreadcapable){
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, two at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-						}
-					}else{// architecture: limit to four at a time when there's a decent amount of registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, four at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							V *pc{psrclo[2]};
-							V *pd{psrclo[3]};
-							psrclo += 4;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-							auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-							std::size_t offsetc{offsets[curc + (80 - 16) * 256 / 8]++};
-							std::size_t offsetd{offsets[curd + (80 - 16) * 256 / 8]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-							pdst[offsetc] = pc;
-							pdst[offsetd] = pd;
-						}
-						if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-						}
-					}
-					if(!(1 & count)){// fill in the final item for odd counts
-						V *p{psrclo[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
-						pdst[offset] = p;
-					}
-				}else{// !ismultithreadcapable
-					V *const *psrchi{psrclo + count};
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-						auto[curlo, curhi]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
-						std::size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-						pdst[offsetlo] = plo;
-						pdst[offsethi] = phi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						V *p{*psrclo};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
-						pdst[offset] = p;
-					}
-				}
-			}
-			if(1 == runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-				[[unlikely]]
-#endif
-				break;
-			{
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
-#endif
-				std::uintptr_t old;
-				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				pdst = pdstnext;
-				// unused: pdstnext = psrclo;
-				if constexpr(ismultithreadcapable){
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-						if(!old) do{
-							spinpause();
-						}while(atomiclightbarrier.load(std::memory_order_relaxed));
-					}else{// detect exceptions
-						if(!old) do{
-							spinpause();
-							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(~static_cast<std::uintptr_t>(0) == old);
-						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
-					}
-				}
-			}
-handletop8:
-			if constexpr(ismultithreadcapable){
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
-					while(0 <= --j){// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
-					while(0 <= --j){// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
-						psrclo += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-						std::size_t offsetc{offsets[curc + (80 - 8) * 256 / 8]++};
-						std::size_t offsetd{offsets[curd + (80 - 8) * 256 / 8]++};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}
-					if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}
-				}
-				if(!(1 & count)){// fill in the final item for odd counts
-					V *p{psrclo[0]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
-					pdst[offset] = p;
-				}
-			}else{// !ismultithreadcapable
-				V *const *psrchi{psrclo + count};
-				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
-					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
-					std::size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
-					std::size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
-					pdst[offsetlo] = plo;
-					pdst[offsethi] = phi;
-				}while(psrclo < psrchi);
-				if(psrclo == psrchi){// fill in the final item for odd counts
-					V *p{*psrclo};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
-					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
-					pdst[offset] = p;
-				}
-			}
-			break;// no further processing beyond the top part
-		}
-	}
-}
-
-// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortcopynoallocmulti2threadmtc(std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	// do not pass a nullptr here
-	assert(input);
-	assert(output);
-	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-	[[maybe_unused]]
-#endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
-		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X>(count, input, output, buffer, offsetscompanion, varparameters...);
-
-	X *offsets;
-	{// barrier and pointer exchange with the main thread
-		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
-		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
-		}
-		if(!other){
-			do{
-				spinpause();
-				other = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
-			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
-			}
-			// reset the barrier after use, only one thread will do this
-			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-		}
-		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
-	}
-
-	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
-
-	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-		// no exception detection required here
-		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
-		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
-			spinpause();// catch up
-		}
-		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
-		if(!other){
-			do{
-				spinpause();
-				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
-			}while(!other);
-			// reset the barrier after use, only one thread will do this
-			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-		}
-		other += compound;// combine
-		unsigned lowercarryoutbits{2 + paritybool};
-		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
-		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
-		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
-	}
-
-	// perform the bidirectional 8-bit sorting sequence
-	// flip the relevant bits inside runsteps first
-	if(runsteps ^= (1u << 80 / 8) - 1)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-		[[likely]]
-#endif
-	{// perform the bidirectional 8-bit sorting sequence
-		V **pdst{buffer}, **pdstnext{output};// for the next iteration
-		if(paritybool){// swap if the count of sorting actions to do is odd
-			pdst = output;
-			pdstnext = buffer;
-		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
-	}
-}
-
-// radixsortcopynoalloc() function implementation template for 80-bit-based long double types with indirection
-// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	, bool ismultithreadcapable = true
-#endif
-	, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void>
-#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
-	radixsortcopynoallocmulti1thread
-#else
-	radixsortcopynoallocmulti2thread
-#endif
-	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	using W = decltype(T::signexponent);
-	using U =
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
-#endif
-		unsigned
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		>
-#endif
-		;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
-	static bool constexpr ismultithreadcapable{false};
-#endif
-	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
-	}
-	// do not pass a nullptr here, even though it's safe if count is 0
-	assert(input);
-	assert(output);
-	assert(buffer);
-	// All the code in this function is adapted for count to be one below its input value here.
-	--count;
-	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multithreading here
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
-
-		// count the 256 configurations, all in one go
-		if constexpr(ismultithreadcapable){
-			try{
-				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-				usemultithread = 1;
-			}catch(...){// std::async may fail gracefully here
-				assert(false);
-			}
-		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
-		{// scope atomicguard, so it's always destructed before asynchandle
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
-					atomicvarwrapper>,// may throw, so set up the guard
-				std::nullptr_t> atomicguard{atomiclightbarrier};
-			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::conditional_t<ismultithreadcapable, std::ptrdiff_t, std::nullptr_t> stride;
-			if constexpr(ismultithreadcapable){
-				// architecture: limit to one at a time when there's few registers
-				if constexpr(defaultgprfilesize < gprfilesize::large) stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
-				else stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-				i -= stride;
-			}
-			if constexpr(isrevorder){// also reverse the array at the same time
-				V *const *pinput{input};
-				if constexpr(ismultithreadcapable) pinput += stride;
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					do{
-						V *p{pinput[0]};
-						++pinput;
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						output[i] = p;
-						buffer[i] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					do{
-						V *plo{pinput[0]};
-						V *phi{pinput[1]};
-						pinput += 2;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						output[i] = plo;
-						buffer[i] = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = phi;
-						buffer[i - 1] = phi;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						output[0] = p;
-						buffer[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}
-				}
-			}else{// not in reverse order
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					do{
-						V *p{input[i]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						output[i] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					do{
-						V *plo{input[i]};
-						V *phi{input[i - 1]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						output[i] = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						output[i - 1] = phi;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						output[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}
-				}
-			}
-
-			// barrier and pointer exchange with the companion thread
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
-			if constexpr(ismultithreadcapable){
-				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
-				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
-				}
-				// simply do not spin if usemultithread is zero
-				if(usemultithread > other){
-					do{
-						spinpause();
-						other = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
-					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
-					}
-					// reset the barrier after use, only one thread will do this
-					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-				}
-				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
-			}else offsetscompanion = nullptr;
-
-			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
-
-			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
-			// no exception detection required here
-			if constexpr(ismultithreadcapable){
-				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
-				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
-					spinpause();// catch up
-				}
-				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
-				// simply do not spin if usemultithread is zero
-				if(usemultithread > other){
-					do{
-						spinpause();
-						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
-					}while(!other);
-					// reset the barrier after use, only one thread will do this
-					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-				}
-				other += compound;// combine
-				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
-				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
-				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
-				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
-			}
-
-			// perform the bidirectional 8-bit sorting sequence
-			// flip the relevant bits inside runsteps first
-			if(runsteps ^= (1u << 80 / 8) - 1)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-			{
-				V **pdst{buffer}, **pdstnext{output};// for the next iteration
-				if(paritybool){// swap if the count of sorting actions to do is odd
-					pdst = output;
-					pdstnext = buffer;
-				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
-			}
-		}
-	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
-}
-
-// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmulti2threadmtc(std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	// do not pass a nullptr here
-	assert(input);
-	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-	[[maybe_unused]]
-#endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
-		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
-
-	X *offsets;
-	{// barrier and pointer exchange with the main thread
-		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
-		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
-		}
-		if(!other){
-			do{
-				spinpause();
-				other = atomiclightbarrier.load(std::memory_order_relaxed);
-			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
-			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
-			}
-			// reset the barrier after use, only one thread will do this
-			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-		}
-		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
-	}
-
-	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
-
-	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
-		// no exception detection required here
-		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
-		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
-			spinpause();// catch up
-		}
-		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
-		if(!other){
-			do{
-				spinpause();
-				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
-			}while(!other);
-			// reset the barrier after use, only one thread will do this
-			// no busy-wait dependency on this store, hence relaxed memory order is fine
-			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-		}
-		other += compound;// combine
-		unsigned lowercarryoutbits{2 + paritybool};
-		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
-		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
-		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
-	}
-
-	// perform the bidirectional 8-bit sorting sequence
-	// flip the relevant bits inside runsteps first
-	if(runsteps ^= (1u << 80 / 8) - 1)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-		[[likely]]
-#endif
-	{// perform the bidirectional 8-bit sorting sequence
-		V **psrclo{input}, **pdst{buffer};
-		if(paritybool){// swap if the count of sorting actions to do is odd
-			psrclo = buffer;
-			pdst = input;
-		}
-		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
-	}
-}
-
-// radixsortnoalloc() function implementation template for 80-bit-based long double types with indirection
-// Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
-#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	, bool ismultithreadcapable = true
-#endif
-	, typename... vararguments>
-RSBD8_FUNC_NORMAL std::enable_if_t<
-	std::is_unsigned_v<X> &&
-	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128 >= CHAR_BIT * sizeof(long double) &&
-	64 < CHAR_BIT * sizeof(long double)),
-	void>
-#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
-	radixsortnoallocmulti1thread
-#else
-	radixsortnoallocmulti2thread
-#endif
-	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
-	using W = decltype(T::signexponent);
-	using U =
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
-#endif
-		unsigned
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		>
-#endif
-		;// assume zero-extension to be basically free for U on basically all modern machines
-#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
-	static bool constexpr ismultithreadcapable{false};
-#endif
-	if constexpr(ismultithreadcapable){
-		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
-		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
-	}
-	// do not pass a nullptr here, even though it's safe if count is 0
-	assert(input);
-	assert(buffer);
-	// All the code in this function is adapted for count to be one below its input value here.
-	--count;
-	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-		// conditionally enable multithreading here
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
-
-		// count the 256 configurations, all in one go
-		if constexpr(ismultithreadcapable){
-			try{
-				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-				usemultithread = 1;
-			}catch(...){// std::async may fail gracefully here
-				assert(false);
-			}
-		}
-		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
-		{// scope atomicguard, so it's always destructed before asynchandle
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
-					atomicvarwrapper>,// may throw, so set up the guard
-				std::nullptr_t> atomicguard{atomiclightbarrier};
-			if constexpr(isrevorder){// also reverse the array at the same time
-				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
-				if constexpr(!ismultithreadcapable){
-					pinputlo = input;
-					pinputhi = input + count;
-					pbufferlo = buffer;
-					pbufferhi = buffer + count;
-				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-					std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
-					pinputlo = input + stride;
-					pinputhi = input + (count - stride);
-					pbufferlo = buffer + stride;
-					pbufferhi = buffer + (count - stride);
-				}
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
-						}
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
-						}
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-					}while(pinputlo < pinputhi);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					do{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-					}while(pinputlo < pinputhi);
-				}
-				if(pinputlo == pinputhi){// fill in the final item for odd counts
-					V *p{pinputlo[0]};
-					// no write to input, as this is the midpoint
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					*pbufferhi = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{cur.mantissa};
-					U cure{static_cast<U>(cur.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-				}
-			}else{// not in reverse order
-				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
-					do{
-						V *p{input[i]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						buffer[i] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
-					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						buffer[i - 1] = plo;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						buffer[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-						std::uint64_t curm{cur.mantissa};
-						U cure{static_cast<U>(cur.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= 0xFFu;
-						curm2 &= 0xFFu;
-						curm3 &= 0xFFu;
-						curm4 &= 0xFFu;
-						curm5 &= 0xFFu;
-						curm6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-						++offsets[256 + static_cast<std::size_t>(curm1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
-					}
-				}
-			}
-
-			// barrier and pointer exchange with the companion thread
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-			[[maybe_unused]]
-#endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
-			if constexpr(ismultithreadcapable){
-				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
-				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
-				}
-				// simply do not spin if usemultithread is zero
-				if(usemultithread > other){
-					do{
-						spinpause();
-						other = atomiclightbarrier.load(std::memory_order_relaxed);
-					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
-					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
-					}
-					// reset the barrier after use, only one thread will do this
-					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-				}
-				// this will just be zero if usemultithread is zero
-				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
-			}else offsetscompanion = nullptr;
-
-			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
-
-			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
-			// no exception detection required here
-			if constexpr(ismultithreadcapable){
-				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
-				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
-				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
-					spinpause();// catch up
-				}
-				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
-				// simply do not spin if usemultithread is zero
-				if(usemultithread > other){
-					do{
-						spinpause();
-						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
-					}while(!other);
-					// reset the barrier after use, only one thread will do this
-					// no busy-wait dependency on this store, hence relaxed memory order is fine
-					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
-					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
-				}
-				other += compound;// combine
-				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
-				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
-				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
-				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
-			}
-
-			// perform the bidirectional 8-bit sorting sequence
-			// flip the relevant bits inside runsteps first
-			if(runsteps ^= (1u << 80 / 8) - 1)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-			{
-				V **psrclo{input}, **pdst{buffer};
-				if(paritybool){// swap if the count of sorting actions to do is odd
-					psrclo = buffer;
-					pdst = input;
-				}
-				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
-			}
-		}
-	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
-}
+// Function implementation templates for multi-part types with indirection
 
 // initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
@@ -22252,7 +22262,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-// Function implementation templates for single-part types
+// Function implementation templates for single-part types without indirection
 
 // initialisation part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
@@ -23927,6 +23937,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		radixsortnoallocsinglemain<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(input, offsets, offsetscompanion, usemultithread);
 	}
 }
+
+// Function implementation templates for single-part types with indirection
 
 // initialisation part, multithreading companion for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types with indirection
 template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
