@@ -748,8 +748,8 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 		unsigned long carrylo, carrymid;
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid);
 #endif
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
@@ -758,11 +758,50 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 #elif defined(_M_X64)
 		return _subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
 #elif defined(_M_IX86)
-		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], nullptr), reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
+		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
 #else
 		return std::tie(static_cast<std::uint_least16_t>(signexponent), mantissa) <
 			std::tie(static_cast<std::uint_least16_t>(other.signexponent) other.mantissa);
 #endif
+	}
+	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
+	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest128 const &other)const noexcept{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrymid;
+		std::uint_least64_t rlo{__builtin_subcll(mantissa, other.mantissa, 0, &carrymid)};
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(mantissa, other.mantissa, 0, &carrymid)};
+#endif
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrylo, carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo)};
+		std::uint_least64_t rhi{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid)};
+		static_cast<void>(rhi);
+#endif
+		static_cast<void>(rlo);
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carry;
+		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+#elif defined(_M_X64)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#elif defined(_M_IX86)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#else
+		std::uint_least64_t rlo{mantissa - other.mantissa};
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
+		rsign -= mantissa < rlo;
+#endif
+		static_cast<void>(carry);
+		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 	RSBD8_FUNC_INLINE longdoubletest128 &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
@@ -814,10 +853,10 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 		mantissa &= other.mantissa;
 		signexponent &= signexponent;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] &= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[0];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] &= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= static_cast<std::uint_least32_t>(other.mantissa >> 32);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] &= static_cast<std::uint_least32_t>(other.signexponent & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] &= static_cast<std::uint_least32_t>(other.signexponent >> 32);
 #endif
 		return{*this};
 	}
@@ -829,10 +868,10 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 		mantissa ^= other.mantissa;
 		signexponent ^= signexponent;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] ^= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[0];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] ^= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= static_cast<std::uint_least32_t>(other.mantissa >> 32);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] ^= static_cast<std::uint_least32_t>(other.signexponent & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] ^= static_cast<std::uint_least32_t>(other.signexponent >> 32);
 #endif
 		return{*this};
 	}
@@ -844,10 +883,10 @@ struct alignas(alignof(std::uint_least64_t) * 2) longdoubletest128{
 		mantissa |= other.mantissa;
 		signexponent |= signexponent;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] |= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[0];
-		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] |= reinterpret_cast<std::uint_least32_t const *>(&other.signexponent)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= static_cast<std::uint_least32_t>(other.mantissa >> 32);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[0] |= static_cast<std::uint_least32_t>(other.signexponent & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&signexponent)[1] |= static_cast<std::uint_least32_t>(other.signexponent >> 32);
 #endif
 		return{*this};
 	}
@@ -876,8 +915,8 @@ struct longdoubletest96{
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 		unsigned long carrylo, carrymid;
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid);
 #endif
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
@@ -886,11 +925,50 @@ struct longdoubletest96{
 #elif defined(_M_X64)
 		return _subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
 #elif defined(_M_IX86)
-		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], nullptr), reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
+		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), nullptr);
 #else
 		return std::tie(static_cast<std::uint_least16_t>(signexponent), mantissa) <
 			std::tie(static_cast<std::uint_least16_t>(other.signexponent), other.mantissa);
 #endif
+	}
+	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
+	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest96 const &other)const noexcept{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrymid;
+		std::uint_least64_t rlo{__builtin_subcll(mantissa, other.mantissa, 0, &carrymid)};
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(mantissa, other.mantissa, 0, &carrymid)};
+#endif
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrylo, carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo)};
+		std::uint_least64_t rhi{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid)};
+		static_cast<void>(rhi);
+#endif
+		static_cast<void>(rlo);
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carry;
+		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+#elif defined(_M_X64)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#elif defined(_M_IX86)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#else
+		std::uint_least64_t rlo{mantissa - other.mantissa};
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
+		rsign -= mantissa < rlo;
+#endif
+		static_cast<void>(carry);
+		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 	RSBD8_FUNC_INLINE longdoubletest96 &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
@@ -935,8 +1013,8 @@ struct longdoubletest96{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent &= other.signexponent;
 		return{*this};
@@ -948,8 +1026,8 @@ struct longdoubletest96{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent ^= other.signexponent;
 		return{*this};
@@ -961,8 +1039,8 @@ struct longdoubletest96{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent |= other.signexponent;
 		return{*this};
@@ -991,8 +1069,8 @@ struct longdoubletest80{
 #else
 		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 		unsigned long carrylo, carrymid;
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], 0, &carrylo);
-		__builtin_subcl(reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], carrylo, &carrymid);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo);
+		__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid);
 #endif
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
@@ -1001,11 +1079,50 @@ struct longdoubletest80{
 #elif defined(_M_X64)
 		return _subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), signexponent, other.signexponent, nullptr);
 #elif defined(_M_IX86)
-		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, reinterpret_cast<std::uint_least32_t const *>(&mantissa)[0], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0], nullptr), reinterpret_cast<std::uint_least32_t const *>(&mantissa)[1], reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1], nullptr), signexponent, other.signexponent, nullptr);
+		return _subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), signexponent, other.signexponent, nullptr);
 #else
 		return std::tie(signexponent, mantissa) <
 			std::tie(other.signexponent, other.mantissa);
 #endif
+	}
+	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
+	RSBD8_FUNC_INLINE std::intptr_t operator-(longdoubletest80 const &other)const noexcept{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrymid;
+		std::uint_least64_t rlo{__builtin_subcll(mantissa, other.mantissa, 0, &carrymid)};
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(mantissa, other.mantissa, 0, &carrymid)};
+#endif
+#else
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrylo, carrymid;
+		std::uint_least64_t rlo{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), 0, &carrylo)};
+		std::uint_least64_t rhi{__builtin_subcl(static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), carrylo, &carrymid)};
+		static_cast<void>(rhi);
+#endif
+		static_cast<void>(rlo);
+		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carry;
+		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+#elif defined(_M_X64)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#elif defined(_M_IX86)
+		std::uint_least16_t rsign;
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+#else
+		std::uint_least64_t rlo{mantissa - other.mantissa};
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
+		rsign -= mantissa < rlo;
+#endif
+		static_cast<void>(carry);
+		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 	RSBD8_FUNC_INLINE longdoubletest80 &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
@@ -1050,8 +1167,8 @@ struct longdoubletest80{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] &= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] &= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent &= other.signexponent;
 		return{*this};
@@ -1063,8 +1180,8 @@ struct longdoubletest80{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] ^= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] ^= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent ^= other.signexponent;
 		return{*this};
@@ -1076,8 +1193,8 @@ struct longdoubletest80{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa |= other.mantissa;
 #else
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[0];
-		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= reinterpret_cast<std::uint_least32_t const *>(&other.mantissa)[1];
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[0] |= static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu);
+		reinterpret_cast<std::uint_least32_t *>(&mantissa)[1] |= static_cast<std::uint_least32_t>(other.mantissa >> 32);
 #endif
 		signexponent |= other.signexponent;
 		return{*this};
@@ -1160,6 +1277,46 @@ struct alignas(alignof(std::uint_least32_t) * 2) test64{
 		return std::tie(data[1], data[0]) <
 			std::tie(other.data[1], other.data[0]);
 #endif
+	}
+	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
+	RSBD8_FUNC_INLINE std::intptr_t operator-(test64 const &other)const noexcept{
+		if constexpr(1 < sizeof(double)){
+			// basic endianess detection, relies on proper inlining and compiler optimisation of that
+			static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
+			if(*reinterpret_cast<std::uint_least32_t const *>(&highbit)){// big and mixed-endian cases
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+				static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+				unsigned long carrymid, carry;
+				std::uint_least32_t rlo{__builtin_subcl(data[1], other.data[1], 0, &carrymid)};
+				static_cast<void>(rlo);
+				std::uint_least32_t rhi{__builtin_subcl(data[0], other.data[0], carrymid, &carry)};
+				static_cast<void>(carry);
+#elif defined(_M_IX86)
+				std::uint_least32_t rhi;
+				_subborrow_u32(_subborrow_u32(0, data[1], other.data[1], nullptr), data[0], other.data[0], &rhi);
+#else
+				std::uint_least32_t rlo{data[1] - other.data[1]}, rhi{data[0] - other.data[0]};
+				rhi -= data[1] < rlo;
+#endif
+				return{static_cast<std::intptr_t>(rhi)};
+			}
+		}
+		// little-endian case
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+		static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid, carry;
+		std::uint_least32_t rlo{__builtin_subcl(data[0], other.data[0], 0, &carrymid)};
+		static_cast<void>(rlo);
+		std::uint_least32_t rhi{__builtin_subcl(data[1], other.data[1], carrymid, &carry)};
+		static_cast<void>(carry);
+#elif defined(_M_IX86)
+		std::uint_least32_t rhi;
+		_subborrow_u32(_subborrow_u32(0, data[0], other.data[0], nullptr), data[1], other.data[1], &rhi);
+#else
+		std::uint_least32_t rlo{data[0] - other.data[0]}, rhi{data[1] - other.data[1]};
+		rhi -= data[0] < rlo;
+#endif
+		return{static_cast<std::intptr_t>(rhi)};
 	}
 	RSBD8_FUNC_INLINE test64 &operator&=(std::intptr_t const &other)noexcept{
 		data[0] &= static_cast<std::uint_least32_t>(other);
@@ -1267,6 +1424,60 @@ struct alignas(alignof(std::uint_least64_t) * 2) test128{
 		return std::tie(data[1], data[0]) <
 			std::tie(other.data[1], other.data[0]);
 #endif
+	}
+	// warning: this minus operator performs subtraction with only the top part returned as result, used to propagate the sign bit next, and not the full difference
+	RSBD8_FUNC_INLINE std::intptr_t operator-(test128 const &other)const noexcept{
+		if constexpr(1 < sizeof(std::uintmax_t)){
+			// basic endianess detection, relies on proper inlining and compiler optimisation of that
+			static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+			if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+				static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+				unsigned long long carrymid, carry;
+				std::uint_least64_t rlo{__builtin_subcll(data[1], other.data[1], 0, &carrymid)};
+				std::uint_least64_t rhi{__builtin_subcll(data[0], other.data[0], carrymid, &carry)};
+#else
+				static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+				unsigned long carrymid, carry;
+				std::uint_least64_t rlo{__builtin_subcl(data[1], other.data[1], 0, &carrymid)};
+				std::uint_least64_t rhi{__builtin_subcl(data[0], other.data[0], carrymid, &carry)};
+#endif
+				static_cast<void>(rlo);
+				static_cast<void>(carry);
+#elif defined(_M_X64)
+				std::uint_least64_t rhi;
+				_subborrow_u64(_subborrow_u64(0, data[1], other.data[1], nullptr), data[0], other.data[0], &rhi);
+#else
+				std::uint_least64_t rlo{data[1] - other.data[1]}, rhi{data[0] - other.data[0]};
+				rhi -= data[1] < rlo;
+#endif
+				return{static_cast<std::intptr_t>(rhi)};
+			}
+		}
+		// little-endian case
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrymid, carry;
+		std::uint_least64_t rlo{__builtin_subcll(data[0], other.data[0], 0, &carrymid)};
+		std::uint_least64_t rhi{__builtin_subcll(data[1], other.data[1], carrymid, &carry)};
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid, carry;
+		std::uint_least64_t rlo{__builtin_subcl(data[0], other.data[0], 0, &carrymid)};
+		std::uint_least64_t rhi{__builtin_subcl(data[1], other.data[1], carrymid, &carry)};
+#endif
+		static_cast<void>(rlo);
+		static_cast<void>(carry);
+#elif defined(_M_IX86)
+		std::uint_least64_t rhi;
+		_subborrow_u64(_subborrow_u64(0, data[0], other.data[0], nullptr), data[1], other.data[1], &rhi);
+#else
+		std::uint_least64_t rlo{data[0] - other.data[0]}, rhi{data[1] - other.data[1]};
+		rhi -= data[0] < rlo;
+#endif
+		return{static_cast<std::intptr_t>(rhi)};
 	}
 	RSBD8_FUNC_INLINE test128 &operator&=(std::intptr_t const &other)noexcept{
 		data[0] &= static_cast<std::uint_least64_t>(other);
@@ -15442,86 +15653,48 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else{// not in reverse order
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
-				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 1) >> 1);
 					do{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
-						// register pressure performance issue on several platforms: first do the low half here
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						buffer[i] = phi;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						std::uint64_t curmhi{curhi.mantissa};
-						U curehi{static_cast<U>(curhi.signexponent)};
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 						}
-						unsigned curehi0{static_cast<unsigned>(curehi & 0xFFu)};
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & 0xFFu)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						curmhi >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curehi0)];
-						curehi &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= 0xFFu;
-						curmhi2 &= 0xFFu;
-						curmhi3 &= 0xFFu;
-						curmhi4 &= 0xFFu;
-						curmhi5 &= 0xFFu;
-						curmhi6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curehi)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmhi)];
-						++offsets[256 + static_cast<std::size_t>(curmhi1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmhi2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmhi3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmhi4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmhi5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmhi6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						buffer[i - 1] = plo;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						std::uint64_t curmlo{curlo.mantissa};
-						U curelo{static_cast<U>(curlo.signexponent)};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
-						}
-						unsigned curelo0{static_cast<unsigned>(curelo & 0xFFu)};
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & 0xFFu)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						curmlo >>= 56;
-						++offsets[8 * 256 + static_cast<std::size_t>(curelo0)];
-						curelo &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= 0xFFu;
-						curmlo2 &= 0xFFu;
-						curmlo3 &= 0xFFu;
-						curmlo4 &= 0xFFu;
-						curmlo5 &= 0xFFu;
-						curmlo6 &= 0xFFu;
-						++offsets[9 * 256 + static_cast<std::size_t>(curelo)];
-						++offsets[7 * 256 + static_cast<std::size_t>(curmlo)];
-						++offsets[256 + static_cast<std::size_t>(curmlo1)];
-						++offsets[2 * 256 + static_cast<std::size_t>(curmlo2)];
-						++offsets[3 * 256 + static_cast<std::size_t>(curmlo3)];
-						++offsets[4 * 256 + static_cast<std::size_t>(curmlo4)];
-						++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
-						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
-						i -= 2;
-					}while(0 < i);
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
+					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
@@ -15596,44 +15769,44 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 						i -= 2;
 					}while(0 < i);
-				}
-				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					buffer[0] = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
-					std::uint64_t curm{cur.mantissa};
-					U cure{static_cast<U>(cur.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
+						unsigned curm1{static_cast<unsigned>(curm >> 8)};
+						unsigned curm2{static_cast<unsigned>(curm >> 16)};
+						unsigned curm3{static_cast<unsigned>(curm >> 24)};
+						unsigned curm4{static_cast<unsigned>(curm >> 32)};
+						unsigned curm5{static_cast<unsigned>(curm >> 40)};
+						unsigned curm6{static_cast<unsigned>(curm >> 48)};
+						curm >>= 56;
+						++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
+						cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= 0xFFu;
+						curm2 &= 0xFFu;
+						curm3 &= 0xFFu;
+						curm4 &= 0xFFu;
+						curm5 &= 0xFFu;
+						curm6 &= 0xFFu;
+						++offsets[9 * 256 + static_cast<std::size_t>(cure)];
+						++offsets[7 * 256 + static_cast<std::size_t>(curm)];
+						++offsets[256 + static_cast<std::size_t>(curm1)];
+						++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
+						++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
+						++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
+						++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
+						++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 					}
-					unsigned cure0{static_cast<unsigned>(cure & 0xFFu)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & 0xFFu)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsets[8 * 256 + static_cast<std::size_t>(cure0)];
-					cure &= 0xFFu >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
-					++offsets[curm0];
-					curm1 &= 0xFFu;
-					curm2 &= 0xFFu;
-					curm3 &= 0xFFu;
-					curm4 &= 0xFFu;
-					curm5 &= 0xFFu;
-					curm6 &= 0xFFu;
-					++offsets[9 * 256 + static_cast<std::size_t>(cure)];
-					++offsets[7 * 256 + static_cast<std::size_t>(curm)];
-					++offsets[256 + static_cast<std::size_t>(curm1)];
-					++offsets[2 * 256 + static_cast<std::size_t>(curm2)];
-					++offsets[3 * 256 + static_cast<std::size_t>(curm3)];
-					++offsets[4 * 256 + static_cast<std::size_t>(curm4)];
-					++offsets[5 * 256 + static_cast<std::size_t>(curm5)];
-					++offsets[6 * 256 + static_cast<std::size_t>(curm6)];
 				}
 			}
 
@@ -25895,6 +26068,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
 		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
 #endif
+		curq >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
 		cure ^= static_cast<U>(curq);
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode) cure &= 0xFFFFu >> 1;
@@ -25957,7 +26131,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cure = curo;
 		}
 	}
-	if constexpr(!isabsvalue && issignmode) cure += static_cast<U>(1) << 15;// flip the sign bit
 	assert(cure <= 0xFFFFu);
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	return{curm, cure};
@@ -26210,6 +26383,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
 		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
 #endif
+		curqa >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
+		curqb >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
@@ -26322,7 +26497,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			cureb = curob;
 		}
 	}
-	if constexpr(!isabsvalue && issignmode) curea += static_cast<U>(1) << 15, cureb += static_cast<U>(1) << 15;// flip the sign bit
 	assert(curea <= 0xFFFFu);
 	assert(cureb <= 0xFFFFu);
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -26663,6 +26837,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
 		curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
 #endif
+		curqa >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
+		curqb >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;
+		curqc >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
 		curec ^= static_cast<U>(curqc);
@@ -26824,7 +27001,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curec = curoc;
 		}
 	}
-	if constexpr(!isabsvalue && issignmode) curea += static_cast<U>(1) << 15, cureb += static_cast<U>(1) << 15, curec += static_cast<U>(1) << 15;// flip the sign bit
 	assert(curea <= 0xFFFFu);
 	assert(cureb <= 0xFFFFu);
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -27250,13 +27426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, U, std::intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -27410,7 +27580,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? curhi - curlo : curlo - curhi;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
@@ -27462,7 +27632,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? curhi - curlo : curlo - curhi;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
@@ -27522,13 +27692,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, U, std::intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -27617,7 +27781,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				*pout++ = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? curhi - curlo : curlo - curhi;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
@@ -27920,13 +28084,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, U, std::intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -28261,7 +28419,7 @@ lastloopunfiltered:
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? cur2 - cur1 : cur1 - cur2;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur2 < cur1 : cur1 < cur2);
@@ -28311,7 +28469,7 @@ lastloopunfiltered:
 				*pout-- = static_cast<W>(out);
 			}else{// flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? cur2 - cur1 : cur1 - cur2;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur2 < cur1 : cur1 < cur2);
@@ -28371,13 +28529,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
-	using M = std::conditional_t<std::is_integral_v<U> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128 cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, U, std::intptr_t>;// used for masking operations
+	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
 	// do not pass a nullptr here, even though it's safe if count is 0
 	assert(input);
@@ -28595,7 +28747,7 @@ lastloopunfiltered:
 				*pout++ = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
-				if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 					mask = !isdescsort? cur1 - cur0 : cur0 - cur1;
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur1 < cur0 : cur0 < cur1);
@@ -29547,7 +29699,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			*pout-- = out;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comphi - complo : complo - comphi;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
@@ -29616,7 +29768,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			*pout-- = out;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comphi - complo : complo - comphi;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
@@ -29728,7 +29880,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			*pout++ = out;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comphi - complo : complo - comphi;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
@@ -30200,7 +30352,7 @@ lastloop:
 			*pout-- = out;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comp2 - comp1 : comp1 - comp2;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2);
@@ -30267,7 +30419,7 @@ lastloop:
 			*pout-- = out;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comp2 - comp1 : comp1 - comp2;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2);
@@ -30462,7 +30614,7 @@ lastloop:
 			*pout++ = out;
 		}else{// flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
-			if constexpr(std::is_signed_v<W>){// signed comparison optimisation
+			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
 				mask = !isdescsort? comp1 - comp0 : comp0 - comp1;
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comp1 < comp0 : comp0 < comp1);
