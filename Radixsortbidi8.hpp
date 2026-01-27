@@ -1236,13 +1236,27 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	T> generatehighbit()noexcept{
 	return{{0, 0x8000u}};
 }
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// disable the recompose64<isfltpmode>() endianess helper and test64 struct on 64-bit and larger systems
+template<bool isfltpmode>
+RSBD8_FUNC_INLINE std::uint_least64_t recompose64(std::uint_least32_t lo, std::uint_least32_t hi)noexcept{
+	if constexpr(1 < sizeof(double)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
+		if(*reinterpret_cast<std::uint_least32_t const *>(&highbit)){// big and mixed-endian cases
+			alignas(std::uint_least64_t) std::uint_least32_t abig[2]{hi, lo};
+			return{*reinterpret_cast<std::uint_least64_t *>(abig)};
+		}
+	}
+	// little-endian case
+	alignas(std::uint_least64_t) std::uint_least32_t alittle[2]{lo, hi};
+	return{*reinterpret_cast<std::uint_least64_t *>(alittle)};
+}
 
 // Utility structures to provide piecewise support and tests for 64- or 128-bit types
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// disable the 64-bit struct on 64-bit and larger systems
 // This one can be big-, mixed- and little-endian.
 template<bool isfltpmode>
-struct alignas(alignof(std::uint_least32_t) * 2) test64{
+struct alignas(std::uint_least64_t) test64{
 	std::uint_least32_t data[2];
 	// warning: this comparison operator performs an unsigned comparison, not a signed or floating-point comparison
 	RSBD8_FUNC_INLINE auto operator<(test64 const &other)const noexcept{
@@ -2547,10 +2561,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -2933,14 +2945,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhid += curmlod < curqd;
 			curod += static_cast<std::uint_least16_t>(curqd);
 			curod += curmhid < curqd;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
+			curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -3403,10 +3411,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -3775,14 +3781,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhid += curmlod < curqd;
 			curod += static_cast<std::uint_least16_t>(curqd);
 			curod += curmhid < curqd;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
+			curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -3992,21 +3994,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &checkcarry);
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo += curq;
 			curmhi += curq;
 			curmhi += curmlo < curq;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		}
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -4015,8 +4014,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		curmlo ^= curq;
 		curmhi ^= curq;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
@@ -4042,8 +4040,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 		curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &checkcarry);
 		static_cast<void>(checkcarry);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 #elif defined(_M_X64)
 		unsigned char checkcarry{_addcarry_u64(_addcarry_u16(0, curo, curo, &curo), curm, curm, &curm)};
@@ -4052,8 +4049,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		unsigned char checkcarry{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curo, curo, &curo), curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi)};
 		static_cast<void>(checkcarry);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 		std::uint_least16_t curotmp{curo};
 		curo += curo;
@@ -4163,26 +4159,22 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &checkcarrya);
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			unsigned long carrymidb, checkcarryb;
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
@@ -4192,10 +4184,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		}
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -4208,10 +4198,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmhia ^= curqa;
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
@@ -4238,8 +4226,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 		curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
 		static_cast<void>(checkcarrya);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 		unsigned short carrysignb;
 		curob = __builtin_addcs(curob, curob, 0, &carrysignb);
@@ -4258,8 +4245,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 		curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
 		static_cast<void>(checkcarryb);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 #elif defined(_M_X64)
 		unsigned char checkcarrya{_addcarry_u64(_addcarry_u16(0, curoa, curoa, &curoa), curma, curma, &curma)};
@@ -4270,13 +4256,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curoa, curoa, &curoa), curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
 		static_cast<void>(checkcarrya);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curob, curob, &curob), curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
 		static_cast<void>(checkcarryb);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 		std::uint_least16_t curotmpa{curoa}, curotmpb{curob};
 		curoa += curoa;
@@ -4431,51 +4415,43 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &checkcarrya);
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			unsigned long carrymidb, checkcarryb;
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymidc, checkcarryc;
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			curmloc = __builtin_addcl(curmloc, curqc, 0, &carrymidc);
 			curmhic = __builtin_addcl(curmhic, curqc, carrymidc, &checkcarryc);
 			static_cast<void>(checkcarryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 			unsigned long carrymidd, checkcarryd;
 			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
 			curmlod = __builtin_addcl(curmlod, curqd, 0, &carrymidd);
 			curmhid = __builtin_addcl(curmhid, curqd, carrymidd, &checkcarryd);
 			static_cast<void>(checkcarryd);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+			curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(0, curmloc, curqc, &curmloc), curmhic, curqc, &curmhic)};
 			static_cast<void>(checkcarryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
 			unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(0, curmlod, curqd, &curmlod), curmhid, curqd, &curmhid)};
 			static_cast<void>(checkcarryd);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+			curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #else
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
@@ -4493,14 +4469,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmlod += curqd;
 			curmhid += curqd;
 			curmhid += curmlod < curqd;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-			curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
+			curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #endif
 		}
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -4521,14 +4493,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmhic ^= curqc;
 		curmlod ^= curqd;
 		curmhid ^= curqd;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-		curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-		curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
+		curmc = recompose64<isfltpmode>(curmloc, curmhic);
+		curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #endif
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
@@ -4557,8 +4525,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 		curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
 		static_cast<void>(checkcarrya);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 		unsigned short carrysignb;
 		curob = __builtin_addcs(curob, curob, 0, &carrysignb);
@@ -4577,8 +4544,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 		curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
 		static_cast<void>(checkcarryb);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		unsigned short carrysignc;
 		curoc = __builtin_addcs(curoc, curoc, 0, &carrysignc);
@@ -4597,8 +4563,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmloc = __builtin_addcl(curmloc, curmloc, static_cast<unsigned long>(carrysignc), &carrymidc);
 		curmhic = __builtin_addcl(curmhic, curmhic, carrymidc, &checkcarryc);
 		static_cast<void>(checkcarryc);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-		curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+		curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 		unsigned short carrysignd;
 		curod = __builtin_addcs(curod, curod, 0, &carrysignd);
@@ -4617,8 +4582,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmlod = __builtin_addcl(curmlod, curmlod, static_cast<unsigned long>(carrysignd), &carrymidd);
 		curmhid = __builtin_addcl(curmhid, curmhid, carrymidd, &checkcarryd);
 		static_cast<void>(checkcarryd);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-		curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+		curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #endif
 #elif defined(_M_X64)
 		unsigned char checkcarrya{_addcarry_u64(_addcarry_u16(0, curoa, curoa, &curoa), curma, curma, &curma)};
@@ -4633,23 +4597,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curoa, curoa, &curoa), curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
 		static_cast<void>(checkcarrya);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curob, curob, &curob), curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
 		static_cast<void>(checkcarryb);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 		std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 		unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curoc, curoc, &curoc), curmloc, curmloc, &curmloc), curmhic, curmhic, &curmhic)};
 		static_cast<void>(checkcarryc);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-		curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+		curmc = recompose64<isfltpmode>(curmloc, curmhic);
 		std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
 		unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curod, curod, &curod), curmlod, curmlod, &curmlod), curmhid, curmhid, &curmhid)};
 		static_cast<void>(checkcarryd);
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmd[2]{curmlod, curmhid};
-		curmd = *reinterpret_cast<std::uint_least64_t *>(acurmd);// recompose
+		curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #else
 		std::uint_least16_t curotmpa{curoa}, curotmpb{curob}, curotmpc{curoc}, curotmpd{curod};
 		curoa += curoa;
@@ -4725,8 +4685,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
@@ -4738,8 +4697,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least64_t curmtmp{curm};
 			curm += curm;
@@ -4775,8 +4733,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
@@ -4788,8 +4745,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
 			curo += static_cast<std::uint_least16_t>(curq);
@@ -4801,8 +4757,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhi += curmlo < curq;
 			curo += static_cast<std::uint_least16_t>(curq);
 			curo += curmhi < curq;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			cure = curo;
 		}
@@ -4812,8 +4767,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		curmlo ^= curq;
 		curmhi ^= curq;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		cure ^= static_cast<U>(curq);
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
@@ -4840,8 +4794,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
@@ -4853,8 +4806,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(_addcarry_u16(0, curo, curo, &curo), curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least16_t curotmp{curo};
 			curo += curo;
@@ -4908,8 +4860,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
@@ -4921,8 +4872,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least64_t curmtmp{curm};
 			curm += curm;
@@ -4965,8 +4915,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
@@ -4978,8 +4927,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
 			curo += static_cast<std::uint_least16_t>(curq);
@@ -4991,8 +4939,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhi += curmlo < curq;
 			curo += static_cast<std::uint_least16_t>(curq);
 			curo += curmhi < curq;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			cure = curo;
 		}
@@ -5002,8 +4949,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		curmlo ^= curq;
 		curmhi ^= curq;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		cure ^= static_cast<U>(curq);
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
@@ -5034,8 +4980,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
@@ -5051,8 +4996,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			out[0].mantissa = curm;
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysign, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least16_t curotmp{curo};
 			curo += curo;
@@ -5111,8 +5055,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
@@ -5124,8 +5067,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least64_t curmtmp{curm};
 			curm += curm;
@@ -5171,8 +5113,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
@@ -5184,8 +5125,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
 			curo += static_cast<std::uint_least16_t>(curq);
@@ -5197,8 +5137,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhi += curmlo < curq;
 			curo += static_cast<std::uint_least16_t>(curq);
 			curo += curmhi < curq;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			cure = curo;
 		}
@@ -5208,8 +5147,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		curmlo ^= curq;
 		curmhi ^= curq;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		cure ^= static_cast<U>(curq);
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
@@ -5243,8 +5181,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, 0, static_cast<unsigned short>(carry), &checkcarry);
@@ -5262,8 +5199,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			dst[0].mantissa = curm;
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysign, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, 0, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least16_t curotmp{curo};
 			curo += curo;
@@ -5319,8 +5255,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5338,8 +5273,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5353,13 +5287,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -5407,8 +5339,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5426,8 +5357,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5441,13 +5371,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
@@ -5462,16 +5390,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhia += curmloa < curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
 			curoa += curmhia < curqa;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -5483,13 +5409,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		curmloa ^= curqa;
 		curmhia ^= curqa;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
@@ -5520,8 +5444,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, 0, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5541,8 +5464,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, 0, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5559,14 +5481,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned char carrysigna{_addcarry_u16(0, curoa, curoa, &curoa)};
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysigna, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, 0, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(0, curob, curob, &curob)};
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysignb, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, 0, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least16_t curotmpa{curoa};
 			curoa += curoa;
@@ -5636,8 +5556,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5655,8 +5574,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5670,13 +5588,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -5732,8 +5648,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5751,8 +5666,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5766,13 +5680,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
@@ -5788,16 +5700,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhia += curmloa < curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
 			curoa += curmhia < curqa;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -5809,13 +5719,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		curmloa ^= curqa;
 		curmhia ^= curqa;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
@@ -5851,8 +5759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, 0, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -5873,8 +5780,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, 0, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -5894,15 +5800,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			outa[0].mantissa = curma;
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysigna, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, 0, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(0, curob, curob, &curob)};
 			outb[0].mantissa = curmb;
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysignb, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, 0, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least16_t curotmpa{curoa};
 			curoa += curoa;
@@ -5982,8 +5886,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -6001,8 +5904,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -6016,13 +5918,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -6084,8 +5984,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
@@ -6103,8 +6002,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
@@ -6118,13 +6016,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
@@ -6139,16 +6035,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhia += curmloa < curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
 			curoa += curmhia < curqa;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -6160,13 +6054,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		curmloa ^= curqa;
 		curmhia ^= curqa;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		curea ^= static_cast<U>(curqa);
 		cureb ^= static_cast<U>(curqb);
@@ -6207,8 +6099,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, 0, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -6230,8 +6121,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, 0, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -6254,16 +6144,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			dsta[0].mantissa = curma;
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysigna, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, 0, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(0, curob, curob, &curob)};
 			outb[0].mantissa = curmb;
 			dstb[0].mantissa = curmb;
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(carrysignb, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, 0, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least16_t curotmpa{curoa};
 			curoa += curoa;
@@ -25978,8 +25866,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curmlo, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
@@ -25991,8 +25878,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least64_t curmtmp{curm};
 			curm += curm;
@@ -26028,8 +25914,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			curmlo = __builtin_addcl(curmlo, curq, 0, &carrymid);
 			curmhi = __builtin_addcl(curmhi, curq, carrymid, &carry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			unsigned short checkcarry;
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
@@ -26041,8 +25926,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curq, &curmlo), curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curm += curq;
 			curo += static_cast<std::uint_least16_t>(curq);
@@ -26054,8 +25938,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhi += curmlo < curq;
 			curo += static_cast<std::uint_least16_t>(curq);
 			curo += curmhi < curq;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 			cure = curo;
 		}
@@ -26065,8 +25948,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
 		curmlo ^= curq;
 		curmhi ^= curq;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-		curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		curq >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
 		cure ^= static_cast<U>(curq);
@@ -26106,8 +25988,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarry;
 			curmlo = __builtin_subcl(curmlo, 0xFFFFFFFFu, static_cast<unsigned long>(carrysign), &checkcarry);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 #elif defined(_M_X64)
 			unsigned char carrysign{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
@@ -26118,8 +25999,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned char carrysign{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			unsigned char checkcarry{_subborrow_u32(carrysign, curmlo, 0xFFFFFFFFu, &curmlo)};// flip the least significant bit
 			static_cast<void>(checkcarry);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurm[2]{curmlo, curmhi};
-			curm = *reinterpret_cast<std::uint_least64_t *>(acurm);// recompose
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 			std::uint_least64_t curmtmp{curm};
 			curm += curm;
@@ -26211,8 +26091,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -26230,8 +26109,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -26245,13 +26123,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -26299,8 +26175,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
@@ -26318,8 +26193,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
@@ -26333,13 +26207,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
@@ -26354,16 +26226,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhia += curmloa < curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
 			curoa += curmhia < curqa;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -26375,13 +26245,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		curmloa ^= curqa;
 		curmhia ^= curqa;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		curqa >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
 		curqb >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;
@@ -26426,8 +26294,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarrya;
 			curmloa = __builtin_subcl(curmloa, 0xFFFFFFFFu, static_cast<unsigned long>(carrysigna), &checkcarrya);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -26456,8 +26323,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarryb;
 			curmlob = __builtin_subcl(curmlob, 0xFFFFFFFFu, static_cast<unsigned long>(carrysignb), &checkcarryb);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 #elif defined(_M_X64)
 			unsigned char carrysigna{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
@@ -26471,14 +26337,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned char carrysigna{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			unsigned char checkcarrya{_subborrow_u32(carrysigna, curmloa, 0xFFFFFFFFu, &curmloa)};// flip the least significant bit
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			unsigned char checkcarryb{_subborrow_u32(carrysignb, curmlob, 0xFFFFFFFFu, &curmlob)};// flip the least significant bit
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -26585,8 +26449,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curmloa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
@@ -26604,8 +26467,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curmlob, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
@@ -26623,8 +26485,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			curmloc = __builtin_addcl(curmloc, curmloc, 0, &carrymidc);
 			curmhic = __builtin_addcl(curmhic, curmhic, carrymidc, &carryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 			unsigned short checkcarryc;
 			curoc = __builtin_addcs(curoc, curoc, static_cast<unsigned short>(carryc), &checkcarryc);
@@ -26640,18 +26501,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloc, curmloc, &curmloc), curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 			static_cast<void>(checkcarryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -26709,8 +26567,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			curmloa = __builtin_addcl(curmloa, curqa, 0, &carrymida);
 			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &carrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 			unsigned short checkcarrya;
 			curoa = __builtin_addcs(curoa, static_cast<unsigned short>(curqa), static_cast<unsigned short>(carrya), &checkcarrya);
@@ -26728,8 +26585,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob = __builtin_addcl(curmlob, curqb, 0, &carrymidb);
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &carryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 			unsigned short checkcarryb;
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
@@ -26747,8 +26603,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			curmloc = __builtin_addcl(curmloc, curqc, 0, &carrymidc);
 			curmhic = __builtin_addcl(curmhic, curqc, carrymidc, &carryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 			unsigned short checkcarryc;
 			curoc = __builtin_addcs(curoc, static_cast<unsigned short>(curqc), static_cast<unsigned short>(carryc), &checkcarryc);
@@ -26764,18 +26619,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloc, curqc, &curmloc), curmhic, curqc, &curmhic), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
 			static_cast<void>(checkcarryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
@@ -26793,24 +26645,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhia += curmloa < curqa;
 			curoa += static_cast<std::uint_least16_t>(curqa);
 			curoa += curmhia < curqa;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			curmlob += curqb;
 			curmhib += curqb;
 			curmhib += curmlob < curqb;
 			curob += static_cast<std::uint_least16_t>(curqb);
 			curob += curmhib < curqb;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			curmloc += curqc;
 			curmhic += curqc;
 			curmhic += curmloc < curqc;
 			curoc += static_cast<std::uint_least16_t>(curqc);
 			curoc += curmhic < curqc;
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 			curea = curoa;
 			cureb = curob;
@@ -26824,18 +26673,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		curmloa ^= curqa;
 		curmhia ^= curqa;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-		curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 		curmlob ^= curqb;
 		curmhib ^= curqb;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-		curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 		std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 		curmloc ^= curqc;
 		curmhic ^= curqc;
-		alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-		curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+		curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 		curqa >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;// flip the sign bit
 		curqb >>= CHAR_BIT * sizeof(std::uintptr_t) - 15;
@@ -26884,8 +26730,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarrya;
 			curmloa = __builtin_subcl(curmloa, 0xFFFFFFFFu, static_cast<unsigned long>(carrysigna), &checkcarrya);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 #endif
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -26914,8 +26759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarryb;
 			curmlob = __builtin_subcl(curmlob, 0xFFFFFFFFu, static_cast<unsigned long>(carrysignb), &checkcarryb);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
@@ -26944,8 +26788,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			unsigned long checkcarryc;
 			curmloc = __builtin_subcl(curmloc, 0xFFFFFFFFu, static_cast<unsigned long>(carrysignc), &checkcarryc);// flip the least significant bit
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #endif
 #elif defined(_M_X64)
 			unsigned char carrysigna{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
@@ -26962,20 +26805,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			unsigned char carrysigna{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			unsigned char checkcarrya{_subborrow_u32(carrysigna, curmloa, 0xFFFFFFFFu, &curmloa)};// flip the least significant bit
 			static_cast<void>(checkcarrya);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurma[2]{curmloa, curmhia};
-			curma = *reinterpret_cast<std::uint_least64_t *>(acurma);// recompose
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
 			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
 			unsigned char carrysignb{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			unsigned char checkcarryb{_subborrow_u32(carrysignb, curmlob, 0xFFFFFFFFu, &curmlob)};// flip the least significant bit
 			static_cast<void>(checkcarryb);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmb[2]{curmlob, curmhib};
-			curmb = *reinterpret_cast<std::uint_least64_t *>(acurmb);// recompose
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			unsigned char carrysignc{_addcarry_u16(_addcarry_u32(_addcarry_u32(0, curmloc, curmloc, &curmloc), curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 			unsigned char checkcarryc{_subborrow_u32(carrysignc, curmloc, 0xFFFFFFFFu, &curmloc)};// flip the least significant bit
 			static_cast<void>(checkcarryc);
-			alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurmc[2]{curmloc, curmhic};
-			curmc = *reinterpret_cast<std::uint_least64_t *>(acurmc);// recompose
+			curmc = recompose64<isfltpmode>(curmloc, curmhic);
 #else
 			std::uint_least64_t curmtmpa{curma};
 			curma += curma;
@@ -27088,14 +26928,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				curhi = __builtin_addcl(curhi, curhi, carrylo, &carryhi);
 				curlo = __builtin_subcl(curlo, 0xFFFFFFFFu, carryhi, &checkcarry);// flip the least significant bit
 				static_cast<void>(checkcarry);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acur[2]{curlo, curhi};
-				cur = *reinterpret_cast<std::uint_least64_t *>(acur);// recompose
+				cur = recompose64<isfltpmode>(curlo, curhi);
 #elif defined(_M_IX86)
 				std::uint_least32_t curlo{static_cast<std::uint_least32_t>(cur & 0xFFFFFFFFu)}, curhi{static_cast<std::uint_least32_t>(cur >> 32)};// decompose
 				unsigned char checkcarry{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curlo, curlo, &curlo), curhi, curhi, &curhi), curlo, 0xFFFFFFFFu, &curlo)};// flip the least significant bit
 				static_cast<void>(checkcarry);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acur[2]{curlo, curhi};
-				cur = *reinterpret_cast<std::uint_least64_t *>(acur);// recompose
+				cur = recompose64<isfltpmode>(curlo, curhi);
 #else
 				cur = rotateleftportable<1>(static_cast<T>(cur));
 				cur ^= 1u;// flip the least significant bit
@@ -27194,27 +27032,23 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				curhia = __builtin_addcl(curhia, curhia, carryloa, &carryhia);
 				curloa = __builtin_subcl(curloa, 0xFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
 				static_cast<void>(checkcarrya);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acura[2]{curloa, curhia};
-				cura = *reinterpret_cast<std::uint_least64_t *>(acura);// recompose
+				cura = recompose64<isfltpmode>(curloa, curhia);
 				std::uint_least32_t curlob{static_cast<std::uint_least32_t>(curb & 0xFFFFFFFFu)}, curhib{static_cast<std::uint_least32_t>(curb >> 32)};// decompose
 				unsigned long carrylob, carryhib, checkcarryb;
 				curlob = __builtin_addcl(curlob, curlob, 0, &carrylob);
 				curhib = __builtin_addcl(curhib, curhib, carrylob, &carryhib);
 				curlob = __builtin_subcl(curlob, 0xFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
 				static_cast<void>(checkcarryb);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurb[2]{curlob, curhib};
-				curb = *reinterpret_cast<std::uint_least64_t *>(acurb);// recompose
+				curb = recompose64<isfltpmode>(curlob, curhib);
 #elif defined(_M_IX86)
 				std::uint_least32_t curloa{static_cast<std::uint_least32_t>(cura & 0xFFFFFFFFu)}, curhia{static_cast<std::uint_least32_t>(cura >> 32)};// decompose
 				unsigned char checkcarrya{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curloa, curloa, &curloa), curhia, curhia, &curhia), curloa, 0xFFFFFFFFu, &curloa)};// flip the least significant bit
 				static_cast<void>(checkcarrya);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acura[2]{curloa, curhia};
-				cura = *reinterpret_cast<std::uint_least64_t *>(acura);// recompose
+				cura = recompose64<isfltpmode>(curloa, curhia);
 				std::uint_least32_t curlob{static_cast<std::uint_least32_t>(curb & 0xFFFFFFFFu)}, curhib{static_cast<std::uint_least32_t>(curb >> 32)};// decompose
 				unsigned char checkcarryb{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curlob, curlob, &curlob), curhib, curhib, &curhib), curlob, 0xFFFFFFFFu, &curlob)};// flip the least significant bit
 				static_cast<void>(checkcarryb);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurb[2]{curlob, curhib};
-				curb = *reinterpret_cast<std::uint_least64_t *>(acurb);// recompose
+				curb = recompose64<isfltpmode>(curlob, curhib);
 #else
 				cura = rotateleftportable<1>(static_cast<T>(cura));
 				curb = rotateleftportable<1>(static_cast<T>(curb));
@@ -27339,40 +27173,34 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				curhia = __builtin_addcl(curhia, curhia, carryloa, &carryhia);
 				curloa = __builtin_subcl(curloa, 0xFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
 				static_cast<void>(checkcarrya);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acura[2]{curloa, curhia};
-				cura = *reinterpret_cast<std::uint_least64_t *>(acura);// recompose
+				cura = recompose64<isfltpmode>(curloa, curhia);
 				std::uint_least32_t curlob{static_cast<std::uint_least32_t>(curb & 0xFFFFFFFFu)}, curhib{static_cast<std::uint_least32_t>(curb >> 32)};// decompose
 				unsigned long carrylob, carryhib, checkcarryb;
 				curlob = __builtin_addcl(curlob, curlob, 0, &carrylob);
 				curhib = __builtin_addcl(curhib, curhib, carrylob, &carryhib);
 				curlob = __builtin_subcl(curlob, 0xFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
 				static_cast<void>(checkcarryb);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurb[2]{curlob, curhib};
-				curb = *reinterpret_cast<std::uint_least64_t *>(acurb);// recompose
+				curb = recompose64<isfltpmode>(curlob, curhib);
 				std::uint_least32_t curloc{static_cast<std::uint_least32_t>(curc & 0xFFFFFFFFu)}, curhic{static_cast<std::uint_least32_t>(curc >> 32)};// decompose
 				unsigned long carryloc, carryhic, checkcarryc;
 				curloc = __builtin_addcl(curloc, curloc, 0, &carryloc);
 				curhic = __builtin_addcl(curhic, curhic, carryloc, &carryhic);
 				curloc = __builtin_subcl(curloc, 0xFFFFFFFFu, carryhic, &checkcarryc);// flip the least significant bit
 				static_cast<void>(checkcarryc);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurc[2]{curloc, curhic};
-				curc = *reinterpret_cast<std::uint_least64_t *>(acurc);// recompose
+				curc = recompose64<isfltpmode>(curloc, curhic);
 #elif defined(_M_IX86)
 				std::uint_least32_t curloa{static_cast<std::uint_least32_t>(cura & 0xFFFFFFFFu)}, curhia{static_cast<std::uint_least32_t>(cura >> 32)};// decompose
 				unsigned char checkcarrya{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curloa, curloa, &curloa), curhia, curhia, &curhia), curloa, 0xFFFFFFFFu, &curloa)};// flip the least significant bit
 				static_cast<void>(checkcarrya);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acura[2]{curloa, curhia};
-				cura = *reinterpret_cast<std::uint_least64_t *>(acura);// recompose
+				cura = recompose64<isfltpmode>(curloa, curhia);
 				std::uint_least32_t curlob{static_cast<std::uint_least32_t>(curb & 0xFFFFFFFFu)}, curhib{static_cast<std::uint_least32_t>(curb >> 32)};// decompose
 				unsigned char checkcarryb{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curlob, curlob, &curlob), curhib, curhib, &curhib), curlob, 0xFFFFFFFFu, &curlob)};// flip the least significant bit
 				static_cast<void>(checkcarryb);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurb[2]{curlob, curhib};
-				curb = *reinterpret_cast<std::uint_least64_t *>(acurb);// recompose
+				curb = recompose64<isfltpmode>(curlob, curhib);
 				std::uint_least32_t curloc{static_cast<std::uint_least32_t>(curc & 0xFFFFFFFFu)}, curhic{static_cast<std::uint_least32_t>(curc >> 32)};// decompose
 				unsigned char checkcarryc{_subborrow_u32(_addcarry_u32(_addcarry_u32(0, curloc, curloc, &curloc), curhic, curhic, &curhic), curloc, 0xFFFFFFFFu, &curloc)};// flip the least significant bit
 				static_cast<void>(checkcarryc);
-				alignas(alignof(std::uint_least32_t) * 2) std::uint_least32_t acurc[2]{curloc, curhic};
-				curc = *reinterpret_cast<std::uint_least64_t *>(acurc);// recompose
+				curc = recompose64<isfltpmode>(curloc, curhic);
 #else
 				cura = rotateleftportable<1>(static_cast<T>(cura));
 				curb = rotateleftportable<1>(static_cast<T>(curb));
