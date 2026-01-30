@@ -369,7 +369,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	{// unit tests with the 3 simulated 80-bit long double types
 		// direct sorting tests with the 80-bit long double types
 
-		rsbd8::helper::longdoubletest80 aji80[7]{
+		rsbd8::helper::longdoubletest80<false, true, true> aji80[7]{
 			{0, 0xFFFFu},// -inf
 			{0, 0x7FFFu},// +inf
 			{0x8000000000000000u, 0xFFFFu},// QNaN, machine indeterminate
@@ -377,7 +377,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 1u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0},// max subnormal
 			{1u, 0}};// min subnormal
-		rsbd8::helper::longdoubletest80 ajo80[_countof(aji80)], ajb80[_countof(aji80)];
+		rsbd8::helper::longdoubletest80<false, true, true> ajo80[_countof(aji80)], ajb80[_countof(aji80)];
 		rsbd8::radixsortcopynoalloc(_countof(aji80), aji80, ajo80, ajb80);
 		assert(ajo80[0].mantissa == 0x8000000000000000u && ajo80[0].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 		assert(ajo80[1].mantissa == 0 && ajo80[1].signexponent == 0xFFFFu);// -inf
@@ -397,7 +397,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajb80[5].mantissa == 0 && ajb80[5].signexponent == 0xFFFFu);// -inf
 		assert(ajb80[6].mantissa == 0x8000000000000000u && ajb80[6].signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest96 aji96[7]{
+		rsbd8::helper::longdoubletest96<false, true, true> aji96[7]{
 			{0, 0xABABFFFFu},// -inf
 			{0, 0xD0017FFFu},// +inf
 			{0x8000000000000000u, 0xEEEEFFFFu},// QNaN, machine indeterminate
@@ -405,7 +405,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 0xFFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xC7C80000u},// max subnormal
 			{1u, 0xB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest96 ajo96[_countof(aji96)], ajb96[_countof(aji96)];
+		rsbd8::helper::longdoubletest96<false, true, true> ajo96[_countof(aji96)], ajb96[_countof(aji96)];
 		rsbd8::radixsortcopynoalloc(_countof(aji96), aji96, ajo96, ajb96);
 		assert(ajo96[0].mantissa == 0x8000000000000000u && ajo96[0].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo96[1].mantissa == 0 && ajo96[1].signexponent == 0xABABFFFFu);// -inf
@@ -425,7 +425,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(ajb96[5].mantissa == 0 && ajb96[5].signexponent == 0xABABFFFFu);// -inf
 		assert(ajb96[6].mantissa == 0x8000000000000000u && ajb96[6].signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest128 aji128[7]{
+		rsbd8::helper::longdoubletest128<false, true, true> aji128[7]{
 			{0, 0xBBBBAAAAABABFFFFu},// -inf
 			{0, 0x22221111D0017FFFu},// +inf
 			{0x8000000000000000u, 0x44443333EEEEFFFFu},// QNaN, machine indeterminate
@@ -433,7 +433,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			{0, 0x88887777FFF80001u},// min normal
 			{0xFFFFFFFFFFFFFFFFu, 0xCCCC9999C7C80000u},// max subnormal
 			{1u, 0xFFFFDDDDB3710000u}};// min subnormal
-		rsbd8::helper::longdoubletest128 ajo128[_countof(aji128)], ajb128[_countof(aji128)];
+		rsbd8::helper::longdoubletest128<false, true, true> ajo128[_countof(aji128)], ajb128[_countof(aji128)];
 		rsbd8::radixsortcopynoalloc(_countof(aji128), aji128, ajo128, ajb128);
 		assert(ajo128[0].mantissa == 0x8000000000000000u && ajo128[0].signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
 		assert(ajo128[1].mantissa == 0 && ajo128[1].signexponent == 0xBBBBAAAAABABFFFFu);// -inf
@@ -455,7 +455,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		// basic indirect sorting tests with the 80-bit long double types
 
-		rsbd8::helper::longdoubletest80 *ako80[_countof(aji80)], *akb80[_countof(aji80)], *aki80[_countof(aji80)]{
+		rsbd8::helper::longdoubletest80<false, true, true> *ako80[_countof(aji80)], *akb80[_countof(aji80)], *aki80[_countof(aji80)]{
 			aji80, aji80 + 1, aji80 + 2, aji80 + 3, aji80 + 4, aji80 + 5, aji80 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki80), aki80, ako80, akb80);
 		assert(ako80[0]->mantissa == 0x8000000000000000u && ako80[0]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
@@ -476,7 +476,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(akb80[5]->mantissa == 0 && akb80[5]->signexponent == 0xFFFFu);// -inf
 		assert(akb80[6]->mantissa == 0x8000000000000000u && akb80[6]->signexponent == 0xFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest96 *ako96[_countof(aji96)], *akb96[_countof(aji96)], *aki96[_countof(aji96)]{
+		rsbd8::helper::longdoubletest96<false, true, true> *ako96[_countof(aji96)], *akb96[_countof(aji96)], *aki96[_countof(aji96)]{
 			aji96, aji96 + 1, aji96 + 2, aji96 + 3, aji96 + 4, aji96 + 5, aji96 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki96), aki96, ako96, akb96);
 		assert(ako96[0]->mantissa == 0x8000000000000000u && ako96[0]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
@@ -497,7 +497,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		assert(akb96[5]->mantissa == 0 && akb96[5]->signexponent == 0xABABFFFFu);// -inf
 		assert(akb96[6]->mantissa == 0x8000000000000000u && akb96[6]->signexponent == 0xEEEEFFFFu);// QNaN, machine indeterminate
 
-		rsbd8::helper::longdoubletest128 *ako128[_countof(aji128)], *akb128[_countof(aji128)], *aki128[_countof(aji128)]{
+		rsbd8::helper::longdoubletest128<false, true, true> *ako128[_countof(aji128)], *akb128[_countof(aji128)], *aki128[_countof(aji128)]{
 			aji128, aji128 + 1, aji128 + 2, aji128 + 3, aji128 + 4, aji128 + 5, aji128 + 6};// indirect input
 		rsbd8::radixsortcopynoalloc(_countof(aki128), aki128, ako128, akb128);
 		assert(ako128[0]->mantissa == 0x8000000000000000u && ako128[0]->signexponent == 0x44443333EEEEFFFFu);// QNaN, machine indeterminate
@@ -1812,7 +1812,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -1898,7 +1898,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128 *>(out), upLargePageSize);
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
@@ -4822,9 +4822,9 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		rsbd8::helper::longdoubletest128 const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128 const *>(in)};
-		rsbd8::helper::longdoubletest128 const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128 const **>(out)};
-		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128), sizeof(void *))};
+		rsbd8::helper::longdoubletest128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in)};
+		rsbd8::helper::longdoubletest128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const **>(out)};
+		std::size_t i{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
 		do{
 			*pDest++ = pSource++;
 		}while(--i);
@@ -4863,7 +4863,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128), sizeof(void *)), reinterpret_cast<rsbd8::helper::longdoubletest128 **>(out), upLargePageSize);
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *)), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> **>(out), upLargePageSize);
 
 		// stop measuring
 		std::uint64_t u64stop;
