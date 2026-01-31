@@ -1822,6 +1822,7 @@ using memberpointerdeduce = typename memberpointerdeducebody<indirection1, isind
 
 // This can alternatively allow std::make_unsigned to do its work, too.
 // This does not require using stripenum first to work.
+// all the 80-bit long double variants are detected first, followed by primitive types of various sizes, followed up by the rest
 template<typename T, bool isabsvalue, bool issignmode, bool isfltpmode>
 using tounifunsigned = std::conditional_t<std::is_same_v<long double, T> &&// convert long double
 		64 == LDBL_MANT_DIG &&
@@ -1831,8 +1832,32 @@ using tounifunsigned = std::conditional_t<std::is_same_v<long double, T> &&// co
 		std::conditional_t<80 == CHAR_BIT * sizeof(long double), longdoubletest80<isabsvalue, issignmode, isfltpmode>,
 		std::conditional_t<96 == CHAR_BIT * sizeof(long double), longdoubletest96<isabsvalue, issignmode, isfltpmode>,
 		std::conditional_t<128 == CHAR_BIT * sizeof(long double), longdoubletest128<isabsvalue, issignmode, isfltpmode>, void>>>,
+	std::conditional_t<std::is_same_v<longdoubletest128<false, false, false>, T> ||
+		std::is_same_v<longdoubletest128<false, false, true>, T> ||
+		std::is_same_v<longdoubletest128<false, true, false>, T> ||
+		std::is_same_v<longdoubletest128<false, true, true>, T> ||
+		std::is_same_v<longdoubletest128<true, false, false>, T> ||
+		std::is_same_v<longdoubletest128<true, false, true>, T> ||
+		std::is_same_v<longdoubletest128<true, true, false>, T> ||
+		std::is_same_v<longdoubletest128<true, true, true>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<longdoubletest96<false, false, false>, T> ||
+		std::is_same_v<longdoubletest96<false, false, true>, T> ||
+		std::is_same_v<longdoubletest96<false, true, false>, T> ||
+		std::is_same_v<longdoubletest96<false, true, true>, T> ||
+		std::is_same_v<longdoubletest96<true, false, false>, T> ||
+		std::is_same_v<longdoubletest96<true, false, true>, T> ||
+		std::is_same_v<longdoubletest96<true, true, false>, T> ||
+		std::is_same_v<longdoubletest96<true, true, true>, T>, longdoubletest96<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<longdoubletest80<false, false, false>, T> ||
+		std::is_same_v<longdoubletest80<false, false, true>, T> ||
+		std::is_same_v<longdoubletest80<false, true, false>, T> ||
+		std::is_same_v<longdoubletest80<false, true, true>, T> ||
+		std::is_same_v<longdoubletest80<true, false, false>, T> ||
+		std::is_same_v<longdoubletest80<true, false, true>, T> ||
+		std::is_same_v<longdoubletest80<true, true, false>, T> ||
+		std::is_same_v<longdoubletest80<true, true, true>, T>, longdoubletest80<isabsvalue, issignmode, isfltpmode>,
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<128 == CHAR_BIT * sizeof(T) && !std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, test128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<128 == CHAR_BIT * sizeof(T), test128<isabsvalue, issignmode, isfltpmode>,
 #else
 	std::conditional_t<64 == CHAR_BIT * sizeof(T), test64<isabsvalue, issignmode, isfltpmode>,
 #endif
@@ -1841,8 +1866,9 @@ using tounifunsigned = std::conditional_t<std::is_same_v<long double, T> &&// co
 	std::conditional_t<sizeof(signed) == sizeof(T), unsigned,
 	std::conditional_t<sizeof(long) == sizeof(T), unsigned long,
 	std::conditional_t<sizeof(long long) == sizeof(T), unsigned long long,
+	std::conditional_t<sizeof(std::uintmax_t) == sizeof(T), std::uintmax_t,
 	std::conditional_t<std::is_class_v<T> || std::is_union_v<T>, T,// pass these through if oddly-sized
-	typename std::conditional_t<std::is_integral_v<T> || std::is_enum_v<T>, std::make_unsigned<T>, std::enable_if<true, void>>::type>>>>>>>>;
+	typename std::conditional_t<std::is_integral_v<T> || std::is_enum_v<T>, std::make_unsigned<T>, std::enable_if<true, void>>::type>>>>>>>>>>>>;
 
 // Utility templates to use bit carry operations for the operators less than, and less than or equal
 
