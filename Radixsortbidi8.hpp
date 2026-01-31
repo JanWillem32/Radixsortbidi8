@@ -1878,7 +1878,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U>,
 	void> addcarryofless(unsigned &accumulator, U minuend, U subtrahend)noexcept{
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc) && __has_builtin(__builtin_addc)
-	tounifunsigned<U, false, false, false> carry;// lowest rank with the same size as U
+	std::conditional_t<1 == sizeof(U), unsigned char,
+		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
+		std::conditional_t<sizeof(signed) == sizeof(U), unsigned,
+		std::conditional_t<sizeof(long) == sizeof(U), unsigned long,
+		std::conditional_t<sizeof(long long) == sizeof(U), unsigned long long, void>>>>> carry;// lowest rank with the same size as U
 	if constexpr(1 == sizeof(U)) __builtin_subcb(minuend, subtrahend, 0, &carry);
 	else if constexpr(sizeof(short) == sizeof(U)) __builtin_subcs(minuend, subtrahend, 0, &carry);
 	else if constexpr(sizeof(signed) == sizeof(U)) __builtin_subc(minuend, subtrahend, 0, &carry);
@@ -1917,7 +1921,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> addcarryoflessorequal(unsigned &accumulator, U minuend, U subtrahend)noexcept{
 	// The specialised versions actually calculate greater-than-or-equal, but with everything reversed.
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
-	tounifunsigned<U, false, false, false> carry;// lowest rank with the same size as U
+	std::conditional_t<1 == sizeof(U), unsigned char,
+		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
+		std::conditional_t<sizeof(signed) == sizeof(U), unsigned,
+		std::conditional_t<sizeof(long) == sizeof(U), unsigned long,
+		std::conditional_t<sizeof(long long) == sizeof(U), unsigned long long, void>>>>> carry;// lowest rank with the same size as U
 	if constexpr(1 == sizeof(U)) __builtin_subcb(minuend, subtrahend, 0, &carry);
 	else if constexpr(sizeof(short) == sizeof(U)) __builtin_subcs(minuend, subtrahend, 0, &carry);
 	else if constexpr(sizeof(signed) == sizeof(U)) __builtin_subc(minuend, subtrahend, 0, &carry);
