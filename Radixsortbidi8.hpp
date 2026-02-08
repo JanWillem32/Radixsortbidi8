@@ -4006,7 +4006,154 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curd.mantissa, static_cast<U>(curd.signexponent))};
 }
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
+	// Filtering is simplified if possible.
+	// This should never filter the top 64 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curp{static_cast<std::int_least64_t>(cur.data[HI])};
+		if constexpr(isabsvalue && !issignmode) cur.data[LO] += cur.data[LO];
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(issignmode) cur.data[LO] += curq;
+		cur.data[LO] ^= curq;
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// "one-register filtering"
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrysign, checkcarry;
+		cur.data[HI] = __builtin_addcll(cur.data[HI], cur.data[HI], 0, &carrysign);
+		cur.data[LO] = __builtin_addcll(cur.data[LO], cur.data[LO], carrysign, &checkcarry);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrysign, checkcarry;
+		cur.data[HI] = __builtin_addcl(cur.data[HI], cur.data[HI], 0, &carrysign);
+		cur.data[LO] = __builtin_addcl(cur.data[LO], cur.data[LO], carrysign, &checkcarry);
+#endif
+		static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+		unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[HI], cur.data[HI], &cur.data[HI]), cur.data[LO], cur.data[LO], &cur.data[LO])};
+		static_cast<void>(checkcarry);
+#else
+		std::uint_least64_t curhitmp{cur.data[HI]};
+		cur.data[HI] += cur.data[HI];
+		cur.data[LO] += cur.data[LO];
+		cur.data[LO] += cur.data[HI] < curhitmp;
+#endif
+	}
+	cur.data[LO] >>= shift;
+	return{cur.data[LO] & 0xFFu};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::size_t filtershifthi8(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
+	// Filtering is simplified if possible.
+	// This should never filter the bottom 64 bits nor the top 8 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curp{static_cast<std::int_least64_t>(cur.data[HI])};
+		if constexpr(isabsvalue && !issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[LO], cur.data[LO], &cur.data[LO]), cur.data[HI], cur.data[HI], &cur.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]};
+			cur.data[LO] += cur.data[LO];
+			cur.data[HI] += cur.data[HI];
+			cur.data[HI] += cur.data[LO] < curlotmp;
+#endif
+		}else if constexpr(isfltpmode) cur.data[HI] += cur.data[HI];
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(isfltpmode) cur.data[HI] >>= 1;
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], curq, 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], curq, carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], curq, 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], curq, carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[LO], curq, &cur.data[LO]), cur.data[HI], curq, &cur.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]};
+			cur.data[LO] += curq;
+			cur.data[HI] += curq;
+			cur.data[HI] += curlotmp < cur.data[LO];
+#endif
+		}
+		cur.data[LO] ^= curq;
+		cur.data[HI] ^= curq;
+	}else if constexpr(isabsvalue && isfltpmode){// "one-register filtering"
+		if constexpr(issignmode) cur.data[HI] &= 0x7FFFFFFFu;
+		else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[LO], cur.data[LO], &cur.data[LO]), cur.data[HI], cur.data[HI], &cur.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]};
+			cur.data[LO] += cur.data[LO];
+			cur.data[HI] += cur.data[HI];
+			cur.data[HI] += cur.data[LO] < curlotmp;
+#endif
+		}
+	}
+	cur.data[HI] >>= shift;
+	return{cur.data[HI] & 0xFFu};
+}
+#else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
 	// Filtering is simplified if possible.
@@ -4272,7 +4419,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shift)};
 }
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+
+#else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{	
 	// Filtering is simplified if possible.
@@ -4431,7 +4580,6 @@ RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> filtershifthi8(test64<isab
 			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
 			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
 			static_cast<void>(checkcarrya);
-			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrylob, checkcarryb;
 			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
 			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
@@ -4675,7 +4823,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shift)};
 }
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+
+#else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
@@ -4924,7 +5074,6 @@ RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>
 			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
 			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
 			static_cast<void>(checkcarrya);
-			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrylob, checkcarryb;
 			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
 			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
@@ -4933,7 +5082,6 @@ RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t>
 			curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], 0, &carryloc);
 			curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], carryloc, &checkcarryc);
 			static_cast<void>(checkcarryc);
-			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrylod, checkcarryd;
 			curd.data[LO] = __builtin_addcl(curd.data[LO], curd.data[LO], 0, &carrylod);
 			curd.data[HI] = __builtin_addcl(curd.data[HI], curd.data[HI], carrylod, &checkcarryd);
@@ -5105,7 +5253,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
 			static_cast<void>(checkcarryb);
 			curmb = recompose64<isfltpmode>(curmlob, curmhib);
-			static_assert(32 == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymidc, checkcarryc;
 			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
 			curmloc = __builtin_addcl(curmloc, curqc, 0, &carrymidc);
@@ -13657,7 +13804,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 }
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+// Function implementation templates for split up 128-bit types without indirection
+// all these functions are disabled on 32-bit or smaller platforms
+
+
+
+
+// Function implementation templates for split up 128-bit types with indirection
+// all these functions are disabled on 32-bit or smaller platforms
+
+
+
+#else// 32-bit or smaller platforms
 // Function implementation templates for split up 64-bit types without indirection
 // all these functions are disabled on 64-bit platforms and onwards
 
@@ -30985,7 +31144,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curc.mantissa, static_cast<U>(curc.signexponent))};
 }
 
-#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+
+#else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T> &&
