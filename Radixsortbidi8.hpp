@@ -4420,7 +4420,229 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> filtershiftlo8(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top 64 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		if constexpr(isabsvalue && !issignmode){
+			cura.data[LO] += cura.data[LO];
+			curb.data[LO] += curb.data[LO];
+		}
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(issignmode){
+			cura.data[LO] += curqa;
+			curb.data[LO] += curqb;
+		}
+		cura.data[LO] ^= curqa;
+		curb.data[LO] ^= curqb;
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// "one-register filtering"
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrysigna, checkcarrya;
+		cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], 0, &carrysigna);
+		cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], carrysign, &checkcarrya);
+		unsigned long long carrysignb, checkcarryb;
+		curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], 0, &carrysignb);
+		curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], carrysign, &checkcarryb);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrysigna, checkcarrya;
+		cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], 0, &carrysigna);
+		cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], carrysign, &checkcarrya);
+		unsigned long carrysignb, checkcarryb;
+		curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], 0, &carrysignb);
+		curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], carrysign, &checkcarryb);
+#endif
+		static_cast<void>(checkcarrya);
+		static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+		unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[HI], cura.data[HI], &cura.data[HI]), cura.data[LO], cura.data[LO], &cura.data[LO])};
+		static_cast<void>(checkcarrya);
+		unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[HI], curb.data[HI], &curb.data[HI]), curb.data[LO], curb.data[LO], &curb.data[LO])};
+		static_cast<void>(checkcarryb);
+#else
+		std::uint_least64_t curhitmpa{cura.data[HI]};
+		cura.data[HI] += cura.data[HI];
+		cura.data[LO] += cura.data[LO];
+		cura.data[LO] += cura.data[HI] < curhitmpa;
+		std::uint_least64_t curhitmpb{curb.data[HI]};
+		curb.data[HI] += curb.data[HI];
+		curb.data[LO] += curb.data[LO];
+		curb.data[LO] += curb.data[HI] < curhitmpb;
+#endif
+	}
+	cura.data[LO] >>= shift;
+	curb.data[LO] >>= shift;
+	return{cura.data[LO] & 0xFFu, curb.data[LO] & 0xFFu};
+}
 
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> filtershifthi8(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the bottom 64 bits nor the top 8 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		if constexpr(isabsvalue && !issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+#endif
+		}else if constexpr(isfltpmode){
+			cura.data[HI] += cura.data[HI];
+			curb.data[HI] += curb.data[HI];
+		}
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(isfltpmode){
+			cura.data[HI] >>= 1;
+			curb.data[HI] >>= 1;
+		}
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curqb, carrylob, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curqb, carrylob, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], curqa, &cura.data[LO]), cura.data[HI], curqa, &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curqb, &curb.data[LO]), curb.data[HI], curqb, &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += curqa;
+			cura.data[HI] += curqa;
+			cura.data[HI] += curlotmpa < cura.data[LO];
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curqb;
+			curb.data[HI] += curqb;
+			curb.data[HI] += curlotmpb < curb.data[LO];
+#endif
+		}
+		cura.data[LO] ^= curqa;
+		cura.data[HI] ^= curqa;
+		curb.data[LO] ^= curqb;
+		curb.data[HI] ^= curqb;
+	}else if constexpr(isabsvalue && isfltpmode){// "one-register filtering"
+		if constexpr(issignmode){
+			cura.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curb.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+#endif
+		}
+	}
+	cura.data[HI] >>= shift;
+	curb.data[HI] >>= shift;
+	return{cura.data[HI] & 0xFFu, curb.data[HI] & 0xFFu};
+}
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{	
@@ -4824,7 +5046,365 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> filtershiftlo8(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the top 64 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		std::int_least64_t curpc{static_cast<std::int_least64_t>(curc.data[HI])};
+		std::int_least64_t curpd{static_cast<std::int_least64_t>(curd.data[HI])};
+		if constexpr(isabsvalue && !issignmode){
+			cura.data[LO] += cura.data[LO];
+			curb.data[LO] += curb.data[LO];
+			curc.data[LO] += curc.data[LO];
+			curd.data[LO] += curd.data[LO];
+		}
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		curpc >>= 64 - 1;
+		std::uint_least64_t curqc{static_cast<std::uint_least64_t>(curpc)};
+		curpd >>= 64 - 1;
+		std::uint_least64_t curqd{static_cast<std::uint_least64_t>(curpd)};
+		if constexpr(issignmode){
+			cura.data[LO] += curqa;
+			curb.data[LO] += curqb;
+			curc.data[LO] += curqc;
+			curd.data[LO] += curqd;
+		}
+		cura.data[LO] ^= curqa;
+		curb.data[LO] ^= curqb;
+		curc.data[LO] ^= curqc;
+		curd.data[LO] ^= curqd;
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// "one-register filtering"
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+		static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+		unsigned long long carrysigna, checkcarrya;
+		cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], 0, &carrysigna);
+		cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], carrysign, &checkcarrya);
+		unsigned long long carrysignb, checkcarryb;
+		curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], 0, &carrysignb);
+		curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], carrysign, &checkcarryb);
+		unsigned long long carrysignc, checkcarryc;
+		curc.data[HI] = __builtin_addcll(curc.data[HI], curc.data[HI], 0, &carrysignc);
+		curc.data[LO] = __builtin_addcll(curc.data[LO], curc.data[LO], carrysign, &checkcarryc);
+		unsigned long long carrysignd, checkcarryd;
+		curd.data[HI] = __builtin_addcll(curd.data[HI], curd.data[HI], 0, &carrysignd);
+		curd.data[LO] = __builtin_addcll(curd.data[LO], curd.data[LO], carrysign, &checkcarryd);
+#else
+		static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrysigna, checkcarrya;
+		cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], 0, &carrysigna);
+		cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], carrysign, &checkcarrya);
+		unsigned long carrysignb, checkcarryb;
+		curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], 0, &carrysignb);
+		curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], carrysign, &checkcarryb);
+		unsigned long carrysignc, checkcarryc;
+		curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], 0, &carrysignc);
+		curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], carrysign, &checkcarryc);
+		unsigned long carrysignd, checkcarryd;
+		curd.data[HI] = __builtin_addcl(curd.data[HI], curd.data[HI], 0, &carrysignd);
+		curd.data[LO] = __builtin_addcl(curd.data[LO], curd.data[LO], carrysign, &checkcarryd);
+#endif
+		static_cast<void>(checkcarrya);
+		static_cast<void>(checkcarryb);
+		static_cast<void>(checkcarryc);
+		static_cast<void>(checkcarryd);
+#elif defined(_M_X64)
+		unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[HI], cura.data[HI], &cura.data[HI]), cura.data[LO], cura.data[LO], &cura.data[LO])};
+		static_cast<void>(checkcarrya);
+		unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[HI], curb.data[HI], &curb.data[HI]), curb.data[LO], curb.data[LO], &curb.data[LO])};
+		static_cast<void>(checkcarryb);
+		unsigned char checkcarryc{_addcarry_u64(_addcarry_u64(0, curc.data[HI], curc.data[HI], &curc.data[HI]), curc.data[LO], curc.data[LO], &curc.data[LO])};
+		static_cast<void>(checkcarryc);
+		unsigned char checkcarryd{_addcarry_u64(_addcarry_u64(0, curd.data[HI], curd.data[HI], &curd.data[HI]), curd.data[LO], curd.data[LO], &curd.data[LO])};
+		static_cast<void>(checkcarryd);
+#else
+		std::uint_least64_t curhitmpa{cura.data[HI]};
+		cura.data[HI] += cura.data[HI];
+		cura.data[LO] += cura.data[LO];
+		cura.data[LO] += cura.data[HI] < curhitmpa;
+		std::uint_least64_t curhitmpb{curb.data[HI]};
+		curb.data[HI] += curb.data[HI];
+		curb.data[LO] += curb.data[LO];
+		curb.data[LO] += curb.data[HI] < curhitmpb;
+		std::uint_least64_t curhitmpc{curc.data[HI]};
+		curc.data[HI] += curc.data[HI];
+		curc.data[LO] += curc.data[LO];
+		curc.data[LO] += curc.data[HI] < curhitmpc;
+		std::uint_least64_t curhitmpd{curd.data[HI]};
+		curd.data[HI] += curd.data[HI];
+		curd.data[LO] += curd.data[LO];
+		curd.data[LO] += curd.data[HI] < curhitmpd;
+#endif
+	}
+	cura.data[LO] >>= shift;
+	curb.data[LO] >>= shift;
+	curc.data[LO] >>= shift;
+	curd.data[LO] >>= shift;
+	return{cura.data[LO] & 0xFFu, curb.data[LO] & 0xFFu, curc.data[LO] & 0xFFu, curd.data[LO] & 0xFFu};
+}
 
+template<bool isabsvalue, bool issignmode, bool isfltpmode>
+RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> filtershifthi8(test128<isabsvalue, issignmode, isfltpmode> cura, test128<isabsvalue, issignmode, isfltpmode> curb, test128<isabsvalue, issignmode, isfltpmode> curc, test128<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
+	// Filtering is simplified if possible.
+	// This should never filter the bottom 64 bits nor the top 8 bits.
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// "two-register filtering"
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		std::int_least64_t curpc{static_cast<std::int_least64_t>(curc.data[HI])};
+		std::int_least64_t curpd{static_cast<std::int_least64_t>(curd.data[HI])};
+		if constexpr(isabsvalue && !issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+			unsigned long long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curc.data[HI], carryloc, &checkcarryc);
+			unsigned long long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcll(curd.data[LO], curd.data[LO], 0, &carrylod);
+			curd.data[HI] = __builtin_addcll(curd.data[HI], curd.data[HI], carrylod, &checkcarryd);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+			unsigned long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], carryloc, &checkcarryc);
+			unsigned long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcl(curd.data[LO], curd.data[LO], 0, &carrylod);
+			curd.data[HI] = __builtin_addcl(curd.data[HI], curd.data[HI], carrylod, &checkcarryd);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+			static_cast<void>(checkcarryc);
+			static_cast<void>(checkcarryd);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+			unsigned char checkcarryc{_addcarry_u64(_addcarry_u64(0, curc.data[LO], curc.data[LO], &curc.data[LO]), curc.data[HI], curc.data[HI], &curc.data[HI])};
+			static_cast<void>(checkcarryc);
+			unsigned char checkcarryd{_addcarry_u64(_addcarry_u64(0, curd.data[LO], curd.data[LO], &curd.data[LO]), curd.data[HI], curd.data[HI], &curd.data[HI])};
+			static_cast<void>(checkcarryd);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+			std::int_least64_t curlotmpc{curc.data[LO]};
+			curc.data[LO] += curc.data[LO];
+			curc.data[HI] += curc.data[HI];
+			curc.data[HI] += curc.data[LO] < curlotmpc;
+			std::int_least64_t curlotmpd{curd.data[LO]};
+			curd.data[LO] += curd.data[LO];
+			curd.data[HI] += curd.data[HI];
+			curd.data[HI] += curd.data[LO] < curlotmpd;
+#endif
+		}else if constexpr(isfltpmode){
+			cura.data[HI] += cura.data[HI];
+			curb.data[HI] += curb.data[HI];
+			curc.data[HI] += curc.data[HI];
+			curd.data[HI] += curd.data[HI];
+		}
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		curpc >>= 64 - 1;
+		std::uint_least64_t curqc{static_cast<std::uint_least64_t>(curpc)};
+		curpd >>= 64 - 1;
+		std::uint_least64_t curqd{static_cast<std::uint_least64_t>(curpd)};
+		if constexpr(isfltpmode){
+			cura.data[HI] >>= 1;
+			curb.data[HI] >>= 1;
+			curc.data[HI] >>= 1;
+			curd.data[HI] >>= 1;
+		}
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curqb, carrylob, &checkcarryb);
+			unsigned long long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curqc, 0, &carryloc);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curqc, carryloc, &checkcarryc);
+			unsigned long long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcll(curd.data[LO], curqd, 0, &carrylod);
+			curd.data[HI] = __builtin_addcll(curd.data[HI], curqd, carrylod, &checkcarryd);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curqb, carrylob, &checkcarryb);
+			unsigned long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curqc, 0, &carryloc);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curqc, carryloc, &checkcarryc);
+			unsigned long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcl(curd.data[LO], curqd, 0, &carrylod);
+			curd.data[HI] = __builtin_addcl(curd.data[HI], curqd, carrylod, &checkcarryd);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+			static_cast<void>(checkcarryc);
+			static_cast<void>(checkcarryd);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], curqa, &cura.data[LO]), cura.data[HI], curqa, &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curqb, &curb.data[LO]), curb.data[HI], curqb, &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+			unsigned char checkcarryc{_addcarry_u64(_addcarry_u64(0, curc.data[LO], curqc, &curc.data[LO]), curc.data[HI], curqc, &curc.data[HI])};
+			static_cast<void>(checkcarryc);
+			unsigned char checkcarryd{_addcarry_u64(_addcarry_u64(0, curd.data[LO], curqd, &curd.data[LO]), curd.data[HI], curqd, &curd.data[HI])};
+			static_cast<void>(checkcarryd);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += curqa;
+			cura.data[HI] += curqa;
+			cura.data[HI] += curlotmpa < cura.data[LO];
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curqb;
+			curb.data[HI] += curqb;
+			curb.data[HI] += curlotmpb < curb.data[LO];
+			std::int_least64_t curlotmpc{curc.data[LO]};
+			curc.data[LO] += curqc;
+			curc.data[HI] += curqc;
+			curc.data[HI] += curlotmpc < curc.data[LO];
+			std::int_least64_t curlotmpd{curd.data[LO]};
+			curd.data[LO] += curqd;
+			curd.data[HI] += curqd;
+			curd.data[HI] += curlotmpd < curd.data[LO];
+#endif
+		}
+		cura.data[LO] ^= curqa;
+		cura.data[HI] ^= curqa;
+		curb.data[LO] ^= curqb;
+		curb.data[HI] ^= curqb;
+		curc.data[LO] ^= curqc;
+		curc.data[HI] ^= curqc;
+		curd.data[LO] ^= curqd;
+		curd.data[HI] ^= curqd;
+	}else if constexpr(isabsvalue && isfltpmode){// "one-register filtering"
+		if constexpr(issignmode){
+			cura.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curb.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curc.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curd.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+			unsigned long long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curc.data[HI], carryloc, &checkcarryc);
+			unsigned long long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcll(curd.data[LO], curd.data[LO], 0, &carrylod);
+			curd.data[HI] = __builtin_addcll(curd.data[HI], curd.data[HI], carrylod, &checkcarryd);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &checkcarryb);
+			unsigned long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], carryloc, &checkcarryc);
+			unsigned long carrylod, checkcarryd;
+			curd.data[LO] = __builtin_addcl(curd.data[LO], curd.data[LO], 0, &carrylod);
+			curd.data[HI] = __builtin_addcl(curd.data[HI], curd.data[HI], carrylod, &checkcarryd);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+			static_cast<void>(checkcarryc);
+			static_cast<void>(checkcarryd);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+			unsigned char checkcarryc{_addcarry_u64(_addcarry_u64(0, curc.data[LO], curc.data[LO], &curc.data[LO]), curc.data[HI], curc.data[HI], &curc.data[HI])};
+			static_cast<void>(checkcarryc);
+			unsigned char checkcarryd{_addcarry_u64(_addcarry_u64(0, curd.data[LO], curd.data[LO], &curd.data[LO]), curd.data[HI], curd.data[HI], &curd.data[HI])};
+			static_cast<void>(checkcarryd);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+			std::int_least64_t curlotmpc{curc.data[LO]};
+			curc.data[LO] += curc.data[LO];
+			curc.data[HI] += curc.data[HI];
+			curc.data[HI] += curc.data[LO] < curlotmpc;
+			std::int_least64_t curlotmpd{curd.data[LO]};
+			curd.data[LO] += curd.data[LO];
+			curd.data[HI] += curd.data[HI];
+			curd.data[HI] += curd.data[LO] < curlotmpd;
+#endif
+		}
+	}
+	cura.data[HI] >>= shift;
+	curb.data[HI] >>= shift;
+	curc.data[HI] >>= shift;
+	curd.data[HI] >>= shift;
+	return{cura.data[HI] & 0xFFu, curb.data[HI] & 0xFFu, curc.data[HI] & 0xFFu, curd.data[HI] & 0xFFu};
+}
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
 RSBD8_FUNC_INLINE std::tuple<std::size_t, std::size_t, std::size_t, std::size_t> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, test64<isabsvalue, issignmode, isfltpmode> curc, test64<isabsvalue, issignmode, isfltpmode> curd, unsigned shift)noexcept{
@@ -7005,6 +7585,922 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 }
+
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curp{static_cast<std::int_least64_t>(curhi)};
+		if constexpr(isfltpmode){
+			curhi += curhi;
+		}else if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curhi, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curhi, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curlo, &curlo), curhi, curhi, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curhi += curhi;
+			curhi += curlo < curlotmp;
+#endif
+		}
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(isfltpmode) curhi >>= 1;
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curq, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curq, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curq, &curlo), curhi, curq, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			curlo += curq;
+			curhi += curq;
+			curhi += curlo < curq;
+#endif
+		}
+		curlo ^= curq;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		if constexpr(issignmode) curhi &= 0xFFFFFFFFFFFFFFFFu >> 1;
+		else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysign, carry, checkcarry;
+			curhi = __builtin_addcll(curhi, curhi, 0, &carrysign);
+			curlo = __builtin_addcll(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcll(curhi, 0, carry, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysign, carry, checkcarry;
+			curhi = __builtin_addcl(curhi, curhi, 0, &carrysign);
+			curlo = __builtin_addcl(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcl(curhi, 0, carry, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char carrysign{_addcarry_u64(0, curhi, curhi, &curhi)};
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(carrysign, curlo, curlo, &curlo), curhi, 0, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curhitmp{curhi};
+			curhi += curhi;
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curlo += curhi < curhitmp;
+			curhi += curlo < curlotmp;
+#endif
+		}
+	}
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	// do not pass a nullptr here
+	assert(out);
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curp{static_cast<std::int_least64_t>(curhi)};
+		if constexpr(isfltpmode){
+			out[0].data[HI] = curhi;
+			curhi += curhi;
+		}else if constexpr(!issignmode){
+			out[0].data[HI] = curhi;
+			out[0].data[LO] = curlo;
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curhi, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curhi, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curlo, &curlo), curhi, curhi, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curhi += curhi;
+			curhi += curlo < curlotmp;
+#endif
+		}
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(isfltpmode){
+			curhi >>= 1;
+			out[0].data[LO] = curlo;
+		}
+		if constexpr(issignmode){
+			if constexpr(!isfltpmode){
+				out[0].data[HI] = curhi;
+				out[0].data[LO] = curlo;
+			}
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curq, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curq, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curq, &curlo), curhi, curq, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			curlo += curq;
+			curhi += curq;
+			curhi += curlo < curq;
+#endif
+		}
+		curlo ^= curq;
+		curhi ^= curq;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		out[0].data[HI] = curhi;
+		if constexpr(issignmode){
+			curhi &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			out[0].data[LO] = curlo;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysign, carry, checkcarry;
+			curhi = __builtin_addcll(curhi, curhi, 0, &carrysign);
+			out[0].data[LO] = curlo;
+			curlo = __builtin_addcll(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcll(curhi, 0, carry, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysign, carry, checkcarry;
+			curhi = __builtin_addcl(curhi, curhi, 0, &carrysign);
+			out[0].data[LO] = curlo;
+			curlo = __builtin_addcl(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcl(curhi, 0, carry, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char carrysign{_addcarry_u64(0, curhi, curhi, &curhi)};
+			out[0].data[LO] = curlo;
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(carrysign, curlo, curlo, &curlo), curhi, 0, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curhitmp{curhi};
+			curhi += curhi;
+			out[0].data[LO] = curlo;
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curlo += curhi < curhitmp;
+			curhi += curlo < curlotmp;
+#endif
+		}
+	}
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out, T *dst)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	// do not pass a nullptr here
+	assert(out);
+	assert(dst);
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curp{static_cast<std::int_least64_t>(curhi)};
+		if constexpr(isfltpmode){
+			out[0].data[HI] = curhi;
+			dst[0].data[HI] = curhi;
+			curhi += curhi;
+		}else if constexpr(!issignmode){
+			out[0].data[HI] = curhi;
+			dst[0].data[HI] = curhi;
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curhi, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curlo, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curhi, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curlo, &curlo), curhi, curhi, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curhi += curhi;
+			curhi += curlo < curlotmp;
+#endif
+		}
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(isfltpmode){
+			curhi >>= 1;
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+		}
+		if constexpr(issignmode){
+			if constexpr(!isfltpmode){
+				out[0].data[HI] = curhi;
+				dst[0].data[HI] = curhi;
+				out[0].data[LO] = curlo;
+				dst[0].data[LO] = curlo;
+			}
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymid, checkcarry;
+			curlo = __builtin_addcll(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcll(curhi, curq, carrymid, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymid, checkcarry;
+			curlo = __builtin_addcl(curlo, curq, 0, &carrymid);
+			curhi = __builtin_addcl(curhi, curq, carrymid, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curlo, curq, &curlo), curhi, curq, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			curlo += curq;
+			curhi += curq;
+			curhi += curlo < curq;
+#endif
+		}
+		curlo ^= curq;
+		curhi ^= curq;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		out[0].data[HI] = curhi;
+		dst[0].data[HI] = curhi;
+		if constexpr(issignmode){
+			curhi &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysign, carry, checkcarry;
+			curhi = __builtin_addcll(curhi, curhi, 0, &carrysign);
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+			curlo = __builtin_addcll(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcll(curhi, 0, carry, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysign, carry, checkcarry;
+			curhi = __builtin_addcl(curhi, curhi, 0, &carrysign);
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+			curlo = __builtin_addcl(curlo, curlo, carrysign, &carry);
+			curhi = __builtin_addcl(curhi, 0, carry, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char carrysign{_addcarry_u64(0, curhi, curhi, &curhi)};
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(carrysign, curlo, curlo, &curlo), curhi, 0, &curhi)};
+			static_cast<void>(checkcarry);
+#else
+			std::uint_least64_t curhitmp{curhi};
+			curhi += curhi;
+			out[0].data[LO] = curlo;
+			dst[0].data[LO] = curlo;
+			std::uint_least64_t curlotmp{curlo};
+			curlo += curlo;
+			curlo += curhi < curhitmp;
+			curhi += curlo < curlotmp;
+#endif
+		}
+	}
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, std::uint_least64_t &curlob, std::uint_least64_t &curhib)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(curhia)};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curhib)};
+		if constexpr(isfltpmode){
+			curhia += curhia;
+			curhib += curhib;
+		}else if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curhib, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curhib, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curloa, &curloa), curhia, curhia, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curlob, &curlob), curhib, curhib, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curhia += curhia;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curhib += curhib;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+		curpa >>= 64 - 1;
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(isfltpmode){
+			curhia >>= 1;
+			curhib >>= 1;
+		}
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curqb, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curqb, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curqa, &curloa), curhia, curqa, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curqb, &curlob), curhib, curqb, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			curloa += curqa;
+			curhia += curqa;
+			curhia += curloa < curqa;
+			curlob += curqb;
+			curhib += curqb;
+			curhib += curlob < curqb;
+#endif
+		}
+		curloa ^= curqa;
+		curlob ^= curqb;
+		curhia ^= curqa;
+		curhib ^= curqb;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		if constexpr(issignmode){
+			curhia &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			curhib &= 0xFFFFFFFFFFFFFFFFu >> 1;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcll(curhia, curhia, 0, &carrysigna);
+			curloa = __builtin_addcll(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcll(curhia, 0, carrya, &checkcarrya);
+			unsigned long long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcll(curhib, curhib, 0, &carrysignb);
+			curlob = __builtin_addcll(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcll(curhib, 0, carryb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcl(curhia, curhia, 0, &carrysigna);
+			curloa = __builtin_addcl(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcl(curhia, 0, carrya, &checkcarrya);
+			unsigned long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcl(curhib, curhib, 0, &carrysignb);
+			curlob = __builtin_addcl(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcl(curhib, 0, carryb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char carrysigna{_addcarry_u64(0, curhia, curhia, &curhia)};
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(carrysigna, curloa, curloa, &curloa), curhia, 0, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char carrysignb{_addcarry_u64(0, curhib, curhib, &curhib)};
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(carrysignb, curlob, curlob, &curlob), curhib, 0, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curhitmpa{curhia};
+			curhia += curhia;
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curloa += curhia < curhitmpa;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curhitmpb{curhib};
+			curhib += curhib;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curlob += curhib < curhitmpb;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+	}
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	// do not pass a nullptr here
+	assert(outa);
+	assert(outb);
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(curhia)};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curhib)};
+		if constexpr(isfltpmode){
+			outa[0].data[HI] = curhia;
+			curhia += curhia;
+			outb[0].data[HI] = curhib;
+			curhib += curhib;
+		}else if constexpr(!issignmode){
+			outa[0].data[HI] = curhia;
+			outa[0].data[LO] = curloa;
+			outb[0].data[HI] = curhib;
+			outb[0].data[LO] = curlob;
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curhib, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curhib, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curloa, &curloa), curhia, curhia, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curlob, &curlob), curhib, curhib, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curhia += curhia;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curhib += curhib;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+		curpa >>= 64 - 1;
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(isfltpmode){
+			curhia >>= 1;
+			curhib >>= 1;
+			outa[0].data[LO] = curloa;
+			outb[0].data[LO] = curlob;
+		}
+		if constexpr(issignmode){
+			if constexpr(!isfltpmode){
+				outa[0].data[HI] = curhia;
+				outb[0].data[HI] = curhib;
+				outa[0].data[LO] = curloa;
+				outb[0].data[LO] = curlob;
+			}
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curqb, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curqb, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curqa, &curloa), curhia, curqa, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curqb, &curlob), curhib, curqb, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			curloa += curqa;
+			curhia += curqa;
+			curhia += curloa < curqa;
+			curlob += curqb;
+			curhib += curqb;
+			curhib += curlob < curqb;
+#endif
+		}
+		curloa ^= curqa;
+		curlob ^= curqb;
+		curhia ^= curqa;
+		curhib ^= curqb;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		outa[0].data[HI] = curhia;
+		outb[0].data[HI] = curhib;
+		if constexpr(issignmode){
+			curhia &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			curhib &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			outa[0].data[LO] = curloa;
+			outb[0].data[LO] = curlob;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcll(curhia, curhia, 0, &carrysigna);
+			outa[0].data[LO] = curloa;
+			curloa = __builtin_addcll(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcll(curhia, 0, carrya, &checkcarrya);
+			unsigned long long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcll(curhib, curhib, 0, &carrysignb);
+			outb[0].data[LO] = curlob;
+			curlob = __builtin_addcll(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcll(curhib, 0, carryb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcl(curhia, curhia, 0, &carrysigna);
+			outa[0].data[LO] = curloa;
+			curloa = __builtin_addcl(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcl(curhia, 0, carrya, &checkcarrya);
+			unsigned long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcl(curhib, curhib, 0, &carrysignb);
+			outb[0].data[LO] = curlob;
+			curlob = __builtin_addcl(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcl(curhib, 0, carryb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char carrysigna{_addcarry_u64(0, curhia, curhia, &curhia)};
+			outa[0].data[LO] = curloa;
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(carrysigna, curloa, curloa, &curloa), curhia, 0, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char carrysignb{_addcarry_u64(0, curhib, curhib, &curhib)};
+			outb[0].data[LO] = curlob;
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(carrysignb, curlob, curlob, &curlob), curhib, 0, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curhitmpa{curhia};
+			curhia += curhia;
+			outa[0].data[LO] = curloa;
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curloa += curhia < curhitmpa;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curhitmpb{curhib};
+			curhib += curhib;
+			outb[0].data[LO] = curlob;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curlob += curhib < curhitmpb;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+	}
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, T *dsta, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb, T *dstb)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	// do not pass a nullptr here
+	assert(outa);
+	assert(dsta);
+	assert(outb);
+	assert(dstb);
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(curhia)};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curhib)};
+		if constexpr(isfltpmode){
+			outa[0].data[HI] = curhia;
+			dsta[0].data[HI] = curhia;
+			curhia += curhia;
+			outb[0].data[HI] = curhib;
+			dstb[0].data[HI] = curhib;
+			curhib += curhib;
+		}else if constexpr(!issignmode){
+			outa[0].data[HI] = curhia;
+			dsta[0].data[HI] = curhia;
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			outb[0].data[HI] = curhib;
+			dstb[0].data[HI] = curhib;
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curhib, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curloa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curhia, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curlob, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curhib, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curloa, &curloa), curhia, curhia, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curlob, &curlob), curhib, curhib, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curhia += curhia;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curhib += curhib;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+		curpa >>= 64 - 1;
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(isfltpmode){
+			curhia >>= 1;
+			curhib >>= 1;
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+		}
+		if constexpr(issignmode){
+			if constexpr(!isfltpmode){
+				outa[0].data[HI] = curhia;
+				dsta[0].data[HI] = curhia;
+				outb[0].data[HI] = curhib;
+				dstb[0].data[HI] = curhib;
+				outa[0].data[LO] = curloa;
+				dsta[0].data[LO] = curloa;
+				outb[0].data[LO] = curlob;
+				dstb[0].data[LO] = curlob;
+			}
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrymida, checkcarrya;
+			curloa = __builtin_addcll(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcll(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long long carrymidb, checkcarryb;
+			curlob = __builtin_addcll(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcll(curhib, curqb, carrymidb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrymida, checkcarrya;
+			curloa = __builtin_addcl(curloa, curqa, 0, &carrymida);
+			curhia = __builtin_addcl(curhia, curqa, carrymida, &checkcarrya);
+			unsigned long carrymidb, checkcarryb;
+			curlob = __builtin_addcl(curlob, curqb, 0, &carrymidb);
+			curhib = __builtin_addcl(curhib, curqb, carrymidb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, curloa, curqa, &curloa), curhia, curqa, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curlob, curqb, &curlob), curhib, curqb, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			curloa += curqa;
+			curhia += curqa;
+			curhia += curloa < curqa;
+			curlob += curqb;
+			curhib += curqb;
+			curhib += curlob < curqb;
+#endif
+		}
+		curloa ^= curqa;
+		curlob ^= curqb;
+		curhia ^= curqa;
+		curhib ^= curqb;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		outa[0].data[HI] = curhia;
+		dsta[0].data[HI] = curhia;
+		outb[0].data[HI] = curhib;
+		dstb[0].data[HI] = curhib;
+		if constexpr(issignmode){
+			curhia &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			curhib &= 0xFFFFFFFFFFFFFFFFu >> 1;
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcll(curhia, curhia, 0, &carrysigna);
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			curloa = __builtin_addcll(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcll(curhia, 0, carrya, &checkcarrya);
+			unsigned long long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcll(curhib, curhib, 0, &carrysignb);
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+			curlob = __builtin_addcll(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcll(curhib, 0, carryb, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrysigna, carrya, checkcarrya;
+			curhia = __builtin_addcl(curhia, curhia, 0, &carrysigna);
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			curloa = __builtin_addcl(curloa, curloa, carrysigna, &carrya);
+			curhia = __builtin_addcl(curhia, 0, carrya, &checkcarrya);
+			unsigned long carrysignb, carryb, checkcarryb;
+			curhib = __builtin_addcl(curhib, curhib, 0, &carrysignb);
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+			curlob = __builtin_addcl(curlob, curlob, carrysignb, &carryb);
+			curhib = __builtin_addcl(curhib, 0, carryb, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char carrysigna{_addcarry_u64(0, curhia, curhia, &curhia)};
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(carrysigna, curloa, curloa, &curloa), curhia, 0, &curhia)};
+			static_cast<void>(checkcarrya);
+			unsigned char carrysignb{_addcarry_u64(0, curhib, curhib, &curhib)};
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(carrysignb, curlob, curlob, &curlob), curhib, 0, &curhib)};
+			static_cast<void>(checkcarryb);
+#else
+			std::uint_least64_t curhitmpa{curhia};
+			curhia += curhia;
+			outa[0].data[LO] = curloa;
+			dsta[0].data[LO] = curloa;
+			std::uint_least64_t curlotmpa{curloa};
+			curloa += curloa;
+			curloa += curhia < curhitmpa;
+			curhia += curloa < curlotmpa;
+			std::uint_least64_t curhitmpb{curhib};
+			curhib += curhib;
+			outb[0].data[LO] = curlob;
+			dstb[0].data[LO] = curlob;
+			std::uint_least64_t curlotmpb{curlob};
+			curlob += curlob;
+			curlob += curhib < curhitmpb;
+			curhib += curlob < curlotmpb;
+#endif
+		}
+	}
+}
+#endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -13808,14 +15304,3514 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // Function implementation templates for split up 128-bit types without indirection
 // all these functions are disabled on 32-bit or smaller platforms
 
+// initialisation part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types without indirection
+template<bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst, X offsetscompanion[])noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pout);
+	if(isinputconst) assert(pdst);
+	assert(offsetscompanion);
+	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	}else{// not in reverse order
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: do not limit as much when there's a reasonable amount of registers
+		// unsigned counter, not zero inclusive inside the loop
+		std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+		input += count - i;
+		pout += count - i;
+		do{
+			T curhi{input[i]};
+			T curlo{input[i - 1]};
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					curhi.data[LO], curhi.data[HI], pout + i,
+					curlo.data[LO], curlo.data[HI], pout + i - 1);
+			}
+			// register pressure performance issue on several platforms: first do the high half here
+			std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+			std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+			std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+			std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+			std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+			std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+			std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i].data[LO] = curhi.data[LO];
+			curhi.data[LO] >>= 56;
+			std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+			std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+			std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i].data[HI] = curhi.data[HI];
+			curhi.data[HI] >>= 56;
+			++offsetscompanion[curhi0];
+			curhi1 &= 0xFFu;
+			curhi2 &= 0xFFu;
+			curhi3 &= 0xFFu;
+			curhi4 &= 0xFFu;
+			curhi5 &= 0xFFu;
+			curhi6 &= 0xFFu;
+			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curhi8)];
+			curhi8 &= 0xFFu;
+			curhi9 &= 0xFFu;
+			curhiA &= 0xFFu;
+			curhiB &= 0xFFu;
+			curhiC &= 0xFFu;
+			curhiD &= 0xFFu;
+			curhiE &= 0xFFu;
+			if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+			++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curhi9)];
+			++offsetscompanion[10 * 256 + static_cast<std::size_t>(curhiA)];
+			++offsetscompanion[11 * 256 + static_cast<std::size_t>(curhiB)];
+			++offsetscompanion[12 * 256 + static_cast<std::size_t>(curhiC)];
+			++offsetscompanion[13 * 256 + static_cast<std::size_t>(curhiD)];
+			++offsetscompanion[14 * 256 + static_cast<std::size_t>(curhiE)];
+			++offsetscompanion[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+			// register pressure performance issue on several platforms: do the low half here second
+			std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+			std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+			std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+			std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+			std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+			std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+			std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1].data[LO] = curlo.data[LO];
+			curlo.data[LO] >>= 56;
+			std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+			std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+			std::uint_least64_t curloA{curlo.data[HI] >> 16};
+			std::uint_least64_t curloB{curlo.data[HI] >> 16};
+			std::uint_least64_t curloC{curlo.data[HI] >> 16};
+			std::uint_least64_t curloD{curlo.data[HI] >> 16};
+			std::uint_least64_t curloE{curlo.data[HI] >> 16};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1].data[HI] = curlo.data[HI];
+			curlo.data[HI] >>= 56;
+			++offsetscompanion[curlo0];
+			curlo1 &= 0xFFu;
+			curlo2 &= 0xFFu;
+			curlo3 &= 0xFFu;
+			curlo4 &= 0xFFu;
+			curlo5 &= 0xFFu;
+			curlo6 &= 0xFFu;
+			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curlo8)];
+			curlo8 &= 0xFFu;
+			curlo9 &= 0xFFu;
+			curloA &= 0xFFu;
+			curloB &= 0xFFu;
+			curloC &= 0xFFu;
+			curloD &= 0xFFu;
+			curloE &= 0xFFu;
+			if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+			++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curlo9)];
+			++offsetscompanion[10 * 256 + static_cast<std::size_t>(curloA)];
+			++offsetscompanion[11 * 256 + static_cast<std::size_t>(curloB)];
+			++offsetscompanion[12 * 256 + static_cast<std::size_t>(curloC)];
+			++offsetscompanion[13 * 256 + static_cast<std::size_t>(curloD)];
+			++offsetscompanion[14 * 256 + static_cast<std::size_t>(curloE)];
+			++offsetscompanion[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+		}while(i -= 2);
+	}
+}
 
+// main part, multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types without indirection
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsetscompanion);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	T *psrchi;
+	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		psrchi = pdstnext + count;
+	}else{// no reverse ordering applied
+		psrchi = const_cast<T *>(input) + count;// psrchi will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if constexpr(!isabsvalue && isfltpmode) if(128 / 8 - 1 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+	shifter *= 8;
+	if(128 / 2 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop64;// rare, but possible
+	do{// low 64 bits
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			T outa{psrchi[0]};
+			T outb{psrchi[-1]};
+			T outc{psrchi[-2]};
+			T outd{psrchi[-3]};
+			psrchi -= 4;
+			auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			std::size_t offsetc{poffset[curc]--};
+			std::size_t offsetd{poffset[curd]--};
+			pdst[offseta] = outa;
+			pdst[offsetb] = outb;
+			pdst[offsetc] = outc;
+			pdst[offsetd] = outd;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		unsigned index{index = bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += 8;
+		poffset += 256;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrchi = pdst;
+		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		pdst = pdstnext;
+		pdstnext = psrchi;
+		psrchi += count;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * 8;
+		poffset += static_cast<std::size_t>(index) * 256;
+		if(!old) do{
+			spinpause();
+		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(64 > shifter);
+	if constexpr(!isabsvalue && isfltpmode) if(128 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+handletop64:
+	shifter -= 64;
+	for(;;){// high 64 bits
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			T outa{psrchi[0]};
+			T outb{psrchi[-1]};
+			T outc{psrchi[-2]};
+			T outd{psrchi[-3]};
+			psrchi -= 4;
+			auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			std::size_t offsetc{poffset[curc]--};
+			std::size_t offsetd{poffset[curd]--};
+			pdst[offseta] = outa;
+			pdst[offsetb] = outb;
+			pdst[offsetc] = outc;
+			pdst[offsetd] = outd;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrchi = pdst;
+			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			pdst = pdstnext;
+			pdstnext = psrchi;
+			psrchi += count;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if(!old) do{
+				spinpause();
+			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}
+		// handle the top part for floating-point differently
+		if(!isabsvalue && isfltpmode && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+			do{// fill the array, four at a time
+				T outa{psrchi[0]};
+				T outb{psrchi[-1]};
+				T outc{psrchi[-2]};
+				T outd{psrchi[-3]};
+				psrchi -= 4;
+				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
+				std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+				std::size_t offsetc{offsetscompanion[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+				std::size_t offsetd{offsetscompanion[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
+				pdst[offseta] = outa;
+				pdst[offsetb] = outb;
+				pdst[offsetc] = outc;
+				pdst[offsetd] = outd;
+			}while(--j);
+		}
+		break;// no further processing beyond the top part
+	}
+}
 
+// main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for split up 128-bit types without indirection
+template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	assert(count && count != MAXSIZE_T);
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsets);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	T *psrclo;
+	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		psrclo = pdstnext;
+	}else{// no reverse ordering applied
+		psrclo = const_cast<T *>(input);// psrclo will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if constexpr(!isabsvalue && isfltpmode) if(128 / 8 - 1 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+	shifter *= 8;
+	if(128 / 2 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop64;// rare, but possible
+	do{// low 64 bits
+		if constexpr(ismultithreadcapable){
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				T outa{psrclo[0]};
+				T outb{psrclo[1]};
+				T outc{psrclo[2]};
+				T outd{psrclo[3]};
+				psrclo += 4;
+				auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				pdst[offseta] = outa;
+				pdst[offsetb] = outb;
+				pdst[offsetc] = outc;
+				pdst[offsetd] = outd;
+			}
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				T outa{psrclo[0]};
+				T outb{psrclo[1]};
+				psrclo += 2;
+				auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = outa;
+				pdst[offsetb] = outb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				T out{psrclo[0]};
+				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = out;
+			}
+		}else{// !ismultithreadcapable
+			T const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				T outlo{*psrclo++};
+				T outhi{*psrchi--};
+				auto[curlo, curhi]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = outlo;
+				pdst[offsethi] = outhi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				T out{*psrclo};
+				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = out;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += 8;
+		poffset += 256;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::uintptr_t old;
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		pdst = pdstnext;
+		pdstnext = psrclo;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * 8;
+		poffset += static_cast<std::size_t>(index) * 256;
+		if constexpr(ismultithreadcapable) if(old < usemultithread) do{
+			spinpause();
+		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}while(64 > shifter);
+	if constexpr(!isabsvalue && isfltpmode) if(128 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+handletop64:
+	shifter -= 64;
+	for(;;){// high 64 bits
+		if constexpr(ismultithreadcapable){
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				T outa{psrclo[0]};
+				T outb{psrclo[1]};
+				T outc{psrclo[2]};
+				T outd{psrclo[3]};
+				psrclo += 4;
+				auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				pdst[offseta] = outa;
+				pdst[offsetb] = outb;
+				pdst[offsetc] = outc;
+				pdst[offsetd] = outd;
+			}
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				T outa{psrclo[0]};
+				T outb{psrclo[1]};
+				psrclo += 2;
+				auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = outa;
+				pdst[offsetb] = outb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				T out{psrclo[0]};
+				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = out;
+			}
+		}else{// !ismultithreadcapable
+			T const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				T outlo{*psrclo++};
+				T outhi{*psrchi--};
+				auto[curlo, curhi]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = outlo;
+				pdst[offsethi] = outhi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				T out{*psrclo};
+				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = out;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::uintptr_t old;
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			pdst = pdstnext;
+			pdstnext = psrclo;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if constexpr(ismultithreadcapable) if(old < usemultithread) do{
+				spinpause();
+			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}
+		// handle the top part for floating-point differently
+		if(!isabsvalue && isfltpmode && CHAR_BIT * sizeof(T) - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
+			if constexpr(ismultithreadcapable){
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					T outa{psrclo[0]};
+					T outb{psrclo[1]};
+					T outc{psrclo[2]};
+					T outd{psrclo[3]};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = outa;
+					pdst[offsetb] = outb;
+					pdst[offsetc] = outc;
+					pdst[offsetd] = outd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					T outa{psrclo[0]};
+					T outb{psrclo[1]};
+					psrclo += 2;
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode,std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI])};
+					std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
+					pdst[offseta] = outa;
+					pdst[offsetb] = outb;
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					T out{psrclo[0]};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = out;
+				}
+			}else{// !ismultithreadcapable
+				T const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					T outlo{*psrclo++};
+					T outhi{*psrchi--};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outlo.data[HI], outhi.data[HI])};
+					std::size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (CHAR_BIT * sizeof(T) - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = outlo;
+					pdst[offsethi] = outhi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					T out{*psrclo};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
+					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
+					pdst[offset] = out;
+				}
+			}
+			break;// no further processing beyond the top part
+		}
+	}
+}
+
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for split up 128-bit types without indirection
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> radixsortcopynoallocmulti2threadmtc(std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << CHAR_BIT * sizeof(T) / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		T *pdst{buffer}, *pdstnext{output};// for the next iteration
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			pdst = output;
+			pdstnext = buffer;
+		}
+		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier);
+	}
+}
+
+// radixsortcopynoalloc() function implementation template for split up 128-bit types without indirection
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortcopynoallocmulti1thread
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, output, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		}else{// not in reverse order
+			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+			do{
+				T curhi{input[i]};
+				T curlo{input[i - 1]};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						curhi.data[LO], curhi.data[HI], output + i,
+						curlo.data[LO], curlo.data[HI], output + i - 1);
+				}
+				// register pressure performance issue on several platforms: first do the high half here
+				std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+				std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+				std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+				std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+				std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+				std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+				std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i].data[LO] = curhi.data[LO];
+				curhi.data[LO] >>= 56;
+				std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+				std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+				std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i].data[HI] = curhi.data[HI];
+				curhi.data[HI] >>= 56;
+				++offsets[curhi0];
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+				curhi8 &= 0xFFu;
+				curhi9 &= 0xFFu;
+				curhiA &= 0xFFu;
+				curhiB &= 0xFFu;
+				curhiC &= 0xFFu;
+				curhiD &= 0xFFu;
+				curhiE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(curhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+				// register pressure performance issue on several platforms: do the low half here second
+				std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+				std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+				std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+				std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+				std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+				std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+				std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1].data[LO] = curlo.data[LO];
+				curlo.data[LO] >>= 56;
+				std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+				std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+				std::uint_least64_t curloA{curlo.data[HI] >> 16};
+				std::uint_least64_t curloB{curlo.data[HI] >> 16};
+				std::uint_least64_t curloC{curlo.data[HI] >> 16};
+				std::uint_least64_t curloD{curlo.data[HI] >> 16};
+				std::uint_least64_t curloE{curlo.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1].data[HI] = curlo.data[HI];
+				curlo.data[HI] >>= 56;
+				++offsets[curlo0];
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(curlo8)];
+				curlo8 &= 0xFFu;
+				curlo9 &= 0xFFu;
+				curloA &= 0xFFu;
+				curloB &= 0xFFu;
+				curloC &= 0xFFu;
+				curloD &= 0xFFu;
+				curloE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(curlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(curlo9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curloA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curloB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curloC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curloD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curloE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				T cur{input[0]};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur.data[LO], cur.data[HI], output);
+				}
+				std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+				std::uint_least64_t cur1{cur.data[LO] >> 8};
+				std::uint_least64_t cur2{cur.data[LO] >> 16};
+				std::uint_least64_t cur3{cur.data[LO] >> 24};
+				std::uint_least64_t cur4{cur.data[LO] >> 32};
+				std::uint_least64_t cur5{cur.data[LO] >> 40};
+				std::uint_least64_t cur6{cur.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0].data[LO] = cur.data[LO];
+				cur.data[LO] >>= 56;
+				std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+				std::uint_least64_t cur9{cur.data[HI] >> 8};
+				std::uint_least64_t curA{cur.data[HI] >> 16};
+				std::uint_least64_t curB{cur.data[HI] >> 16};
+				std::uint_least64_t curC{cur.data[HI] >> 16};
+				std::uint_least64_t curD{cur.data[HI] >> 16};
+				std::uint_least64_t curE{cur.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[0].data[HI] = cur.data[HI];
+				cur.data[HI] >>= 56;
+				++offsets[cur0];
+				cur1 &= 0xFFu;
+				cur2 &= 0xFFu;
+				cur3 &= 0xFFu;
+				cur4 &= 0xFFu;
+				cur5 &= 0xFFu;
+				cur6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+				cur8 &= 0xFFu;
+				cur9 &= 0xFFu;
+				curA &= 0xFFu;
+				curB &= 0xFFu;
+				curC &= 0xFFu;
+				curD &= 0xFFu;
+				curE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(cur1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+			}
+		}
+
+		// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		if constexpr(ismultithreadcapable){
+			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+				// reset the barrier after use, only one thread will do this
+				// no busy-wait dependency on this store, hence relaxed memory order is fine
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+			}
+			// this will just be zero if usemultithread is zero
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+		}else offsetscompanion = nullptr;
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread)};
+
+		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		if constexpr(ismultithreadcapable){
+			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+			while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+				spinpause();// catch up
+			}
+			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+				}while(!other);
+				// reset the barrier after use, only one thread will do this
+				// no busy-wait dependency on this store, hence relaxed memory order is fine
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+			}
+			other += compound;// combine
+			unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+			paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+		}
+
+		// perform the bidirectional 8-bit sorting sequence
+		// flip the relevant bits inside runsteps first
+		if(runsteps ^= (1u << CHAR_BIT * sizeof(T) / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{
+			T *pdst{buffer}, *pdstnext{output};// for the next iteration
+			if(paritybool){// swap if the count of sorting actions to do is odd
+				pdst = output;
+				pdstnext = buffer;
+			}
+			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+}
+
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types without indirection
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void> radixsortnoallocmulti2threadmtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << CHAR_BIT * sizeof(T) / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		T *psrclo{input}, *pdst{buffer};
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			psrclo = buffer;
+			pdst = input;
+		}
+		radixsortnoallocmulti2threadmainmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier);
+	}
+}
+
+// radixsortnoalloc() function implementation template for split up 128-bit types without indirection
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortnoallocmulti1thread
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, count, input, buffer, std::ref(atomiclightbarrier));
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		}else{// not in reverse order
+			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+			do{
+				T curhi{input[i]};
+				T curlo{input[i - 1]};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						curhi.data[LO], curhi.data[HI], buffer + i,
+						curlo.data[LO], curlo.data[HI], buffer + i - 1);
+				}
+				// register pressure performance issue on several platforms: first do the high half here
+				std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+				std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+				std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+				std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+				std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+				std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+				std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i].data[LO] = curhi.data[LO];
+				curhi.data[LO] >>= 56;
+				std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+				std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+				std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i].data[HI] = curhi.data[HI];
+				curhi.data[HI] >>= 56;
+				++offsets[curhi0];
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+				curhi8 &= 0xFFu;
+				curhi9 &= 0xFFu;
+				curhiA &= 0xFFu;
+				curhiB &= 0xFFu;
+				curhiC &= 0xFFu;
+				curhiD &= 0xFFu;
+				curhiE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(curhi1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+				// register pressure performance issue on several platforms: do the low half here second
+				std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+				std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+				std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+				std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+				std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+				std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+				std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1].data[LO] = curlo.data[LO];
+				curlo.data[LO] >>= 56;
+				std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+				std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+				std::uint_least64_t curloA{curlo.data[HI] >> 16};
+				std::uint_least64_t curloB{curlo.data[HI] >> 16};
+				std::uint_least64_t curloC{curlo.data[HI] >> 16};
+				std::uint_least64_t curloD{curlo.data[HI] >> 16};
+				std::uint_least64_t curloE{curlo.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1].data[HI] = curlo.data[HI];
+				curlo.data[HI] >>= 56;
+				++offsets[curlo0];
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(curlo8)];
+				curlo8 &= 0xFFu;
+				curlo9 &= 0xFFu;
+				curloA &= 0xFFu;
+				curloB &= 0xFFu;
+				curloC &= 0xFFu;
+				curloD &= 0xFFu;
+				curloE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(curlo1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(curlo9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curloA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curloB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curloC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curloD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curloE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+				i -= 2;
+			}while(0 < i);
+			if(!(1 & i)){// fill in the final item for odd counts
+				T cur{input[0]};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(cur.data[LO], cur.data[HI], buffer);
+				}
+				std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+				std::uint_least64_t cur1{cur.data[LO] >> 8};
+				std::uint_least64_t cur2{cur.data[LO] >> 16};
+				std::uint_least64_t cur3{cur.data[LO] >> 24};
+				std::uint_least64_t cur4{cur.data[LO] >> 32};
+				std::uint_least64_t cur5{cur.data[LO] >> 40};
+				std::uint_least64_t cur6{cur.data[LO] >> 48};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0].data[LO] = cur.data[LO];
+				cur.data[LO] >>= 56;
+				std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+				std::uint_least64_t cur9{cur.data[HI] >> 8};
+				std::uint_least64_t curA{cur.data[HI] >> 16};
+				std::uint_least64_t curB{cur.data[HI] >> 16};
+				std::uint_least64_t curC{cur.data[HI] >> 16};
+				std::uint_least64_t curD{cur.data[HI] >> 16};
+				std::uint_least64_t curE{cur.data[HI] >> 16};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[0].data[HI] = cur.data[HI];
+				cur.data[HI] >>= 56;
+				++offsets[cur0];
+				cur1 &= 0xFFu;
+				cur2 &= 0xFFu;
+				cur3 &= 0xFFu;
+				cur4 &= 0xFFu;
+				cur5 &= 0xFFu;
+				cur6 &= 0xFFu;
+				++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+				cur8 &= 0xFFu;
+				cur9 &= 0xFFu;
+				curA &= 0xFFu;
+				curB &= 0xFFu;
+				curC &= 0xFFu;
+				curD &= 0xFFu;
+				curE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+				++offsets[256 + static_cast<std::size_t>(cur1)];
+				++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+				++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+				++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+				++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+				++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+				++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+				++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+				++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+				++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+				++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+				++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+				++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+				++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+			}
+		}
+
+		// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		if constexpr(ismultithreadcapable){
+			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+				// reset the barrier after use, only one thread will do this
+				// no busy-wait dependency on this store, hence relaxed memory order is fine
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+			}
+			// this will just be zero if usemultithread is zero
+			offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+		}else offsetscompanion = nullptr;
+
+		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+		auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+
+		// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+		if constexpr(ismultithreadcapable){
+			// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+			std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+			while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+				spinpause();// catch up
+			}
+			std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+			// simply do not spin if usemultithread is zero
+			if(usemultithread > other){
+				do{
+					spinpause();
+					other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+				}while(!other);
+				// reset the barrier after use, only one thread will do this
+				// no busy-wait dependency on this store, hence relaxed memory order is fine
+				reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+				// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+			}
+			other += compound;// combine
+			unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+			paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+			other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+			runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+		}
+
+		// perform the bidirectional 8-bit sorting sequence
+		// flip the relevant bits inside runsteps first
+		if(runsteps ^= (1u << CHAR_BIT * sizeof(T) / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+		{
+			T *psrclo{input}, *pdst{buffer};
+			if(paritybool){// swap if the count of sorting actions to do is odd
+				psrclo = buffer;
+				pdst = input;
+			}
+			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+}
 
 // Function implementation templates for split up 128-bit types with indirection
 // all these functions are disabled on 32-bit or smaller platforms
 
+// initialisation part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for split up 128-bit with indirection
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool isinputconst, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void> radixsortnoallocmulti2threadinitmtc(std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pout);
+	if(isinputconst) assert(pdst);
+	assert(offsetscompanion);
+	if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isinputconst){
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			// unsigned counter, not zero inclusive inside the loop
+			std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+			pout += count - i;
+			pdst += count - i;
+			do{
+				V *phi{input[0]};
+				V *plo{input[1]};
+				input += 2;
+				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				pout[i] = phi;
+				pdst[i] = phi;
+				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				pout[i - 1] = plo;
+				pdst[i - 1] = plo;
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+						curhi.data[LO], curhi.data[HI],
+						curlo.data[LO], curlo.data[HI]);
+				}
+				// register pressure performance issue on several platforms: first do the high half here
+				std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+				std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+				std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+				std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+				std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+				std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+				std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+				curhi.data[LO] >>= 56;
+				std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+				std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+				std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+				curhi.data[HI] >>= 56;
+				++offsetscompanion[curhi0];
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curhi8)];
+				curhi8 &= 0xFFu;
+				curhi9 &= 0xFFu;
+				curhiA &= 0xFFu;
+				curhiB &= 0xFFu;
+				curhiC &= 0xFFu;
+				curhiD &= 0xFFu;
+				curhiE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curhi9)];
+				++offsetscompanion[10 * 256 + static_cast<std::size_t>(curhiA)];
+				++offsetscompanion[11 * 256 + static_cast<std::size_t>(curhiB)];
+				++offsetscompanion[12 * 256 + static_cast<std::size_t>(curhiC)];
+				++offsetscompanion[13 * 256 + static_cast<std::size_t>(curhiD)];
+				++offsetscompanion[14 * 256 + static_cast<std::size_t>(curhiE)];
+				++offsetscompanion[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+				// register pressure performance issue on several platforms: do the low half here second
+				std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+				std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+				std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+				std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+				std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+				std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+				std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+				curlo.data[LO] >>= 56;
+				std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+				std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+				std::uint_least64_t curloA{curlo.data[HI] >> 16};
+				std::uint_least64_t curloB{curlo.data[HI] >> 16};
+				std::uint_least64_t curloC{curlo.data[HI] >> 16};
+				std::uint_least64_t curloD{curlo.data[HI] >> 16};
+				std::uint_least64_t curloE{curlo.data[HI] >> 16};
+				curlo.data[HI] >>= 56;
+				++offsetscompanion[curlo0];
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curlo8)];
+				curlo8 &= 0xFFu;
+				curlo9 &= 0xFFu;
+				curloA &= 0xFFu;
+				curloB &= 0xFFu;
+				curloC &= 0xFFu;
+				curloD &= 0xFFu;
+				curloE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curlo9)];
+				++offsetscompanion[10 * 256 + static_cast<std::size_t>(curloA)];
+				++offsetscompanion[11 * 256 + static_cast<std::size_t>(curloB)];
+				++offsetscompanion[12 * 256 + static_cast<std::size_t>(curloC)];
+				++offsetscompanion[13 * 256 + static_cast<std::size_t>(curloD)];
+				++offsetscompanion[14 * 256 + static_cast<std::size_t>(curloE)];
+				++offsetscompanion[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+			}while(i -= 2);
+		}else{// !isinputconst
+			V **pinputlo{input}, **pinputhi{input + count};
+			V **poutputlo{pout}, **poutputhi{pout + count};
+			std::size_t i{(count + 1 + 2) >> 2};// rounded up in the companion thread
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			do{
+				V *plo{pinputlo[0]};
+				V *phi{pinputhi[0]};
+				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				*pinputhi-- = plo;
+				*poutputhi-- = plo;
+				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				*pinputlo++ = phi;
+				*poutputlo++ = phi;
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+						curlo.data[LO], curlo.data[HI],
+						curhi.data[LO], curhi.data[HI]);
+				}
+				// register pressure performance issue on several platforms: first do the low half here
+				std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+				std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+				std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+				std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+				std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+				std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+				std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+				curlo.data[LO] >>= 56;
+				std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+				std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+				std::uint_least64_t curloA{curlo.data[HI] >> 16};
+				std::uint_least64_t curloB{curlo.data[HI] >> 16};
+				std::uint_least64_t curloC{curlo.data[HI] >> 16};
+				std::uint_least64_t curloD{curlo.data[HI] >> 16};
+				std::uint_least64_t curloE{curlo.data[HI] >> 16};
+				curlo.data[HI] >>= 56;
+				++offsetscompanion[curlo0];
+				curlo1 &= 0xFFu;
+				curlo2 &= 0xFFu;
+				curlo3 &= 0xFFu;
+				curlo4 &= 0xFFu;
+				curlo5 &= 0xFFu;
+				curlo6 &= 0xFFu;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curlo8)];
+				curlo8 &= 0xFFu;
+				curlo9 &= 0xFFu;
+				curloA &= 0xFFu;
+				curloB &= 0xFFu;
+				curloC &= 0xFFu;
+				curloD &= 0xFFu;
+				curloE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+				++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curlo9)];
+				++offsetscompanion[10 * 256 + static_cast<std::size_t>(curloA)];
+				++offsetscompanion[11 * 256 + static_cast<std::size_t>(curloB)];
+				++offsetscompanion[12 * 256 + static_cast<std::size_t>(curloC)];
+				++offsetscompanion[13 * 256 + static_cast<std::size_t>(curloD)];
+				++offsetscompanion[14 * 256 + static_cast<std::size_t>(curloE)];
+				++offsetscompanion[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+				// register pressure performance issue on several platforms: do the high half here second
+				std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+				std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+				std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+				std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+				std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+				std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+				std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+				curhi.data[LO] >>= 56;
+				std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+				std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+				std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+				std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+				curhi.data[HI] >>= 56;
+				++offsetscompanion[curhi0];
+				curhi1 &= 0xFFu;
+				curhi2 &= 0xFFu;
+				curhi3 &= 0xFFu;
+				curhi4 &= 0xFFu;
+				curhi5 &= 0xFFu;
+				curhi6 &= 0xFFu;
+				++offsetscompanion[8 * 256 + static_cast<std::size_t>(curhi8)];
+				curhi8 &= 0xFFu;
+				curhi9 &= 0xFFu;
+				curhiA &= 0xFFu;
+				curhiB &= 0xFFu;
+				curhiC &= 0xFFu;
+				curhiD &= 0xFFu;
+				curhiE &= 0xFFu;
+				if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+				++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+				++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+				++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+				++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+				++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+				++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+				++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+				++offsetscompanion[9 * 256 + static_cast<std::size_t>(curhi9)];
+				++offsetscompanion[10 * 256 + static_cast<std::size_t>(curhiA)];
+				++offsetscompanion[11 * 256 + static_cast<std::size_t>(curhiB)];
+				++offsetscompanion[12 * 256 + static_cast<std::size_t>(curhiC)];
+				++offsetscompanion[13 * 256 + static_cast<std::size_t>(curhiD)];
+				++offsetscompanion[14 * 256 + static_cast<std::size_t>(curhiE)];
+				++offsetscompanion[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+			}while(--i);
+		}
+	}else{// not in reverse order
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: do not limit as much when there's a reasonable amount of registers
+		// unsigned counter, not zero inclusive inside the loop
+		std::size_t i{((count + 1 + 2) >> 2) * 2};// rounded up in the companion thread
+		input += count - i;
+		pout += count - i;
+		do{
+			V *phi{input[i]};
+			V *plo{input[i - 1]};
+			auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+			pout[i] = phi;
+			auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+			pout[i - 1] = plo;
+			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+					curhi.data[LO], curhi.data[HI],
+					curlo.data[LO], curlo.data[HI]);
+			}
+			// register pressure performance issue on several platforms: first do the high half here
+			std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+			std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+			std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+			std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+			std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+			std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+			std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+			curhi.data[LO] >>= 56;
+			std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+			std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+			std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+			std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+			curhi.data[HI] >>= 56;
+			++offsetscompanion[curhi0];
+			curhi1 &= 0xFFu;
+			curhi2 &= 0xFFu;
+			curhi3 &= 0xFFu;
+			curhi4 &= 0xFFu;
+			curhi5 &= 0xFFu;
+			curhi6 &= 0xFFu;
+			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curhi8)];
+			curhi8 &= 0xFFu;
+			curhi9 &= 0xFFu;
+			curhiA &= 0xFFu;
+			curhiB &= 0xFFu;
+			curhiC &= 0xFFu;
+			curhiD &= 0xFFu;
+			curhiE &= 0xFFu;
+			if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+			++offsetscompanion[256 + static_cast<std::size_t>(curhi1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curhi2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curhi3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curhi4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curhi5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curhi6)];
+			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curhi9)];
+			++offsetscompanion[10 * 256 + static_cast<std::size_t>(curhiA)];
+			++offsetscompanion[11 * 256 + static_cast<std::size_t>(curhiB)];
+			++offsetscompanion[12 * 256 + static_cast<std::size_t>(curhiC)];
+			++offsetscompanion[13 * 256 + static_cast<std::size_t>(curhiD)];
+			++offsetscompanion[14 * 256 + static_cast<std::size_t>(curhiE)];
+			++offsetscompanion[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+			// register pressure performance issue on several platforms: do the low half here second
+			std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+			std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+			std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+			std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+			std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+			std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+			std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+			curlo.data[LO] >>= 56;
+			std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+			std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+			std::uint_least64_t curloA{curlo.data[HI] >> 16};
+			std::uint_least64_t curloB{curlo.data[HI] >> 16};
+			std::uint_least64_t curloC{curlo.data[HI] >> 16};
+			std::uint_least64_t curloD{curlo.data[HI] >> 16};
+			std::uint_least64_t curloE{curlo.data[HI] >> 16};
+			curlo.data[HI] >>= 56;
+			++offsetscompanion[curlo0];
+			curlo1 &= 0xFFu;
+			curlo2 &= 0xFFu;
+			curlo3 &= 0xFFu;
+			curlo4 &= 0xFFu;
+			curlo5 &= 0xFFu;
+			curlo6 &= 0xFFu;
+			++offsetscompanion[8 * 256 + static_cast<std::size_t>(curlo8)];
+			curlo8 &= 0xFFu;
+			curlo9 &= 0xFFu;
+			curloA &= 0xFFu;
+			curloB &= 0xFFu;
+			curloC &= 0xFFu;
+			curloD &= 0xFFu;
+			curloE &= 0xFFu;
+			if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+			++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
+			++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
+			++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
+			++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
+			++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
+			++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
+			++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+			++offsetscompanion[9 * 256 + static_cast<std::size_t>(curlo9)];
+			++offsetscompanion[10 * 256 + static_cast<std::size_t>(curloA)];
+			++offsetscompanion[11 * 256 + static_cast<std::size_t>(curloB)];
+			++offsetscompanion[12 * 256 + static_cast<std::size_t>(curloC)];
+			++offsetscompanion[13 * 256 + static_cast<std::size_t>(curloD)];
+			++offsetscompanion[14 * 256 + static_cast<std::size_t>(curloE)];
+			++offsetscompanion[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+		}while(i -= 2);
+	}
+}
 
+// main part, multithreading companion for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for split up 128-bit types with indirection
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void> radixsortnoallocmulti2threadmainmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsetscompanion);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	V **psrchi;
+	if constexpr(isrevorder){
+		psrchi = pdstnext + count;
+	}else{
+		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
+	while(1 < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if constexpr(!isabsvalue && isfltpmode) if(128 / 8 - 1 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+	shifter *= 8;
+	if(128 / 2 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop64;// rare, but possible
+	do{// low 64 bits
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			V *pa{psrchi[0]};
+			V *pb{psrchi[-1]};
+			V *pc{psrchi[-2]};
+			V *pd{psrchi[-3]};
+			psrchi -= 4;
+			auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+			auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+			auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+			auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			std::size_t offsetc{poffset[curc]--};
+			std::size_t offsetd{poffset[curd]--};
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+			pdst[offsetc] = pc;
+			pdst[offsetd] = pd;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
+		unsigned index{index = bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += 8;
+		poffset += 256;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrchi = pdst;
+		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		pdst = pdstnext;
+		pdstnext = psrchi;
+		psrchi += count;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * 8;
+		poffset += static_cast<std::size_t>(index) * 256;
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(!old) do{
+				spinpause();
+			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}else{// detect exceptions
+			if(!old) do{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+		}
+	}while(64 > shifter);
+	if constexpr(!isabsvalue && isfltpmode) if(128 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+handletop64:
+	shifter -= 64;
+	for(;;){// high 64 bits
+		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+		// architecture: limit to four at a time when there's a decent amount of registers
+		std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+		do{// fill the array, four at a time
+			V *pa{psrchi[0]};
+			V *pb{psrchi[-1]};
+			V *pc{psrchi[-2]};
+			V *pd{psrchi[-3]};
+			psrchi -= 4;
+			auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+			auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+			auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+			auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			std::size_t offsetc{poffset[curc]--};
+			std::size_t offsetd{poffset[curd]--};
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+			pdst[offsetc] = pc;
+			pdst[offsetd] = pd;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{index = bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrchi = pdst;
+			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+			pdst = pdstnext;
+			pdstnext = psrchi;
+			psrchi += count;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+			}
+		}
+		// handle the top part for floating-point differently
+		if(!isabsvalue && isfltpmode && 64 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::size_t j{(count + 1 + 4) >> 3};// rounded up in the top part
+			do{// fill the array, four at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				V *pc{psrchi[-2]};
+				V *pd{psrchi[-3]};
+				psrchi -= 4;
+				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
+				std::size_t offseta{offsetscompanion[cura + (128 - 8) * 256 / 8]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (128 - 8) * 256 / 8]--};
+				std::size_t offsetc{offsetscompanion[curc + (128 - 8) * 256 / 8]--};
+				std::size_t offsetd{offsetscompanion[curd + (128 - 8) * 256 / 8]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}while(--j);
+			break;// no further processing beyond the top part
+		}
+	}
+}
 
+// main part for the radixsortcopynoallocmulti2thread() and radixsortnoallocmulti2thread() function implementation templates for split up 128-bit types with indirection
+template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	assert(count && count != MAXSIZE_T);
+	// do not pass a nullptr here
+	assert(input);
+	assert(pdst);
+	assert(pdstnext);
+	assert(offsets);
+	assert(runsteps);
+	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+	V **psrclo;
+	if constexpr(isrevorder){
+		psrclo = pdstnext;
+	}else{
+		psrclo = const_cast<V **>(input);// psrclo will never be written to
+	}
+	// skip a step if possible
+	runsteps >>= shifter;
+	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
+	if constexpr(ismultithreadcapable) while(1 < 1 + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
+		spinpause();// catch up until the other thread releases the barrier
+	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
+	if constexpr(!isabsvalue && isfltpmode) if(128 / 8 - 1 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+	shifter *= 8;
+	if(128 / 2 <= shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop64;// rare, but possible
+	do{// low 64 bits
+		if constexpr(ismultithreadcapable){
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				V *pc{psrclo[2]};
+				V *pd{psrclo[3]};
+				psrclo += 4;
+				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto[curlo, curhi]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += 8;
+		poffset += 256;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::uintptr_t old;
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		pdst = pdstnext;
+		pdstnext = psrclo;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * 8;
+		poffset += static_cast<std::size_t>(index) * 256;
+		if constexpr(ismultithreadcapable){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			}
+		}
+	}while(64 > shifter);
+	if constexpr(!isabsvalue && isfltpmode) if(128 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop8;// rare, but possible
+handletop64:
+	shifter -= 64;
+	for(;;){// high 64 bits
+		if constexpr(ismultithreadcapable){
+			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				V *pc{psrclo[2]};
+				V *pd{psrclo[3]};
+				psrclo += 4;
+				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}
+			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+			if(!(1 & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto[curlo, curhi]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			break;
+		{
+			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+			shifter += 8;
+			poffset += 256;
+			// swap the pointers for the next round, data is moved on each iteration
+			psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::uintptr_t old;
+			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+			pdst = pdstnext;
+			pdstnext = psrclo;
+			// skip a step if possible
+			runsteps >>= index;
+			shifter += index * 8;
+			poffset += static_cast<std::size_t>(index) * 256;
+			if constexpr(ismultithreadcapable){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(!old) do{
+						spinpause();
+					}while(atomiclightbarrier.load(std::memory_order_relaxed));
+				}else{// detect exceptions
+					if(!old) do{
+						spinpause();
+						old = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(~std::uintptr_t{} == old);
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+				}
+			}
+		}
+		// handle the top part for floating-point differently
+		if(!isabsvalue && isfltpmode && 64 - 8 == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+		{
+handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here, but that's fine
+			if constexpr(ismultithreadcapable){
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (2 + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
+					std::size_t offseta{offsets[cura + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (128 - 8) * 256 / 8]++};
+					std::size_t offsetc{offsets[curc + (128 - 8) * 256 / 8]++};
+					std::size_t offsetd{offsets[curd + (128 - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI])};
+					std::size_t offseta{offsets[cura + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (128 - 8) * 256 / 8]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+				if(!(1 & count)){// fill in the final item for odd counts
+					V *p{psrclo[0]};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
+					std::size_t offset{offsets[cur + (128 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}else{// !ismultithreadcapable
+				V *const *psrchi{psrclo + count};
+				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+					V *plo{*psrclo++};
+					V *phi{*psrchi--};
+					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outlo.data[HI], outhi.data[HI])};
+					std::size_t offsetlo{offsets[curlo + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi + (128 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
+					pdst[offsetlo] = plo;
+					pdst[offsethi] = phi;
+				}while(psrclo < psrchi);
+				if(psrclo == psrchi){// fill in the final item for odd counts
+					V *p{*psrclo};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
+					std::size_t offset{offsets[cur + (128 - 8) * 256 / 8]};
+					pdst[offset] = p;
+				}
+			}
+			break;// no further processing beyond the top part
+		}
+	}
+}
+
+// multithreading companion for the radixsortcopynoallocmulti2thread() function implementation template for split up 128-bit types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void> radixsortcopynoallocmulti2threadmtc(std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X>(count, input, output, buffer, offsetscompanion, varparameters...);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << 128 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			pdst = output;
+			pdstnext = buffer;
+		}
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, input, pdst, pdstnext, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+	}
+}
+
+// radixsortcopynoalloc() function implementation template for split up 128-bit types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortcopynoallocmulti1thread
+#else
+	radixsortcopynoallocmulti2thread
+#endif
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(output);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortcopynoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		{// scope atomicguard, so it's always destructed before asynchandle
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+					atomicvarwrapper>,// may throw, so set up the guard
+				std::nullptr_t> atomicguard{atomiclightbarrier};
+			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, std::ptrdiff_t, std::nullptr_t> stride;
+			if constexpr(ismultithreadcapable){
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				stride = -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+				i -= stride;
+			}
+			if constexpr(isrevorder){// also reverse the array at the same time
+				V *const *pinput{input};
+				if constexpr(ismultithreadcapable) pinput += stride;
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					V *phi{pinput[0]};
+					V *plo{pinput[1]};
+					pinput += 2;
+					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					output[i] = phi;
+					buffer[i] = phi;
+					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					output[i - 1] = plo;
+					buffer[i - 1] = plo;
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+							curhi.data[LO], curhi.data[HI],
+							curlo.data[LO], curlo.data[HI]);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+					std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+					std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+					std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+					std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+					std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+					std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+					curhi.data[LO] >>= 56;
+					std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+					std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+					std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+					curhi.data[HI] >>= 56;
+					++offsets[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+					curhi8 &= 0xFFu;
+					curhi9 &= 0xFFu;
+					curhiA &= 0xFFu;
+					curhiB &= 0xFFu;
+					curhiC &= 0xFFu;
+					curhiD &= 0xFFu;
+					curhiE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+					// register pressure performance issue on several platforms: do the low half here second
+					std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+					std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+					std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+					std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+					std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+					std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+					std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+					curlo.data[LO] >>= 56;
+					std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+					std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+					std::uint_least64_t curloA{curlo.data[HI] >> 16};
+					std::uint_least64_t curloB{curlo.data[HI] >> 16};
+					std::uint_least64_t curloC{curlo.data[HI] >> 16};
+					std::uint_least64_t curloD{curlo.data[HI] >> 16};
+					std::uint_least64_t curloE{curlo.data[HI] >> 16};
+					curlo.data[HI] >>= 56;
+					++offsets[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curlo8)];
+					curlo8 &= 0xFFu;
+					curlo9 &= 0xFFu;
+					curloA &= 0xFFu;
+					curloB &= 0xFFu;
+					curloC &= 0xFFu;
+					curloD &= 0xFFu;
+					curloE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curlo9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curloA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curloB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curloC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curloD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curloE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					V *p{pinput[0]};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					output[i] = p;
+					buffer[i] = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
+					}
+					std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+					std::uint_least64_t cur1{cur.data[LO] >> 8};
+					std::uint_least64_t cur2{cur.data[LO] >> 16};
+					std::uint_least64_t cur3{cur.data[LO] >> 24};
+					std::uint_least64_t cur4{cur.data[LO] >> 32};
+					std::uint_least64_t cur5{cur.data[LO] >> 40};
+					std::uint_least64_t cur6{cur.data[LO] >> 48};
+					cur.data[LO] >>= 56;
+					std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+					std::uint_least64_t cur9{cur.data[HI] >> 8};
+					std::uint_least64_t curA{cur.data[HI] >> 16};
+					std::uint_least64_t curB{cur.data[HI] >> 16};
+					std::uint_least64_t curC{cur.data[HI] >> 16};
+					std::uint_least64_t curD{cur.data[HI] >> 16};
+					std::uint_least64_t curE{cur.data[HI] >> 16};
+					cur.data[HI] >>= 56;
+					++offsets[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+					cur8 &= 0xFFu;
+					cur9 &= 0xFFu;
+					curA &= 0xFFu;
+					curB &= 0xFFu;
+					curC &= 0xFFu;
+					curD &= 0xFFu;
+					curE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+				}
+			}else{// not in reverse order
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
+					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					output[i] = phi;
+					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					output[i - 1] = plo;
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+							curhi.data[LO], curhi.data[HI],
+							curlo.data[LO], curlo.data[HI]);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+					std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+					std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+					std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+					std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+					std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+					std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+					curhi.data[LO] >>= 56;
+					std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+					std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+					std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+					curhi.data[HI] >>= 56;
+					++offsets[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+					curhi8 &= 0xFFu;
+					curhi9 &= 0xFFu;
+					curhiA &= 0xFFu;
+					curhiB &= 0xFFu;
+					curhiC &= 0xFFu;
+					curhiD &= 0xFFu;
+					curhiE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+					// register pressure performance issue on several platforms: do the low half here second
+					std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+					std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+					std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+					std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+					std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+					std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+					std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+					curlo.data[LO] >>= 56;
+					std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+					std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+					std::uint_least64_t curloA{curlo.data[HI] >> 16};
+					std::uint_least64_t curloB{curlo.data[HI] >> 16};
+					std::uint_least64_t curloC{curlo.data[HI] >> 16};
+					std::uint_least64_t curloD{curlo.data[HI] >> 16};
+					std::uint_least64_t curloE{curlo.data[HI] >> 16};
+					curlo.data[HI] >>= 56;
+					++offsets[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curlo8)];
+					curlo8 &= 0xFFu;
+					curlo9 &= 0xFFu;
+					curloA &= 0xFFu;
+					curloB &= 0xFFu;
+					curloC &= 0xFFu;
+					curloD &= 0xFFu;
+					curloE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curlo9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curloA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curloB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curloC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curloD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curloE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					output[0] = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
+					}
+					std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+					std::uint_least64_t cur1{cur.data[LO] >> 8};
+					std::uint_least64_t cur2{cur.data[LO] >> 16};
+					std::uint_least64_t cur3{cur.data[LO] >> 24};
+					std::uint_least64_t cur4{cur.data[LO] >> 32};
+					std::uint_least64_t cur5{cur.data[LO] >> 40};
+					std::uint_least64_t cur6{cur.data[LO] >> 48};
+					cur.data[LO] >>= 56;
+					std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+					std::uint_least64_t cur9{cur.data[HI] >> 8};
+					std::uint_least64_t curA{cur.data[HI] >> 16};
+					std::uint_least64_t curB{cur.data[HI] >> 16};
+					std::uint_least64_t curC{cur.data[HI] >> 16};
+					std::uint_least64_t curD{cur.data[HI] >> 16};
+					std::uint_least64_t curE{cur.data[HI] >> 16};
+					cur.data[HI] >>= 56;
+					++offsets[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+					cur8 &= 0xFFu;
+					cur9 &= 0xFFu;
+					curA &= 0xFFu;
+					curB &= 0xFFu;
+					curC &= 0xFFu;
+					curD &= 0xFFu;
+					curE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+				}
+			}
+
+			// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			if constexpr(ismultithreadcapable){
+				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+					// detect exceptions
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+					}
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				// this will just be zero if usemultithread is zero
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+			}else offsetscompanion = nullptr;
+
+			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, X>(count, offsets, offsetscompanion, usemultithread)};
+
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+			// no exception detection required here
+			if constexpr(ismultithreadcapable){
+				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+					spinpause();// catch up
+				}
+				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+					}while(!other);
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				other += compound;// combine
+				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+			}
+
+			// perform the bidirectional 8-bit sorting sequence
+			// flip the relevant bits inside runsteps first
+			if(runsteps ^= (1u << 128 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				if(paritybool){// swap if the count of sorting actions to do is odd
+					pdst = output;
+					pdstnext = buffer;
+				}
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+			}
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+}
+
+// multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void> radixsortnoallocmulti2threadmtc(std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+	[[maybe_unused]]
+#endif
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
+	radixsortnoallocmulti2threadinitmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X>(count, input, buffer, nullptr, offsetscompanion, varparameters...);
+
+	X *offsets;
+	{// barrier and pointer exchange with the main thread
+		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion))};
+		// detect exceptions
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+		}
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == other);
+			// detect exceptions
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
+			}
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		offsets = reinterpret_cast<X *>(other);// retrieve the pointer
+	}
+
+	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+	auto[runsteps, paritybool]{generateoffsetsmultimtc<isdescsort, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, X>(count, offsets, offsetscompanion)};
+
+	{// barrier and (flipped bits) runsteps, paritybool value exchange with the main thread
+		// no exception detection required here
+		// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+		std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + 1};
+		while(reinterpret_cast<std::uintptr_t>(offsetscompanion) == atomiclightbarrier.load(std::memory_order_relaxed)){
+			spinpause();// catch up
+		}
+		std::uintptr_t other{atomiclightbarrier.fetch_add(compound)};
+		if(!other){
+			do{
+				spinpause();
+				other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+			}while(!other);
+			// reset the barrier after use, only one thread will do this
+			// no busy-wait dependency on this store, hence relaxed memory order is fine
+			reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+			// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+		}
+		other += compound;// combine
+		unsigned lowercarryoutbits{2 + paritybool};
+		paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+		other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+		runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+	}
+
+	// perform the bidirectional 8-bit sorting sequence
+	// flip the relevant bits inside runsteps first
+	if(runsteps ^= (1u << 128 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// perform the bidirectional 8-bit sorting sequence
+		V **psrclo{input}, **pdst{buffer};
+		if(paritybool){// swap if the count of sorting actions to do is odd
+			psrclo = buffer;
+			pdst = input;
+		}
+		radixsortnoallocmulti2threadmainmtc<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(count, psrclo, pdst, psrclo, offsetscompanion, runsteps, atomiclightbarrier, varparameters...);
+	}
+}
+
+// radixsortnoalloc() function implementation template for split up 128-bit types with indirection
+template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	, bool ismultithreadcapable = true
+#endif
+	, typename... vararguments>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X> &&
+	std::is_member_pointer_v<decltype(indirection1)> &&
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	radixsortnoallocmulti1thread
+#else
+	radixsortnoallocmulti2thread
+#endif
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	static bool constexpr ismultithreadcapable{false};
+#endif
+	if constexpr(ismultithreadcapable){
+		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
+		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
+	}
+	// do not pass a nullptr here, even though it's safe if count is 0
+	assert(input);
+	assert(buffer);
+	// All the code in this function is adapted for count to be one below its input value here.
+	--count;
+	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
+		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		// conditionally enable multithreading here
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		unsigned usemultithread{};// filled in as a boolean 0 or 1, used as unsigned input later on
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+
+		// count the 256 configurations, all in one go
+		if constexpr(ismultithreadcapable){
+			try{
+				asynchandle = std::async(std::launch::async, radixsortnoallocmulti2threadmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
+				usemultithread = 1;
+			}catch(...){// std::async may fail gracefully here
+				assert(false);
+			}
+		}
+		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
+		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		{// scope atomicguard, so it's always destructed before asynchandle
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+					atomicvarwrapper>,// may throw, so set up the guard
+				std::nullptr_t> atomicguard{atomiclightbarrier};
+			if constexpr(isrevorder){// also reverse the array at the same time
+				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+				if constexpr(!ismultithreadcapable){
+					pinputlo = input;
+					pinputhi = input + count;
+					pbufferlo = buffer;
+					pbufferhi = buffer + count;
+				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
+					std::ptrdiff_t const stride{-static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2)};
+					pinputlo = input + stride;
+					pinputhi = input + (count - stride);
+					pbufferlo = buffer + stride;
+					pbufferhi = buffer + (count - stride);
+				}
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					V *plo{pinputlo[0]};
+					V *phi{pinputhi[0]};
+					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					*pinputhi-- = plo;
+					*pbufferhi-- = plo;
+					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					*pinputlo++ = phi;
+					*pbufferlo++ = phi;
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+							curlo.data[LO], curlo.data[HI],
+							curhi.data[LO], curhi.data[HI]);
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					std::uint_least64_t curlo0{curlo.data[LO] & 0xFFu};
+					std::uint_least64_t curlo1{curlo.data[LO] >> 8};
+					std::uint_least64_t curlo2{curlo.data[LO] >> 16};
+					std::uint_least64_t curlo3{curlo.data[LO] >> 24};
+					std::uint_least64_t curlo4{curlo.data[LO] >> 32};
+					std::uint_least64_t curlo5{curlo.data[LO] >> 40};
+					std::uint_least64_t curlo6{curlo.data[LO] >> 48};
+					curlo.data[LO] >>= 56;
+					std::uint_least64_t curlo8{curlo.data[HI] & 0xFFu};
+					std::uint_least64_t curlo9{curlo.data[HI] >> 8};
+					std::uint_least64_t curloA{curlo.data[HI] >> 16};
+					std::uint_least64_t curloB{curlo.data[HI] >> 16};
+					std::uint_least64_t curloC{curlo.data[HI] >> 16};
+					std::uint_least64_t curloD{curlo.data[HI] >> 16};
+					std::uint_least64_t curloE{curlo.data[HI] >> 16};
+					curlo.data[HI] >>= 56;
+					++offsets[curlo0];
+					curlo1 &= 0xFFu;
+					curlo2 &= 0xFFu;
+					curlo3 &= 0xFFu;
+					curlo4 &= 0xFFu;
+					curlo5 &= 0xFFu;
+					curlo6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curlo8)];
+					curlo8 &= 0xFFu;
+					curlo9 &= 0xFFu;
+					curloA &= 0xFFu;
+					curloB &= 0xFFu;
+					curloC &= 0xFFu;
+					curloD &= 0xFFu;
+					curloE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curlo.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curlo1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curlo9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curloA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curloB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curloC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curloD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curloE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curlo.data[HI])];
+					// register pressure performance issue on several platforms: do the high half here second
+					std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+					std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+					std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+					std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+					std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+					std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+					std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+					curhi.data[LO] >>= 56;
+					std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+					std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+					std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+					curhi.data[HI] >>= 56;
+					++offsets[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+					curhi8 &= 0xFFu;
+					curhi9 &= 0xFFu;
+					curhiA &= 0xFFu;
+					curhiB &= 0xFFu;
+					curhiC &= 0xFFu;
+					curhiD &= 0xFFu;
+					curhiE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+				}while(pinputlo < pinputhi);
+				if(pinputlo == pinputhi){// fill in the final item for odd counts
+					V *p{pinputlo[0]};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					// no write to input, as this is the midpoint
+					*pbufferhi = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
+					}
+					std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+					std::uint_least64_t cur1{cur.data[LO] >> 8};
+					std::uint_least64_t cur2{cur.data[LO] >> 16};
+					std::uint_least64_t cur3{cur.data[LO] >> 24};
+					std::uint_least64_t cur4{cur.data[LO] >> 32};
+					std::uint_least64_t cur5{cur.data[LO] >> 40};
+					std::uint_least64_t cur6{cur.data[LO] >> 48};
+					cur.data[LO] >>= 56;
+					std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+					std::uint_least64_t cur9{cur.data[HI] >> 8};
+					std::uint_least64_t curA{cur.data[HI] >> 16};
+					std::uint_least64_t curB{cur.data[HI] >> 16};
+					std::uint_least64_t curC{cur.data[HI] >> 16};
+					std::uint_least64_t curD{cur.data[HI] >> 16};
+					std::uint_least64_t curE{cur.data[HI] >> 16};
+					cur.data[HI] >>= 56;
+					++offsets[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+					cur8 &= 0xFFu;
+					cur9 &= 0xFFu;
+					curA &= 0xFFu;
+					curB &= 0xFFu;
+					curC &= 0xFFu;
+					curD &= 0xFFu;
+					curE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+				}
+			}else{// not in reverse order
+				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
+				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
+				do{
+					V *phi{input[i]};
+					V *plo{input[i - 1]};
+					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					buffer[i] = phi;
+					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					buffer[i - 1] = plo;
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
+							curhi.data[LO], curhi.data[HI],
+							curlo.data[LO], curlo.data[HI]);
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					std::uint_least64_t curhi0{curhi.data[LO] & 0xFFu};
+					std::uint_least64_t curhi1{curhi.data[LO] >> 8};
+					std::uint_least64_t curhi2{curhi.data[LO] >> 16};
+					std::uint_least64_t curhi3{curhi.data[LO] >> 24};
+					std::uint_least64_t curhi4{curhi.data[LO] >> 32};
+					std::uint_least64_t curhi5{curhi.data[LO] >> 40};
+					std::uint_least64_t curhi6{curhi.data[LO] >> 48};
+					curhi.data[LO] >>= 56;
+					std::uint_least64_t curhi8{curhi.data[HI] & 0xFFu};
+					std::uint_least64_t curhi9{curhi.data[HI] >> 8};
+					std::uint_least64_t curhiA{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiB{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiC{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiD{curhi.data[HI] >> 16};
+					std::uint_least64_t curhiE{curhi.data[HI] >> 16};
+					curhi.data[HI] >>= 56;
+					++offsets[curhi0];
+					curhi1 &= 0xFFu;
+					curhi2 &= 0xFFu;
+					curhi3 &= 0xFFu;
+					curhi4 &= 0xFFu;
+					curhi5 &= 0xFFu;
+					curhi6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(curhi8)];
+					curhi8 &= 0xFFu;
+					curhi9 &= 0xFFu;
+					curhiA &= 0xFFu;
+					curhiB &= 0xFFu;
+					curhiC &= 0xFFu;
+					curhiD &= 0xFFu;
+					curhiE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) curhi.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(curhi1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(curhi2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(curhi3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(curhi4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(curhi5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(curhi6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(curhi.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(curhi9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curhiA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curhiB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curhiC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curhiD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curhiE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(curhi.data[HI])];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					V *p{input[0]};
+					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					buffer[0] = p;
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
+					}
+					std::uint_least64_t cur0{cur.data[LO] & 0xFFu};
+					std::uint_least64_t cur1{cur.data[LO] >> 8};
+					std::uint_least64_t cur2{cur.data[LO] >> 16};
+					std::uint_least64_t cur3{cur.data[LO] >> 24};
+					std::uint_least64_t cur4{cur.data[LO] >> 32};
+					std::uint_least64_t cur5{cur.data[LO] >> 40};
+					std::uint_least64_t cur6{cur.data[LO] >> 48};
+					cur.data[LO] >>= 56;
+					std::uint_least64_t cur8{cur.data[HI] & 0xFFu};
+					std::uint_least64_t cur9{cur.data[HI] >> 8};
+					std::uint_least64_t curA{cur.data[HI] >> 16};
+					std::uint_least64_t curB{cur.data[HI] >> 16};
+					std::uint_least64_t curC{cur.data[HI] >> 16};
+					std::uint_least64_t curD{cur.data[HI] >> 16};
+					std::uint_least64_t curE{cur.data[HI] >> 16};
+					cur.data[HI] >>= 56;
+					++offsets[cur0];
+					cur1 &= 0xFFu;
+					cur2 &= 0xFFu;
+					cur3 &= 0xFFu;
+					cur4 &= 0xFFu;
+					cur5 &= 0xFFu;
+					cur6 &= 0xFFu;
+					++offsets[8 * 256 + static_cast<std::size_t>(cur8)];
+					cur8 &= 0xFFu;
+					cur9 &= 0xFFu;
+					curA &= 0xFFu;
+					curB &= 0xFFu;
+					curC &= 0xFFu;
+					curD &= 0xFFu;
+					curE &= 0xFFu;
+					if constexpr(isabsvalue && issignmode && isfltpmode) cur.data[HI] &= 0x7Fu;
+					++offsets[256 + static_cast<std::size_t>(cur1)];
+					++offsets[2 * 256 + static_cast<std::size_t>(cur2)];
+					++offsets[3 * 256 + static_cast<std::size_t>(cur3)];
+					++offsets[4 * 256 + static_cast<std::size_t>(cur4)];
+					++offsets[5 * 256 + static_cast<std::size_t>(cur5)];
+					++offsets[6 * 256 + static_cast<std::size_t>(cur6)];
+					++offsets[7 * 256 + static_cast<std::size_t>(cur.data[LO])];
+					++offsets[9 * 256 + static_cast<std::size_t>(cur9)];
+					++offsets[10 * 256 + static_cast<std::size_t>(curA)];
+					++offsets[11 * 256 + static_cast<std::size_t>(curB)];
+					++offsets[12 * 256 + static_cast<std::size_t>(curC)];
+					++offsets[13 * 256 + static_cast<std::size_t>(curD)];
+					++offsets[14 * 256 + static_cast<std::size_t>(curE)];
+					++offsets[15 * 256 + static_cast<std::size_t>(cur.data[HI])];
+				}
+			}
+
+			// barrier and pointer exchange with the companion thread
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+			[[maybe_unused]]
+#endif
+			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			if constexpr(ismultithreadcapable){
+				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets) & -static_cast<std::intptr_t>(usemultithread))};
+				// detect exceptions
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+				}
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed);
+					}while(reinterpret_cast<std::uintptr_t>(offsets) == other);
+					// detect exceptions
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
+					}
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				// this will just be zero if usemultithread is zero
+				offsetscompanion = reinterpret_cast<X *>(other);// retrieve the pointer
+			}else offsetscompanion = nullptr;
+
+			// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
+			auto[runsteps, paritybool]{generateoffsetsmulti<isdescsort, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, X>(count, offsets, offsetscompanion, usemultithread, movetobuffer)};
+
+			// barrier and (flipped bits) runsteps, paritybool value exchange with the companion thread
+			// no exception detection required here
+			if constexpr(ismultithreadcapable){
+				// paritybool is either 0 or 1 here, so we can pack it together with runsteps and add usemultithread on top
+				std::uintptr_t compound{static_cast<std::uintptr_t>(runsteps) * 2 + static_cast<std::uintptr_t>(paritybool) + static_cast<std::uintptr_t>(usemultithread)};
+				while(reinterpret_cast<std::uintptr_t>(offsets) == atomiclightbarrier.load(std::memory_order_relaxed)){
+					spinpause();// catch up
+				}
+				std::uintptr_t other{atomiclightbarrier.fetch_add(compound & -static_cast<std::intptr_t>(usemultithread))};
+				// simply do not spin if usemultithread is zero
+				if(usemultithread > other){
+					do{
+						spinpause();
+						other = atomiclightbarrier.load(std::memory_order_relaxed) - compound;
+					}while(!other);
+					// reset the barrier after use, only one thread will do this
+					// no busy-wait dependency on this store, hence relaxed memory order is fine
+					reinterpret_cast<std::uintptr_t &>(atomiclightbarrier) = 0;//atomiclightbarrier.store(0, std::memory_order_relaxed); TODO: fix this, as the original failed to inline anything in an early testing round
+					// the next write to atomiclightbarrier will simply lock on and synchronise based on 0
+				}
+				other += compound;// combine
+				unsigned lowercarryoutbits{2 * usemultithread + paritybool};
+				paritybool = static_cast<unsigned>(other) & 1;// piece together the parity from both threads
+				other -= lowercarryoutbits;// this will remove possiby two bits of carry-out before the next right shift
+				runsteps = static_cast<unsigned>(other >> 1);// this can shift out a 0 or a 1 bit here, depending on the leftovers of parity
+			}
+
+			// perform the bidirectional 8-bit sorting sequence
+			// flip the relevant bits inside runsteps first
+			if(runsteps ^= (1u << 128 / 8) - 1)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+			{
+				V **psrclo{input}, **pdst{buffer};
+				if(paritybool){// swap if the count of sorting actions to do is odd
+					psrclo = buffer;
+					pdst = input;
+				}
+				radixsortnoallocmulti2threadmain<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, ismultithreadcapable, V, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier, varparameters...);
+			}
+		}
+	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+}
 #else// 32-bit or smaller platforms
 // Function implementation templates for split up 64-bit types without indirection
 // all these functions are disabled on 64-bit platforms and onwards
@@ -14027,11 +19023,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[unlikely]]
 #endif
 			break;
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		unsigned index;
-		if constexpr(16 < CHAR_BIT * sizeof(T)) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 		shifter += 8;
 		poffset += 256;
 		// swap the pointers for the next round, data is moved on each iteration
@@ -14041,23 +19033,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		pdstnext = psrchi;
 		psrchi += count;
 		// skip a step if possible
-		if constexpr(16 < CHAR_BIT * sizeof(T)){
-			runsteps >>= index;
-			shifter += index * 8;
-			poffset += static_cast<std::size_t>(index) * 256;
-		}
+		runsteps >>= index;
+		shifter += index * 8;
+		poffset += static_cast<std::size_t>(index) * 256;
 		if(!old) do{
 			spinpause();
 		}while(atomiclightbarrier.load(std::memory_order_relaxed));
 	}while(32 > shifter);
-	shifter -= 32;
 	if constexpr(!isabsvalue && isfltpmode) if(64 - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop8;// rare, but possible
-	for(;;){// high 32 bits
 handletop32:
+	shifter -= 32;
+	for(;;){// high 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
 			do{// fill the array, two at a time
@@ -14296,14 +19286,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			spinpause();
 		}while(atomiclightbarrier.load(std::memory_order_relaxed));
 	}while(32 > shifter);
-	shifter -= 32;
 	if constexpr(!isabsvalue && isfltpmode) if(64 - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop8;// rare, but possible
-	for(;;){// high 32 bits
 handletop32:
+	shifter -= 32;
+	for(;;){// high 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
@@ -15620,14 +20610,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 		}
 	}while(32 > shifter);
-	shifter -= 32;
 	if constexpr(!isabsvalue && isfltpmode) if(64 - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop8;// rare, but possible
-	for(;;){// high 32 bits
 handletop32:
+	shifter -= 32;
+	for(;;){// high 32 bits
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
 			do{// fill the array, two at a time
@@ -15903,11 +20893,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[unlikely]]
 #endif
 			return;
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		unsigned index;
-		if constexpr(16 < 64) index = bitscanforwardportable(runsteps);// at least 1 bit is set inside runsteps as by previous check
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 		shifter += 8;
 		poffset += 256;
 		// swap the pointers for the next round, data is moved on each iteration
@@ -15937,14 +20923,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 	}while(32 > shifter);
-	shifter -= 32;
 	if constexpr(!isabsvalue && isfltpmode) if(64 - 8 == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop8;// rare, but possible
-	for(;;){// high 32 bits
 handletop32:
+	shifter -= 32;
+	for(;;){// high 32 bits
 		if constexpr(ismultithreadcapable){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
@@ -31145,7 +36131,509 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	test128<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curp{static_cast<std::int_least64_t>(cur.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], cur.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[LO], cur.data[LO], &cur.data[LO]), cur.data[HI], cur.data[HI], &cur.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]};
+			cur.data[LO] += cur.data[LO];
+			cur.data[HI] += cur.data[HI];
+			cur.data[HI] += curlotmp < cur.data[LO];
+#endif
+		}else if constexpr(isfltpmode) cur.data[HI] += cur.data[HI];
+		curp >>= 64 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};
+		if constexpr(isfltpmode) cur.data[HI] >>= 1;
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], curq, 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], curq, carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], curq, 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], curq, carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cur.data[LO], curq, &cur.data[LO]), cur.data[HI], curq, &cur.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]};
+			cur.data[LO] += curq;
+			cur.data[HI] += curq;
+			cur.data[HI] += curlotmp < cur.data[LO];
+#endif
+		}
+		cur.data[LO] ^= curq;
+		curq >>= 1;// flip the sign bit
+		cur.data[HI] ^= curq;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		if constexpr(issignmode) cur.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+		else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, carryhi, checkcarry;
+			cur.data[LO] = __builtin_addcll(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcll(cur.data[HI], cur.data[HI], carrylo, &carryhi);
+			cur.data[LO] = __builtin_subcll(cur.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhi, &checkcarry);// flip the least significant bit
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, carryhi, checkcarry;
+			cur.data[LO] = __builtin_addcl(cur.data[LO], cur.data[LO], 0, &carrylo);
+			cur.data[HI] = __builtin_addcl(cur.data[HI], cur.data[HI], carrylo, &carryhi);
+			cur.data[LO] = __builtin_subcl(cur.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhi, &checkcarry);// flip the least significant bit
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, cur.data[LO], cur.data[LO], &cur.data[LO]), cur.data[HI], cur.data[HI], &cur.data[HI]), cur.data[LO], 0xFFFFFFFFFFFFFFFFu, &cur.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cur.data[LO]}, curhitmp{cur.data[HI]};
+			cur.data[LO] += cur.data[LO];
+			cur.data[HI] += cur.data[HI];
+			cur.data[HI] += cur.data[LO] < curlotmp;
+			cur.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			cur.data[LO] -= cur.data[HI] < curhitmp;
+#endif
+		}
+	}
+	return{cur};
+}
 
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	std::pair<test128<isabsvalue, issignmode, isfltpmode>, test128<isabsvalue, issignmode, isfltpmode>>> convertinput(U cura, U curb)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carrylo);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carrylo);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += curlotmp < cura.data[LO];
+#endif
+		}else if constexpr(isfltpmode) cura.data[HI] += cura.data[HI];
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylo);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylo);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curlotmp < curb.data[LO];
+#endif
+		}else if constexpr(isfltpmode) curb.data[HI] += curb.data[HI];
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		if constexpr(isfltpmode){
+			cura.data[HI] >>= 1;
+			curb.data[HI] >>= 1;
+		}
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curqb, carrylob, &checkcarryb);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curqb, carrylob, &checkcarryb);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], curqa, &cura.data[LO]), cura.data[HI], curqa, &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curqb, &curb.data[LO]), curb.data[HI], curqb, &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += curqa;
+			cura.data[HI] += curqa;
+			cura.data[HI] += curlotmpa < cura.data[LO];
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curqb;
+			curb.data[HI] += curqb;
+			curb.data[HI] += curlotmpb < curb.data[LO];
+#endif
+		}
+		cura.data[LO] ^= curqa;
+		curb.data[LO] ^= curqb;
+		curqa >>= 1;// flip the sign bit
+		curqb >>= 1;
+		cura.data[HI] ^= curqa;
+		curb.data[HI] ^= curqb;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		if constexpr(issignmode){
+			cura.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curb.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, carryhia, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &carryhia);
+			cura.data[LO] = __builtin_subcll(cura.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
+			unsigned long long carrylob, carryhib, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &carryhib);
+			curb.data[LO] = __builtin_subcll(curb.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, carryhia, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &carryhia);
+			cura.data[LO] = __builtin_subcl(cura.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
+			unsigned long carrylob, carryhib, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &carryhib);
+			curb.data[LO] = __builtin_subcl(curb.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI]), cura.data[LO], 0xFFFFFFFFFFFFFFFFu, &cura.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI]), curb.data[LO], 0xFFFFFFFFFFFFFFFFu, &curb.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarryb);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]}, curhitmpa{cura.data[HI]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			cura.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			cura.data[LO] -= cura.data[HI] < curhitmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]}, curhitmpb{curb.data[HI]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+			curb.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			curb.data[LO] -= curb.data[HI] < curhitmpb;
+#endif
+		}
+	}
+	return{cura, curb};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
+	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	std::tuple<test128<isabsvalue, issignmode, isfltpmode>, test128<isabsvalue, issignmode, isfltpmode>, test128<isabsvalue, issignmode, isfltpmode>>> convertinput(U cura, U curb, U curc)noexcept{
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(std::uintmax_t)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static std::uintmax_t constexpr highbit{generatehighbit<std::uintmax_t>()};
+		if(*reinterpret_cast<unsigned char const *>(&highbit)){// big-endian case
+			LO = 1;
+			HI = 0;
+		}
+	}
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least64_t curpa{static_cast<std::int_least64_t>(cura.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carrylo);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carrylo);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{cura.data[LO]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += curlotmp < cura.data[LO];
+#endif
+		}else if constexpr(isfltpmode) cura.data[HI] += cura.data[HI];
+		curpa >>= 64 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};
+		std::int_least64_t curpb{static_cast<std::int_least64_t>(curb.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylo);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylo);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{curb.data[LO]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curlotmp < curb.data[LO];
+#endif
+		}else if constexpr(isfltpmode) curb.data[HI] += curb.data[HI];
+		curpb >>= 64 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};
+		std::int_least64_t curpc{static_cast<std::int_least64_t>(curc.data[HI])};
+		if constexpr(!issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carrylo, checkcarry;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curc.data[LO], 0, &carrylo);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curc.data[HI], carrylo, &checkcarry);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carrylo, checkcarry;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], 0, &carrylo);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], carrylo, &checkcarry);
+#endif
+			static_cast<void>(checkcarry);
+#elif defined(_M_X64)
+			unsigned char checkcarry{_addcarry_u64(_addcarry_u64(0, curc.data[LO], curc.data[LO], &curc.data[LO]), curc.data[HI], curc.data[HI], &curc.data[HI])};
+			static_cast<void>(checkcarry);
+#else
+			std::int_least64_t curlotmp{curc.data[LO]};
+			curc.data[LO] += curc.data[LO];
+			curc.data[HI] += curc.data[HI];
+			curc.data[HI] += curlotmp < curc.data[LO];
+#endif
+		}else if constexpr(isfltpmode) curc.data[HI] += curc.data[HI];
+		curpc >>= 64 - 1;
+		std::uint_least64_t curqc{static_cast<std::uint_least64_t>(curpc)};
+		if constexpr(isfltpmode){
+			cura.data[HI] >>= 1;
+			curb.data[HI] >>= 1;
+			curc.data[HI] >>= 1;
+		}
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curqb, carrylob, &checkcarryb);
+			unsigned long long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curqc, 0, &carryloc);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curqc, carryloc, &checkcarryc);
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], curqa, 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], curqa, carryloa, &checkcarrya);
+			unsigned long carrylob, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curqb, 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curqb, carrylob, &checkcarryb);
+			unsigned long carryloc, checkcarryc;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curqc, 0, &carryloc);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curqc, carryloc, &checkcarryc);
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+			static_cast<void>(checkcarryc);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_addcarry_u64(_addcarry_u64(0, cura.data[LO], curqa, &cura.data[LO]), cura.data[HI], curqa, &cura.data[HI])};
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_addcarry_u64(_addcarry_u64(0, curb.data[LO], curqb, &curb.data[LO]), curb.data[HI], curqb, &curb.data[HI])};
+			static_cast<void>(checkcarryb);
+			unsigned char checkcarryc{_addcarry_u64(_addcarry_u64(0, curc.data[LO], curqc, &curc.data[LO]), curc.data[HI], curqc, &curc.data[HI])};
+			static_cast<void>(checkcarryc);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]};
+			cura.data[LO] += curqa;
+			cura.data[HI] += curqa;
+			cura.data[HI] += curlotmpa < cura.data[LO];
+			std::int_least64_t curlotmpb{curb.data[LO]};
+			curb.data[LO] += curqb;
+			curb.data[HI] += curqb;
+			curb.data[HI] += curlotmpb < curb.data[LO];
+			std::int_least64_t curlotmpc{curc.data[LO]};
+			curc.data[LO] += curqc;
+			curc.data[HI] += curqc;
+			curc.data[HI] += curlotmpc < curc.data[LO];
+#endif
+		}
+		cura.data[LO] ^= curqa;
+		curb.data[LO] ^= curqb;
+		curc.data[LO] ^= curqc;
+		curqa >>= 1;// flip the sign bit
+		curqb >>= 1;
+		curqc >>= 1;
+		cura.data[HI] ^= curqa;
+		curb.data[HI] ^= curqb;
+		curc.data[HI] ^= curqc;
+	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
+		if constexpr(issignmode){
+			cura.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curb.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+			curc.data[HI] &= 0x7FFFFFFFFFFFFFFFu;
+		}else{
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc) && __has_builtin(__builtin_subc)
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+			static_assert(64 == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
+			unsigned long long carryloa, carryhia, checkcarrya;
+			cura.data[LO] = __builtin_addcll(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcll(cura.data[HI], cura.data[HI], carryloa, &carryhia);
+			cura.data[LO] = __builtin_subcll(cura.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
+			unsigned long long carrylob, carryhib, checkcarryb;
+			curb.data[LO] = __builtin_addcll(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcll(curb.data[HI], curb.data[HI], carrylob, &carryhib);
+			curb.data[LO] = __builtin_subcll(curb.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
+			unsigned long long carryloc, carryhic, checkcarryc;
+			curc.data[LO] = __builtin_addcll(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcll(curc.data[HI], curc.data[HI], carryloc, &carryhic);
+			curc.data[LO] = __builtin_subcll(curc.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhic, &checkcarryc);// flip the least significant bit
+#else
+			static_assert(64 == CHAR_BIT * sizeof(long), "unexpected size of type long");
+			unsigned long carryloa, carryhia, checkcarrya;
+			cura.data[LO] = __builtin_addcl(cura.data[LO], cura.data[LO], 0, &carryloa);
+			cura.data[HI] = __builtin_addcl(cura.data[HI], cura.data[HI], carryloa, &carryhia);
+			cura.data[LO] = __builtin_subcl(cura.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhia, &checkcarrya);// flip the least significant bit
+			unsigned long carrylob, carryhib, checkcarryb;
+			curb.data[LO] = __builtin_addcl(curb.data[LO], curb.data[LO], 0, &carrylob);
+			curb.data[HI] = __builtin_addcl(curb.data[HI], curb.data[HI], carrylob, &carryhib);
+			curb.data[LO] = __builtin_subcl(curb.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhib, &checkcarryb);// flip the least significant bit
+			unsigned long carryloc, carryhic, checkcarryc;
+			curc.data[LO] = __builtin_addcl(curc.data[LO], curc.data[LO], 0, &carryloc);
+			curc.data[HI] = __builtin_addcl(curc.data[HI], curc.data[HI], carryloc, &carryhic);
+			curc.data[LO] = __builtin_subcl(curc.data[LO], 0xFFFFFFFFFFFFFFFFu, carryhic, &checkcarryc);// flip the least significant bit
+#endif
+			static_cast<void>(checkcarrya);
+			static_cast<void>(checkcarryb);
+			static_cast<void>(checkcarryc);
+#elif defined(_M_X64)
+			unsigned char checkcarrya{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, cura.data[LO], cura.data[LO], &cura.data[LO]), cura.data[HI], cura.data[HI], &cura.data[HI]), cura.data[LO], 0xFFFFFFFFFFFFFFFFu, &cura.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarrya);
+			unsigned char checkcarryb{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, curb.data[LO], curb.data[LO], &curb.data[LO]), curb.data[HI], curb.data[HI], &curb.data[HI]), curb.data[LO], 0xFFFFFFFFFFFFFFFFu, &curb.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarryb);
+			unsigned char checkcarryc{_subborrow_u64(_addcarry_u64(_addcarry_u64(0, curc.data[LO], curc.data[LO], &curc.data[LO]), curc.data[HI], curc.data[HI], &curc.data[HI]), curc.data[LO], 0xFFFFFFFFFFFFFFFFu, &curc.data[LO])};// flip the least significant bit
+			static_cast<void>(checkcarryc);
+#else
+			std::int_least64_t curlotmpa{cura.data[LO]}, curhitmpa{cura.data[HI]};
+			cura.data[LO] += cura.data[LO];
+			cura.data[HI] += cura.data[HI];
+			cura.data[HI] += cura.data[LO] < curlotmpa;
+			cura.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			cura.data[LO] -= cura.data[HI] < curhitmpa;
+			std::int_least64_t curlotmpb{curb.data[LO]}, curhitmpb{curb.data[HI]};
+			curb.data[LO] += curb.data[LO];
+			curb.data[HI] += curb.data[HI];
+			curb.data[HI] += curb.data[LO] < curlotmpb;
+			curb.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			curb.data[LO] -= curb.data[HI] < curhitmpb;
+			std::int_least64_t curlotmpc{curc.data[LO]}, curhitmpc{curc.data[HI]};
+			curc.data[LO] += curc.data[LO];
+			curc.data[HI] += curc.data[HI];
+			curc.data[HI] += curc.data[LO] < curlotmpc;
+			curc.data[LO] -= 0xFFFFFFFFFFFFFFFFu;// flip the least significant bit
+			curc.data[LO] -= curc.data[HI] < curhitmpc;
+#endif
+		}
+	}
+	return{cura, curb, curc};
+}
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
