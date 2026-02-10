@@ -55,8 +55,8 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Reroutes to the 1- or 2-thread functions for single-part types
 - Reroutes to the 1- or 2-thread functions (variants without indirection)
 - Reroutes to the 1- or 2-thread functions (variants with indirection)
-- Functions to establish the initial treshold for beyond 2-way multithreading
 - Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
+- Functions to establish the initial treshold for beyond 2-way multithreading
 - Helper functions for merging the halves from multithreading inputs without indirection
 - Up to 4-way multithreading functions without indirection
 - Helper functions for merging the thirds from multithreading inputs without indirection
