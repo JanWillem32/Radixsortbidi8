@@ -47,6 +47,10 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Helper functions to implement the offset transforms
 - Function implementation templates for 80-bit-based long double types without indirection
 - Function implementation templates for 80-bit-based long double types with indirection
+- Function implementation templates for split up 128-bit types without indirection
+- Function implementation templates for split up 128-bit types with indirection
+- Function implementation templates for split up 64-bit types without indirection
+- Function implementation templates for split up 64-bit types with indirection
 - Function implementation templates for multi-part types without indirection
 - Function implementation templates for multi-part types with indirection
 - Function implementation templates for single-part types without indirection

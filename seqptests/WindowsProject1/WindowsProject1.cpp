@@ -701,466 +701,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"mini rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"mini rsbd8::radixsortcopy() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"half rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"half rsbd8::radixsortcopy() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float std::stable_sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double std::stable_sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
 		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> *>(out), upLargePageSize);
 
 		// stop measuring
@@ -1228,92 +768,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::longdoubletest128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"quad rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"quad rsbd8::radixsortcopy() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
@@ -1477,6 +931,92 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			auto curhi{*piter++};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"quad rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 16, reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in), reinterpret_cast<rsbd8::helper::test128<false, true, true> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"quad rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
 			curlo = curhi;
 		}while(--k);
 #endif
@@ -1770,6 +1310,150 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
+		std::sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"double std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + (RSBD8_TEST_BATCH_SIZE) / 8);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"double std::stable_sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"double rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 8, reinterpret_cast<double const *>(in), reinterpret_cast<double *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"double rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 8 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint64_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
 		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t *>(out), reinterpret_cast<std::uint32_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
 
 		// stop measuring
@@ -2046,6 +1730,150 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
+		std::sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float std::sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + (RSBD8_TEST_BATCH_SIZE) / 4);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float std::stable_sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy((RSBD8_TEST_BATCH_SIZE) / 4, reinterpret_cast<float const *>(in), reinterpret_cast<float *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 4 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
 		std::sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t *>(out), reinterpret_cast<std::uint16_t *>(out) + (RSBD8_TEST_BATCH_SIZE) / 2);
 
 		// stop measuring
@@ -2305,6 +2133,92 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			auto curhi{*piter++};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"half rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE) / 2, reinterpret_cast<std::uint16_t const *>(in), reinterpret_cast<std::uint16_t *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"half rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) / 2 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
 			curlo = curhi;
 		}while(--k);
 #endif
@@ -2588,6 +2502,92 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>((RSBD8_TEST_BATCH_SIZE), reinterpret_cast<std::uint8_t const *>(in), reinterpret_cast<std::uint8_t *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{(RSBD8_TEST_BATCH_SIZE) - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
 		rsbd8::helper::longdoubletest128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(in)};
 		rsbd8::helper::longdoubletest128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const **>(out)};
 		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
@@ -2652,6 +2652,55 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64start{__rdtsc()};
 
+		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::test128<false, false, false> **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint128_t, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{*lo};
+		do{
+			auto hi{*piter++};
+			auto curhi{*hi};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		rsbd8::helper::test128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in)};
+		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
 		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::test128<false, true, true> **>(out), upLargePageSize);
 
 		// stop measuring
@@ -2676,6 +2725,98 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		do{
 			auto hi{*piter++};
 			auto curhi{rsbd8::helper::convertinput<false, true, true, rsbd8::helper::test128<false, true, true>>(*hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64wstart{__rdtsc()};
+
+		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + testsize, indlesslambda);
+
+		// stop measuring
+		std::uint64_t u64wstop;
+		{
+			unsigned int uAux;// unused
+			u64wstop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint64_t, indirect std::stable_sort() test\n"	);
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
+		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64wstart{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint64_t **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64wstop;
+		{
+			unsigned int uAux;// unused
+			u64wstop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"std::uint64_t, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{*lo};
+		do{
+			auto hi{*piter++};
+			auto curhi{*hi};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
@@ -2792,334 +2933,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		std::uint64_t u64wstart{__rdtsc()};
 
 		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + testsize, indlesslambda);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float, indirect std::stable_sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
-		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<float **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(*lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
-		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"half, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(*lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
-		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"mini, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		rsbd8::helper::test128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in)};
-		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::test128<false, false, false> **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint128_t, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{*lo};
-		do{
-			auto hi{*piter++};
-			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
-		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
-		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + testsize, indlesslambda);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint64_t, indirect std::stable_sort() test\n"	);
-		OutputDebugStringW(szTicksRu64Text);
-	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint64_t const *pSource{reinterpret_cast<std::uint64_t const *>(in)};
-		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint64_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<std::uint64_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64wstop;
-		{
-			unsigned int uAux;// unused
-			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"std::uint64_t, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-#ifdef _DEBUG
-		// verify if sorted
-		size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{*lo};
-		do{
-			auto hi{*piter++};
-			auto curhi{*hi};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-#endif
-	}while(!succeeded);
-#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
-		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64wstart{__rdtsc()};
-
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3185,6 +2998,95 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
+#ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64wstart{__rdtsc()};
+
+		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + testsize, indlesslambda);
+
+		// stop measuring
+		std::uint64_t u64wstop;
+		{
+			unsigned int uAux;// unused
+			u64wstop = __rdtscp(&uAux);
+			static_cast<void>(uAux);
+		}
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64wstop - u64wstart - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float, indirect std::stable_sort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}
+#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint32_t const *pSource{reinterpret_cast<std::uint32_t const *>(in)};
+		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint32_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<float **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"float, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(*lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint32_t>(*hi)};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			// shift up by one
 			lo = hi;
@@ -3284,6 +3186,55 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 #endif
 	}while(!succeeded);
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint16_t const *pSource{reinterpret_cast<std::uint16_t const *>(in)};
+		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint16_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint16_t **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"half, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(*lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint16_t>(*hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3324,6 +3275,55 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
+		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+#ifdef _DEBUG
+		// verify if sorted
+		size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*hi)};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+#endif
+	}while(!succeeded);
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 

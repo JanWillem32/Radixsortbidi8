@@ -54,6 +54,10 @@
 // - Helper functions to implement the offset transforms
 // - Function implementation templates for 80-bit-based long double types without indirection
 // - Function implementation templates for 80-bit-based long double types with indirection
+// - Function implementation templates for split up 128-bit types without indirection
+// - Function implementation templates for split up 128-bit types with indirection
+// - Function implementation templates for split up 64-bit types without indirection
+// - Function implementation templates for split up 64-bit types with indirection
 // - Function implementation templates for multi-part types without indirection
 // - Function implementation templates for multi-part types with indirection
 // - Function implementation templates for single-part types without indirection
@@ -4215,7 +4219,7 @@ RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test128<isabsvalue, issignmode, isf
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershifthi8(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
+RSBD8_FUNC_INLINE std::size_t filtershifthi8(test128<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the bottom 64 bits nor the top 8 bits.
 	std::size_t LO{}, HI{1};// little-endian case
@@ -4313,7 +4317,7 @@ RSBD8_FUNC_INLINE std::size_t filtershifthi8(test128<isabsvalue, issignmode, isf
 }
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
+RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top 32 bits.
 	std::size_t LO{}, HI{1};// little-endian case
@@ -4354,7 +4358,7 @@ RSBD8_FUNC_INLINE std::size_t filtershiftlo8(test64<isabsvalue, issignmode, isfl
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::size_t filtershifthi8(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{	
+RSBD8_FUNC_INLINE std::size_t filtershifthi8(test64<isabsvalue, issignmode, isfltpmode> cur, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the bottom 32 bits nor the top 8 bits.
 	std::size_t LO{}, HI{1};// little-endian case
@@ -4808,7 +4812,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi8(test128<isabsvalue, 
 }
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{	
+RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the top 32 bits.
 	std::size_t LO{}, HI{1};// little-endian case
@@ -4868,7 +4872,7 @@ RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershiftlo8(test64<isabsvalue, i
 }
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
-RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{	
+RSBD8_FUNC_INLINE std::array<std::size_t, 2> filtershifthi8(test64<isabsvalue, issignmode, isfltpmode> cura, test64<isabsvalue, issignmode, isfltpmode> curb, unsigned shift)noexcept{
 	// Filtering is simplified if possible.
 	// This should never filter the bottom 32 bits nor the top 8 bits.
 	std::size_t LO{}, HI{1};// little-endian case
