@@ -12149,7 +12149,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -12717,7 +12717,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -14503,7 +14503,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -15091,7 +15091,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -16272,7 +16272,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -16657,7 +16657,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -18050,7 +18050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -18664,7 +18664,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -19881,7 +19881,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -20212,7 +20212,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -21579,7 +21579,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -22085,7 +22085,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -23543,7 +23543,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -24484,7 +24484,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -27889,7 +27889,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -29756,7 +29756,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -32501,7 +32501,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -32770,7 +32770,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -32942,7 +32942,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
@@ -33007,7 +33007,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
@@ -33058,7 +33058,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -33327,7 +33327,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
@@ -33922,7 +33922,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -34308,7 +34308,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 	// All the code in this function is adapted for count to be one below its input value here.
@@ -37504,7 +37504,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -37516,15 +37516,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	U curhi{*pdatahi}, curlo{*pdatalo};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi, curlo)};
+#if defined(_DEBUG) || defined(DEBUG)
+		decltype(comphi) previouscomp;// used for debug assertion of the sorted order
+		std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+#endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(complo < previouscomp));
+					previouscomp = complo;
+#endif
 					--pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
 					complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comphi < previouscomp));
+					previouscomp = comphi;
+#endif
 					--pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
@@ -37532,8 +37545,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comphi - complo : complo - comphi;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comphi < complo : complo < comphi){
+					assert(!(previouscomp < complo));
+					previouscomp = complo;
+				}else{
+					assert(!(previouscomp < comphi));
+					previouscomp = comphi;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdatalo += mask;
@@ -37577,12 +37603,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// never sample beyond the lower division (half of count, rounded down) of the array
 				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 				if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(complo < previouscomp));
+					previouscomp = complo;
+#endif
 					--pdatalo;
 					if constexpr(!isrevorder) if(pdatalo < reinterpret_cast<W const *>(input)) pdatalo = pdatahi;
 					out = curlo;
 					curlo = *pdatalo;
 					complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comphi < previouscomp));
+					previouscomp = comphi;
+#endif
 					--pdatahi;
 					if constexpr(isrevorder) if(pdatahi < reinterpret_cast<W const *>(input)) pdatahi = pdatalo;
 					out = curhi;
@@ -37591,10 +37625,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				// line breaks are placed for clarity, based on the dependency sequences
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comphi - complo : complo - comphi;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comphi < complo : complo < comphi){
+					assert(!(previouscomp < complo));
+					previouscomp = complo;
+				}else{
+					assert(!(previouscomp < comphi));
+					previouscomp = comphi;
+				}
+#endif
 
+				// line breaks are placed for clarity, based on the dependency sequences
 				pdatalo += mask;
 				U outlo{curlo & static_cast<M>(mask)};
 				pdatahi += notmask;
@@ -37639,16 +37686,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
 			curhi = curlo;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(complo < previouscomp));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(comphi < previouscomp));
+#endif
 	}else{// unfiltered input, uses direct integer comparisons
+#if defined(_DEBUG) || defined(DEBUG)
+		U previouscur;// used for debug assertion of the sorted order
+		std::memset(&previouscur, 0xFF, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// clear the high bit for signed values
+#endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(curlo < previouscur));
+					previouscur = curlo;
+#endif
 					--pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(curhi < previouscur));
+					previouscur = curhi;
+#endif
 					--pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
@@ -37661,6 +37727,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					assert(!(previouscur < curlo));
+					previouscur = curlo;
+				}else{
+					assert(!(previouscur < curhi));
+					previouscur = curhi;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdatalo += mask;
@@ -37695,6 +37770,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// never sample beyond the lower division (half of count, rounded down) of the array
 				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 				if(!isdescsort? curhi < curlo : curlo < curhi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(curlo < previouscur));
+					previouscur = curlo;
+#endif
 					--pdatalo;
 					if constexpr(!isrevorder) if(pdatalo < reinterpret_cast<W const *>(input)) pdatalo = pdatahi;
 					out = curlo;
@@ -37713,6 +37792,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					assert(!(previouscur < curlo));
+					previouscur = curlo;
+				}else{
+					assert(!(previouscur < curhi));
+					previouscur = curhi;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdatalo += mask;
@@ -37750,7 +37838,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
 			curhi = curlo;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(curlo < previouscur));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(curhi < previouscur));
+#endif
 	}
 	*pout = static_cast<W>(curhi);
 }
@@ -37770,7 +37864,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -37783,15 +37877,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo, curhi)};
+#if defined(_DEBUG) || defined(DEBUG)
+		decltype(complo) previouscomp;// used for debug assertion of the sorted order
+		std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+#endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comphi < previouscomp));
+					previouscomp = comphi;
+#endif
 					++pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
 					comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(complo < previouscomp));
+					previouscomp = complo;
+#endif
 					++pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
@@ -37799,10 +37905,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				*pout++ = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				// line breaks are placed for clarity, based on the dependency sequences
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comphi - complo : complo - comphi;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comphi < complo : complo < comphi){
+					assert(!(comphi < previouscomp));
+					previouscomp = comphi;
+				}else{
+					assert(!(complo < previouscomp));
+					previouscomp = complo;
+				}
+#endif
 
+				// line breaks are placed for clarity, based on the dependency sequences
 				pdatahi -= mask;
 				U outhi{curhi & static_cast<M>(mask)};
 				pdatalo -= notmask;
@@ -37840,16 +37959,34 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
 			curlo = curhi;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(comphi < previouscomp));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(complo < previouscomp));
+#endif
 	}else{// unfiltered input
+#if defined(_DEBUG) || defined(DEBUG)
+		U previouscur;// used for debug assertion of the sorted order
+		std::memset(&previouscur, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscur));
+#endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(curhi < previouscur));
+					previouscur = curhi;
+#endif
 					++pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(curlo < previouscur));
+					previouscur = curlo;
+#endif
 					++pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
@@ -37862,6 +37999,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? curhi < curlo : curlo < curhi);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? curhi < curlo : curlo < curhi){
+					assert(!(curhi < previouscur));
+					previouscur = curhi;
+				}else{
+					assert(!(curlo < previouscur));
+					previouscur = curlo;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdatahi -= mask;
@@ -37892,7 +38038,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
 			curlo = curhi;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(curhi < previouscur));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(curlo < previouscur));
+#endif
 	}
 	*pout = static_cast<W>(curlo);
 }
@@ -37917,7 +38069,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortcopynoallocmulti4thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -38037,7 +38189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortnoallocmulti4thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -38162,7 +38314,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -38181,21 +38333,38 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	W const *pdata0stop{isrevorder? pdata1 : reinterpret_cast<W const *>(input) - 1};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2, cur1, cur0)};
+#if defined(_DEBUG) || defined(DEBUG)
+		decltype(comp2) previouscomp;// used for debug assertion of the sorted order
+		std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+#endif
 		U out;
 		do{
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0filtered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp1 < previouscomp));
+				previouscomp = comp1;
+#endif
 				--pdata1;
 				out = cur1;
 				cur1 = *pdata1;
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp2 < previouscomp));
+				previouscomp = comp2;
+#endif
 				--pdata2;
 				out = cur2;
 				cur2 = *pdata2;
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}else{
 handle0filtered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				--pdata0;
 				out = cur0;
 				cur0 = *pdata0;
@@ -38208,6 +38377,10 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0finalfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp1 < previouscomp));
+				previouscomp = comp1;
+#endif
 				--pdata1;
 				out = cur1;
 				if(pdata1stop < pdata1){
@@ -38219,6 +38392,10 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 					goto lastloopfiltered;
 				}
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp2 < previouscomp));
+				previouscomp = comp2;
+#endif
 				--pdata2;
 				out = cur2;
 				if(pdata2stop < pdata2){
@@ -38233,6 +38410,10 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				}
 			}else{
 handle0finalfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				--pdata0;
 				out = cur0;
 				if(pdata0stop >= pdata0) goto lastloopfiltered;
@@ -38246,12 +38427,20 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0oddfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp1 < previouscomp));
+				previouscomp = comp1;
+#endif
 				--pdata1;
 				if(pdata1stop >= pdata1) pdata1 = pdata2;
 				out = cur1;
 				cur1 = *pdata1;
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				--pdata2;
 				if(pdata2stop >= pdata2) pdata2 = pdata1;
 				out = cur2;
@@ -38259,6 +38448,10 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}else{
 handle0oddfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				--pdata0;
 				if(pdata0stop >= pdata0) pdata0 = pdata1;
 				out = cur0;
@@ -38278,11 +38471,19 @@ lastloopfiltered:
 		while(--finalcount){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp1 < previouscomp));
+					previouscomp = comp1;
+#endif
 					--pdata1;
 					out = cur1;
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp2 < previouscomp));
+					previouscomp = comp2;
+#endif
 					--pdata2;
 					out = cur2;
 					cur2 = *pdata2;
@@ -38290,10 +38491,23 @@ lastloopfiltered:
 				}
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				// line breaks are placed for clarity, based on the dependency sequences
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comp2 - comp1 : comp1 - comp2;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
+					assert(!(previouscomp < comp1));
+					previouscomp = comp1;
+				}else{
+					assert(!(previouscomp < comp2));
+					previouscomp = comp2;
+				}
+#endif
 
+				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 += mask;
 				pdata2 += notmask;
 
@@ -38333,12 +38547,20 @@ lastloopfiltered:
 				// the only modification here is this part
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp1 < previouscomp));
+					previouscomp = comp1;
+#endif
 					--pdata1;
 					if(pdata1stop >= pdata1) pdata1 = pdata2;
 					out = cur1;
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp2 < previouscomp));
+					previouscomp = comp2;
+#endif
 					--pdata2;
 					if(pdata2stop >= pdata2) pdata2 = pdata1;
 					out = cur2;
@@ -38347,10 +38569,23 @@ lastloopfiltered:
 				}
 				*pout-- = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				// line breaks are placed for clarity, based on the dependency sequences
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comp2 - comp1 : comp1 - comp2;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comp2 < comp1 : comp1 < comp2);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
+					assert(!(previouscomp < comp1));
+					previouscomp = comp1;
+				}else{
+					assert(!(previouscomp < comp2));
+					previouscomp = comp2;
+				}
+#endif
 
+				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 += mask;
 				U out1{cur1 & static_cast<M>(mask)};
 				pdata2 += notmask;
@@ -38394,21 +38629,44 @@ lastloopfiltered:
 exitfiltered:
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 			cur2 = cur1;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(comp1 < previouscomp));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(comp2 < previouscomp));
+#endif
 	}else{// unfiltered input
+#if defined(_DEBUG) || defined(DEBUG)
+		U previouscur;// used for debug assertion of the sorted order
+		std::memset(&previouscur, 0xFF, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// clear the high bit for signed values
+#endif
 		do{
 			U out;
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0unfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur1 < previouscur));
+				previouscur = cur1;
+#endif
 				--pdata1;
 				out = cur1;
 				cur1 = *pdata1;
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur2 < previouscur));
+				previouscur = cur2;
+#endif
 				--pdata2;
 				out = cur2;
 				cur2 = *pdata2;
 			}else{
 handle0unfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur0 < previouscur));
+				previouscur = cur0;
+#endif
 				--pdata0;
 				out = cur0;
 				cur0 = *pdata0;
@@ -38421,6 +38679,10 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0finalunfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur1 < previouscur));
+				previouscur = cur1;
+#endif
 				--pdata1;
 				out = cur1;
 				if(pdata1stop < pdata1){
@@ -38431,6 +38693,10 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 					goto lastloopunfiltered;
 				}
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur2 < previouscur));
+				previouscur = cur2;
+#endif
 				--pdata2;
 				out = cur2;
 				if(pdata2stop < pdata2){
@@ -38444,6 +38710,10 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				}
 			}else{
 handle0finalunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur0 < previouscur));
+				previouscur = cur0;
+#endif
 				--pdata0;
 				out = cur0;
 				if(pdata0stop >= pdata0) goto lastloopunfiltered;
@@ -38456,6 +38726,10 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0oddunfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur1 < previouscur));
+				previouscur = cur1;
+#endif
 				--pdata1;
 				if(pdata1stop >= pdata1) pdata1 = pdata2;
 				out = cur1;
@@ -38467,6 +38741,10 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				cur2 = *pdata2;
 			}else{
 handle0oddunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur0 < previouscur));
+				previouscur = cur0;
+#endif
 				--pdata0;
 				if(pdata0stop >= pdata0) pdata0 = pdata1;
 				out = cur0;
@@ -38484,10 +38762,18 @@ lastloopunfiltered:
 		while(--finalcount){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur1 < previouscur));
+					previouscur = cur1;
+#endif
 					--pdata1;
 					out = cur1;
 					cur1 = *pdata1;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur2 < previouscur));
+					previouscur = cur2;
+#endif
 					--pdata2;
 					out = cur2;
 					cur2 = *pdata2;
@@ -38500,6 +38786,15 @@ lastloopunfiltered:
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur2 < cur1 : cur1 < cur2);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
+					assert(!(previouscur < cur1));
+					previouscur = cur1;
+				}else{
+					assert(!(previouscur < cur2));
+					previouscur = cur2;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 += mask;
@@ -38532,11 +38827,19 @@ lastloopunfiltered:
 				// the only modification here is this part
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur1 < previouscur));
+					previouscur = cur1;
+#endif
 					--pdata1;
 					if(pdata1stop >= pdata1) pdata1 = pdata2;
 					out = cur1;
 					cur1 = *pdata1;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur2 < previouscur));
+					previouscur = cur2;
+#endif
 					--pdata2;
 					if(pdata2stop >= pdata2) pdata2 = pdata1;
 					out = cur2;
@@ -38550,6 +38853,15 @@ lastloopunfiltered:
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur2 < cur1 : cur1 < cur2);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
+					assert(!(previouscur < cur1));
+					previouscur = cur1;
+				}else{
+					assert(!(previouscur < cur2));
+					previouscur = cur2;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 += mask;
@@ -38587,7 +38899,13 @@ lastloopunfiltered:
 exitunfiltered:
 		if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 			cur2 = cur1;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(cur1 < previouscur));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(cur2 < previouscur));
+#endif
 	}
 	*pout = static_cast<W>(cur2);
 }
@@ -38607,7 +38925,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -38626,21 +38944,37 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	W const *const pdata2stop{isrevorder? pdata1 : reinterpret_cast<W const *>(input) + count};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0, cur1, cur2)};
+#if defined(_DEBUG) || defined(DEBUG)
+		decltype(comp0) previouscomp;// used for debug assertion of the sorted order
+		std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+#endif
 		U out;
 		do{
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2filtered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp1 < previouscomp));
+				previouscomp = comp1;
+#endif
 				++pdata1;
 				out = cur1;
 				cur1 = *pdata1;
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				++pdata0;
 				out = cur0;
 				cur0 = *pdata0;
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}else{
 handle2filtered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp2 < previouscomp));
+				previouscomp = comp2;
+#endif
 				++pdata2;
 				out = cur2;
 				cur2 = *pdata2;
@@ -38653,6 +38987,10 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 			// never sample beyond the three divisions (one third, two thirds and the end) of the array
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2finalfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp1 < previouscomp));
+				previouscomp = comp1;
+#endif
 				++pdata1;
 				out = cur1;
 				if(pdata1stop > pdata1){
@@ -38663,6 +39001,10 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 					goto lastloopfiltered;
 				}
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp0 < previouscomp));
+				previouscomp = comp0;
+#endif
 				++pdata0;
 				out = cur0;
 				if(pdata0stop > pdata0){
@@ -38675,6 +39017,10 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				}
 			}else{
 handle2finalfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comp2 < previouscomp));
+				previouscomp = comp2;
+#endif
 				++pdata2;
 				out = cur2;
 				if(pdata2stop <= pdata2) goto lastloopfiltered;
@@ -38694,11 +39040,19 @@ lastloopfiltered:
 		while(--finalcount){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp1 < previouscomp));
+					previouscomp = comp1;
+#endif
 					++pdata1;
 					out = cur1;
 					cur1 = *pdata1;
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(comp0 < previouscomp));
+					previouscomp = comp0;
+#endif
 					++pdata0;
 					out = cur0;
 					cur0 = *pdata0;
@@ -38706,10 +39060,23 @@ lastloopfiltered:
 				}
 				*pout++ = static_cast<W>(out);
 			}else{// architecture: flatten the branch, at a higher register pressure cost
-				// line breaks are placed for clarity, based on the dependency sequences
-				std::intptr_t mask{-static_cast<std::intptr_t>(!isdescsort? comp1 < comp0 : comp0 < comp1)};
+				std::intptr_t mask;
+				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
+					mask = !isdescsort? comp1 - comp0 : comp0 - comp1;
+					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
+				}else mask = -static_cast<std::intptr_t>(!isdescsort? comp1 < comp0 : comp0 < comp1);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? comp1 < comp0 : comp0 < comp1){
+					assert(!(comp1 < previouscomp));
+					previouscomp = comp1;
+				}else{
+					assert(!(comp0 < previouscomp));
+					previouscomp = comp0;
+				}
+#endif
 
+				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 -= mask;
 				U out1{cur1 & static_cast<M>(mask)};
 				pdata0 -= notmask;
@@ -38748,21 +39115,43 @@ lastloopfiltered:
 exitfiltered:
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 			cur0 = cur1;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(comp1 < previouscomp));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(comp0 < previouscomp));
+#endif
 	}else{// unfiltered input
+#if defined(_DEBUG) || defined(DEBUG)
+		U previouscur;// used for debug assertion of the sorted order
+		std::memset(&previouscur, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscur));
+#endif
 		do{
 			U out;
 			if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2) goto handle2unfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur1 < previouscur));
+				previouscur = cur1;
+#endif
 				++pdata1;
 				out = cur1;
 				cur1 = *pdata1;
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur0 < previouscur));
+				previouscur = cur0;
+#endif
 				++pdata0;
 				out = cur0;
 				cur0 = *pdata0;
 			}else{
 handle2unfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur2 < previouscur));
+				previouscur = cur2;
+#endif
 				++pdata2;
 				out = cur2;
 				cur2 = *pdata2;
@@ -38775,6 +39164,10 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			// never sample beyond the three divisions (one third, two thirds and the end) of the array
 			if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2) goto handle2finalunfiltered;
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur1 < previouscur));
+				previouscur = cur1;
+#endif
 				++pdata1;
 				out = cur1;
 				if(pdata1stop > pdata1){
@@ -38784,6 +39177,10 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 					goto lastloopunfiltered;
 				}
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur0 < previouscur));
+				previouscur = cur0;
+#endif
 				++pdata0;
 				out = cur0;
 				if(pdata0stop > pdata0){
@@ -38795,6 +39192,10 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				}
 			}else{
 handle2finalunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(cur2 < previouscur));
+				previouscur = cur2;
+#endif
 				++pdata2;
 				out = cur2;
 				if(pdata2stop <= pdata2) goto lastloopunfiltered;
@@ -38812,10 +39213,18 @@ lastloopunfiltered:
 		while(--finalcount){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1){
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur1 < previouscur));
+					previouscur = cur1;
+#endif
 					++pdata1;
 					out = cur1;
 					cur1 = *pdata1;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(cur0 < previouscur));
+					previouscur = cur0;
+#endif
 					++pdata0;
 					out = cur0;
 					cur0 = *pdata0;
@@ -38828,6 +39237,15 @@ lastloopunfiltered:
 					mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 				}else mask = -static_cast<std::intptr_t>(!isdescsort? cur1 < cur0 : cur0 < cur1);
 				std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+				if(!isdescsort? cur1 < cur0 : cur0 < cur1){
+					assert(!(cur1 < previouscur));
+					previouscur = cur1;
+				}else{
+					assert(!(cur0 < previouscur));
+					previouscur = cur0;
+				}
+#endif
 
 				// line breaks are placed for clarity, based on the dependency sequences
 				pdata1 -= mask;
@@ -38859,7 +39277,13 @@ lastloopunfiltered:
 exitunfiltered:
 		if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 			cur0 = cur1;
+#if defined(_DEBUG) || defined(DEBUG)
+			assert(!(cur1 < previouscur));
+#endif
 		}
+#if defined(_DEBUG) || defined(DEBUG)
+		else assert(!(cur0 < previouscur));
+#endif
 	}
 	*pout++ = static_cast<W>(cur0);
 }
@@ -38880,7 +39304,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortcopynoallocmulti6thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -38997,7 +39421,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortnoallocmulti6thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -39126,7 +39550,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortcopynoallocmulti8thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -39272,7 +39696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortnoallocmulti8thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -39416,7 +39840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -39568,7 +39992,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -39730,8 +40154,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> mergehalvesmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
+	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -39742,34 +40167,40 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdatalo{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? (count - 1) : halfcount)};
 	std::intptr_t phi{*pdatahi}, plo{*pdatalo};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-	auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-	auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
-	auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
-	auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi, curlo)};
-	using M = std::conditional_t<std::is_integral_v<decltype(comphi)> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128<isabsvalue, issignmode, isfltpmode> cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
+	auto imhiinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+	auto imloinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imhiinit, varparameters...)};
+	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imloinit, varparameters...)};
+	auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhiinit, curloinit)};
+#if defined(_DEBUG) || defined(DEBUG)
+	decltype(comphi) previouscomp;// used for debug assertion of the sorted order
+	std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
 #endif
-		, decltype(comphi), std::intptr_t>;// used for masking operations
 	do{
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(complo < previouscomp));
+				previouscomp = complo;
+#endif
 				--pdatalo;
 				out = plo;
 				plo = *pdatalo;
-				imlo = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...);
-				curlo = indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...);
+				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comphi < previouscomp));
+				previouscomp = comphi;
+#endif
 				--pdatahi;
 				out = phi;
 				phi = *pdatahi;
-				imhi = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...);
-				curhi = indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...);
+				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -39780,6 +40211,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 			std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+			if(!isdescsort? comphi < complo : complo < comphi){
+				assert(!(previouscomp < complo));
+				previouscomp = complo;
+			}else{
+				assert(!(previouscomp < comphi));
+				previouscomp = comphi;
+			}
+#endif
 
 			// line breaks are placed for clarity, based on the dependency sequences
 			pdatalo += mask;
@@ -39825,20 +40265,28 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// never sample beyond the lower division (half of count, rounded down) of the array
 			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 			if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(complo < previouscomp));
+				previouscomp = complo;
+#endif
 				--pdatalo;
 				if constexpr(!isrevorder) if(pdatalo < reinterpret_cast<std::intptr_t const *>(input)) pdatalo = pdatahi;
 				out = plo;
 				plo = *pdatalo;
-				imlo = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...);
-				curlo = indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...);
+				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comphi < previouscomp));
+				previouscomp = comphi;
+#endif
 				--pdatahi;
 				if constexpr(isrevorder) if(pdatahi < reinterpret_cast<std::intptr_t const *>(input)) pdatahi = pdatalo;
 				out = phi;
 				phi = *pdatahi;
-				imhi = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...);
-				curhi = indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...);
+				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -39849,6 +40297,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 			std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+			if(!isdescsort? comphi < complo : complo < comphi){
+				assert(!(previouscomp < complo));
+				previouscomp = complo;
+			}else{
+				assert(!(previouscomp < comphi));
+				previouscomp = comphi;
+			}
+#endif
 
 			// line breaks are placed for clarity, based on the dependency sequences
 			pdatalo += mask;
@@ -39897,7 +40354,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
 		phi = plo;
+#if defined(_DEBUG) || defined(DEBUG)
+		assert(!(complo < previouscomp));
+#endif
 	}
+#if defined(_DEBUG) || defined(DEBUG)
+	else assert(!(comphi < previouscomp));
+#endif
 	*pout = phi;
 }
 
@@ -39911,8 +40374,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> mergehalvesmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
+	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -39923,34 +40387,39 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdatahi{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * halfcount};
 	std::intptr_t plo{*pdatalo}, phi{*pdatahi};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-	auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-	auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
-	auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
-	auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo, curhi)};
-	using M = std::conditional_t<std::is_integral_v<decltype(complo)> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128<isabsvalue, issignmode, isfltpmode> cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
+	auto imloinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+	auto imhiinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imloinit, varparameters...)};
+	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imhiinit, varparameters...)};
+	auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curloinit, curhiinit)};
+#if defined(_DEBUG) || defined(DEBUG)
+	decltype(complo) previouscomp;// used for debug assertion of the sorted order
+	std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
 #endif
-		, decltype(complo), std::intptr_t>;// used for masking operations
 	do{
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(comphi < previouscomp));
+				previouscomp = comphi;
+#endif
 				++pdatahi;
 				out = phi;
 				phi = *pdatahi;
-				imhi = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...);
-				curhi = indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...);
+				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}else{
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(complo < previouscomp));
+				previouscomp = complo;
+#endif
 				++pdatalo;
 				out = plo;
 				plo = *pdatalo;
-				imlo = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...);
-				curlo = indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...);
+				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}
 			*pout++ = out;
@@ -39961,6 +40430,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mask >>= CHAR_BIT * sizeof(std::intptr_t) - 1;
 			}else mask = -static_cast<std::intptr_t>(!isdescsort? comphi < complo : complo < comphi);
 			std::intptr_t notmask{~mask};
+#if defined(_DEBUG) || defined(DEBUG)
+			if(!isdescsort? comphi < complo : complo < comphi){
+				assert(!(comphi < previouscomp));
+				previouscomp = comphi;
+			}else{
+				assert(!(complo < previouscomp));
+				previouscomp = complo;
+			}
+#endif
 
 			// line breaks are placed for clarity, based on the dependency sequences
 			pdatahi -= mask;
@@ -40002,7 +40480,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
 		plo = phi;
+#if defined(_DEBUG) || defined(DEBUG)
+		assert(!(comphi < previouscomp));
+#endif
 	}
+#if defined(_DEBUG) || defined(DEBUG)
+	else assert(!(complo < previouscomp));
+#endif
 	*pout = plo;
 }
 
@@ -40025,7 +40509,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -40144,7 +40628,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -40264,8 +40748,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> mergethirdsmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
+	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -40279,29 +40764,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdata1{reinterpret_cast<std::intptr_t const *>(input) + (thirdcount + thirdcountmid)};
 	std::intptr_t const *pdata0{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1 : thirdcount)};
 	std::intptr_t p2{*pdata2}, p1{*pdata1}, p0{*pdata0};
-	auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-	auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-	auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-	auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
-	auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
-	auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+	auto im2init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+	auto im1init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+	auto im0init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, W>(im2init, varparameters...)};
+	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, W>(im1init, varparameters...)};
+	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, W>(im0init, varparameters...)};
 	std::intptr_t const *pdata2stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
 	std::intptr_t const *pdata1stop{!isrevorder? pdata0 : pdata2};
 	std::intptr_t const *pdata0stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
-	auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2, cur1, cur0)};
-	using M = std::conditional_t<std::is_integral_v<decltype(comp2)> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128<isabsvalue, issignmode, isfltpmode> cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, decltype(comp2), std::intptr_t>;// used for masking operations
-	std::intptr_t out;
+	auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2init, cur1init, cur0init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp2) previouscomp;// used for debug assertion of the sorted order
 	std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
-	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<T>();// clear the high bit for signed values
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
 #endif
+	std::intptr_t out;
 	do{
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0;
@@ -40312,8 +40790,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--pdata1;
 			out = p1;
 			p1 = *pdata1;
-			im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-			cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -40323,8 +40801,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--pdata2;
 			out = p2;
 			p2 = *pdata2;
-			im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-			cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}else{
 handle0:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -40335,8 +40813,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			--pdata0;
 			out = p0;
 			p0 = *pdata0;
-			im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-			cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -40354,8 +40832,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			out = p1;
 			if(pdata1stop < pdata1){
 				p1 = *pdata1;
-				im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-				cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 				pdata1 = pdata0;
@@ -40371,8 +40849,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			out = p2;
 			if(pdata2stop < pdata2){
 				p2 = *pdata2;
-				im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-				cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}else{
 				pdata2 = pdata1;
@@ -40391,8 +40869,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			out = p0;
 			if(pdata0stop >= pdata0) goto lastloop;
 			p0 = *pdata0;
-			im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-			cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -40410,8 +40888,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			if(pdata1stop >= pdata1) pdata1 = pdata2;
 			out = p1;
 			p1 = *pdata1;
-			im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-			cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -40422,8 +40900,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			if(pdata2stop >= pdata2) pdata2 = pdata1;
 			out = p2;
 			p2 = *pdata2;
-			im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-			cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}else{
 handle0odd:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -40435,8 +40913,8 @@ handle0odd:// architecture: jump label reuse (from the else branch, including po
 			if(pdata0stop >= pdata0) pdata0 = pdata1;
 			out = p0;
 			p0 = *pdata0;
-			im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-			cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -40459,8 +40937,8 @@ lastloop:
 				--pdata1;
 				out = p1;
 				p1 = *pdata1;
-				im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-				cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -40470,8 +40948,8 @@ lastloop:
 				--pdata2;
 				out = p2;
 				p2 = *pdata2;
-				im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-				cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -40542,16 +41020,16 @@ lastloop:
 				if(pdata1stop >= pdata1) pdata1 = pdata2;
 				out = p1;
 				p1 = *pdata1;
-				im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-				cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 				--pdata2;
 				if(pdata2stop >= pdata2) pdata2 = pdata1;
 				out = p2;
 				p2 = *pdata2;
-				im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-				cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -40638,8 +41116,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> mergethirdsmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
+	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 
@@ -40653,28 +41132,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t p0{*pdata0}, p1{*pdata1}, p2{*pdata2};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-	auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-	auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-	auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
-	auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
-	auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+	auto im0init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+	auto im1init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+	auto im2init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, W>(im0init, varparameters...)};
+	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, W>(im1init, varparameters...)};
+	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, W>(im2init, varparameters...)};
 	std::intptr_t const *const pdata0stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) + count};
 	std::intptr_t const *const pdata1stop{!isrevorder? pdata2 : pdata0};
 	std::intptr_t const *const pdata2stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) + count};
-	auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0, cur1, cur2)};
-	using M = std::conditional_t<std::is_integral_v<decltype(comp0)> &&
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		128 != CHAR_BIT * sizeof(T)// test128 and longdoubletest128<isabsvalue, issignmode, isfltpmode> cases
-#else
-		64 != CHAR_BIT * sizeof(T)// test64 case
-#endif
-		, decltype(comp0), std::intptr_t>;// used for masking operations
-	std::intptr_t out;
+	auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0init, cur1init, cur2init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp0) previouscomp;// used for debug assertion of the sorted order
 	std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
 #endif
+	std::intptr_t out;
 	do{
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2;
@@ -40685,8 +41157,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			++pdata1;
 			out = p1;
 			p1 = *pdata1;
-			im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-			cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -40696,8 +41168,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			++pdata0;
 			out = p0;
 			p0 = *pdata0;
-			im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-			cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}else{
 handle2:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -40708,8 +41180,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			++pdata2;
 			out = p2;
 			p2 = *pdata2;
-			im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-			cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
 		*pout++ = out;
@@ -40727,8 +41199,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			out = p1;
 			if(pdata1stop > pdata1){
 				p1 = *pdata1;
-				im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-				cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 				pdata1 = pdata2;
@@ -40743,8 +41215,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			out = p0;
 			if(pdata0stop > pdata0){
 				p0 = *pdata0;
-				im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-				cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+				auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}else{
 				pdata0 = pdata1;
@@ -40761,8 +41233,8 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			out = p2;
 			if(pdata2stop <= pdata2) goto lastloop;
 			p2 = *pdata2;
-			im2 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...);
-			cur2 = indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...);
+			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
 		*pout++ = out;
@@ -40785,8 +41257,8 @@ lastloop:
 				++pdata1;
 				out = p1;
 				p1 = *pdata1;
-				im1 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...);
-				cur1 = indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...);
+				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -40796,8 +41268,8 @@ lastloop:
 				++pdata0;
 				out = p0;
 				p0 = *pdata0;
-				im0 = indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...);
-				cur0 = indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...);
+				auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
 			*pout++ = out;
@@ -40884,7 +41356,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -41000,7 +41472,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -41128,7 +41600,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -41273,7 +41745,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
@@ -41422,7 +41894,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(output);
 	assert(buffer);
@@ -41579,7 +42051,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// do not pass a nullptr here, even though it's safe if count is 0
+	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
 
