@@ -6,6 +6,12 @@
 
 // WindowsProject1.cpp : Defines the entry point for the application.
 // the test batch size for the performance tests (8 GiB default)
+// suggestions, all prime numbers to make sure all sorts of count leftover paths are touched inside the functions:
+// 251uz, the largest prime that will fit into an 8-bit unsigned integer (allocates 2 MiB with regular large pages enabled)
+// 65521uz, the largest prime that will fit into a 16-bit unsigned integer (allocates 2 MiB with regular large pages enabled)
+// 1073741789uz, the largest prime that will just allocate 1 GiB
+// 4294967291uz, the largest prime that will fit into a 32-bit unsigned integer (allocates 4 GiB)
+// 4294967311uz, the first prime that breaks the 32-bit unsigned integer limit, (allocates 4 GiB + 2 MiB with regular large pages enabled)
 #define RSBD8_TEST_BATCH_SIZE 8uz * 1024 * 1024 * 1024
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
@@ -775,6 +781,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 #endif
 	}while(!succeeded);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1021,6 +1028,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 #endif
 	}while(!succeeded);
+#endif
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2634,6 +2642,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 #endif
 	}while(!succeeded);
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2732,6 +2741,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 #endif
 	}while(!succeeded);
+#endif
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()

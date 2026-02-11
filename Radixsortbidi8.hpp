@@ -1459,18 +1459,35 @@ struct test64{
 template<typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<test64<false, false, false>, T> ||
-	std::is_same_v<test64<false, false, true>, T> ||
 	std::is_same_v<test64<false, true, false>, T> ||
-	std::is_same_v<test64<false, true, true>, T> ||
 	std::is_same_v<test64<true, false, false>, T> ||
-	std::is_same_v<test64<true, false, true>, T> ||
-	std::is_same_v<test64<true, true, false>, T> ||
-	std::is_same_v<test64<true, true, true>, T>,
-	T> generatehighbit()noexcept{
+	std::is_same_v<test64<true, true, false>, T>,
+	T> generatehighbit()noexcept{// integral 64-bit type
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
-		static auto constexpr highbit{generatehighbit<std::conditional_t<isfltpmode, double, std::uint_least64_t>>()};
+		static auto constexpr highbit{generatehighbit<std::uint_least64_t>()};
+		if(*reinterpret_cast<std::uint_least32_t const *>(&highbit)){// big and mixed-endian cases
+			LO = 1;
+			HI = 0;
+		}
+	}
+	T ret;
+	ret.data[LO] = 0u;
+	ret.data[HI] = 0x80000000u;
+	return{ret};
+}
+template<typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<test64<false, false, true>, T> ||
+	std::is_same_v<test64<false, true, true>, T> ||
+	std::is_same_v<test64<true, false, true>, T> ||
+	std::is_same_v<test64<true, true, true>, T>,
+	T> generatehighbit()noexcept{// floating-point 64-bit type
+	std::size_t LO{}, HI{1};// little-endian case
+	if constexpr(1 < sizeof(double)){
+		// basic endianess detection, relies on proper inlining and compiler optimisation of that
+		static auto constexpr highbit{generatehighbit<double>()};
 		if(*reinterpret_cast<std::uint_least32_t const *>(&highbit)){// big and mixed-endian cases
 			LO = 1;
 			HI = 0;
@@ -7885,6 +7902,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		}
 		curlo ^= curq;
+		curhi ^= curq;
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(issignmode) curhi &= 0x7FFFFFFFFFFFFFFFu;
 		else{
@@ -40281,7 +40299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t out;
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp2) previouscomp;// used for debug assertion of the sorted order
-	memset(&previouscomp, 0xFF, sizeof(previouscomp));
+	std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
 	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<T>();// clear the high bit for signed values
 #endif
 	do{
@@ -40655,7 +40673,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t out;
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp0) previouscomp;// used for debug assertion of the sorted order
-	memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+	std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
 #endif
 	do{
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
