@@ -1836,7 +1836,8 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 	// do not pass a nullptr here
 	assert(p);
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		if constexpr(!std::is_pointer_v<U>){// indirection directly to member, ignore isindexed2
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to member
+			static_assert(!isindexed2, "only first-level indirection used, impossible combination for indicating usage of a secondary index parameter");
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 				return reinterpret_cast<V *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T V:: *>(indirection1);
@@ -1844,12 +1845,14 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 				return p->*reinterpret_cast<T V:: *>(indirection1);
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
 		}else{
+			// no assertion on the number of variable arguments here, as the follow-up function indirectinput2() will handle that
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
-		if constexpr(!std::is_pointer_v<U>){// indirection directly to item, ignore isindexed2
+		if constexpr(!std::is_pointer_v<U>){// indirection directly to item
+			static_assert(!isindexed2, "only first-level indirection used with a getter function, impossible combination for indicating usage of a secondary index parameter");
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			U val{(p->*indirection1)(varparameters...)};
 #ifdef __cpp_lib_bit_cast
@@ -1858,6 +1861,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 			return *reinterpret_cast<T *>(&val);
 #endif
 		}else{// indirection to second level pointer
+			// no assertion on the number of variable arguments here, as the getter function can be variadic and the extra parameters can be intended for that, instead of indicating second-level indexing
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
 			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V>(p, varparameters...));
@@ -1870,7 +1874,8 @@ RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, varargumen
 	// do not pass a nullptr here
 	assert(pintermediate);
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
-		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices, ignore isindexed2
+		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices
+			static_assert(!isindexed2, "second-level indirection used without additional parameters, impossible combination for indicating usage of a secondary index parameter");
 			return *reinterpret_cast<T const *>(pintermediate + indirection2);
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
@@ -1878,7 +1883,8 @@ RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, varargumen
 			}else{// first level extra index
 				return *reinterpret_cast<T const *>(pintermediate + indirection2);
 			}
-		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices, ignore isindexed2
+		}else if constexpr(2 == sizeof...(varparameters)){// indirection to member with two indices
+			static_assert(isindexed2, "second-level indirection indexing is probably intended, given two additional parameters, but indicating usage of a secondary index parameter is not set explicitly");
 			std::pair indices{varparameters...};
 			return reinterpret_cast<T const *>(pintermediate + indirection2)[indices.second];
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
