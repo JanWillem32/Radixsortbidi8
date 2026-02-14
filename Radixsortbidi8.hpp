@@ -37524,15 +37524,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi, curlo)};
 #if defined(_DEBUG) || defined(DEBUG)
 		decltype(comphi) previouscomp;// used for debug assertion of the sorted order
-		std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
-		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+		std::memset(&previouscomp, !isdescsort? 0xFF : 0, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(complo < previouscomp));
+					assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 					previouscomp = complo;
 #endif
 					--pdatalo;
@@ -37541,7 +37541,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comphi < previouscomp));
+					assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 					previouscomp = comphi;
 #endif
 					--pdatahi;
@@ -37559,10 +37559,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comphi < complo : complo < comphi){
-					assert(!(previouscomp < complo));
+					assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 					previouscomp = complo;
 				}else{
-					assert(!(previouscomp < comphi));
+					assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 					previouscomp = comphi;
 				}
 #endif
@@ -37610,7 +37610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 				if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(complo < previouscomp));
+					assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 					previouscomp = complo;
 #endif
 					--pdatalo;
@@ -37620,7 +37620,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comphi < previouscomp));
+					assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 					previouscomp = comphi;
 #endif
 					--pdatahi;
@@ -37639,10 +37639,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comphi < complo : complo < comphi){
-					assert(!(previouscomp < complo));
+					assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 					previouscomp = complo;
 				}else{
-					assert(!(previouscomp < comphi));
+					assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 					previouscomp = comphi;
 				}
 #endif
@@ -37691,26 +37691,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
-			curhi = curlo;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(complo < previouscomp));
+			assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 #endif
+			curhi = curlo;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(comphi < previouscomp));
+		else assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 #endif
 	}else{// unfiltered input, uses direct integer comparisons
 #if defined(_DEBUG) || defined(DEBUG)
 		U previouscur;// used for debug assertion of the sorted order
-		std::memset(&previouscur, 0xFF, sizeof(previouscur));
-		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// clear the high bit for signed values
+		std::memset(&previouscur, !isdescsort? 0xFF : 0, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(curlo < previouscur));
+					assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 					previouscur = curlo;
 #endif
 					--pdatalo;
@@ -37718,7 +37718,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curlo = *pdatalo;
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(curhi < previouscur));
+					assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
 					previouscur = curhi;
 #endif
 					--pdatahi;
@@ -37735,10 +37735,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? curhi < curlo : curlo < curhi){
-					assert(!(previouscur < curlo));
+					assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 					previouscur = curlo;
 				}else{
-					assert(!(previouscur < curhi));
+					assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
 					previouscur = curhi;
 				}
 #endif
@@ -37777,7 +37777,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 				if(!isdescsort? curhi < curlo : curlo < curhi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(curlo < previouscur));
+					assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 					previouscur = curlo;
 #endif
 					--pdatalo;
@@ -37785,6 +37785,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					out = curlo;
 					curlo = *pdatalo;
 				}else{
+#if defined(_DEBUG) || defined(DEBUG)
+					assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
+					previouscur = curhi;
+#endif
 					--pdatahi;
 					if constexpr(isrevorder) if(pdatahi < reinterpret_cast<W const *>(input)) pdatahi = pdatalo;
 					out = curhi;
@@ -37800,10 +37804,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? curhi < curlo : curlo < curhi){
-					assert(!(previouscur < curlo));
+					assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 					previouscur = curlo;
 				}else{
-					assert(!(previouscur < curhi));
+					assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
 					previouscur = curhi;
 				}
 #endif
@@ -37843,13 +37847,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
-			curhi = curlo;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(curlo < previouscur));
+			assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 #endif
+			curhi = curlo;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(curhi < previouscur));
+		else assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
 #endif
 	}
 	*pout = static_cast<W>(curhi);
@@ -37885,14 +37889,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo, curhi)};
 #if defined(_DEBUG) || defined(DEBUG)
 		decltype(complo) previouscomp;// used for debug assertion of the sorted order
-		std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+		std::memset(&previouscomp, !isdescsort? 0 : 0xFF, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comphi < previouscomp));
+					assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 					previouscomp = comphi;
 #endif
 					++pdatahi;
@@ -37901,7 +37906,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(complo < previouscomp));
+					assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 					previouscomp = complo;
 #endif
 					++pdatalo;
@@ -37919,10 +37924,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comphi < complo : complo < comphi){
-					assert(!(comphi < previouscomp));
+					assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 					previouscomp = comphi;
 				}else{
-					assert(!(complo < previouscomp));
+					assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 					previouscomp = complo;
 				}
 #endif
@@ -37964,25 +37969,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(--halfcount);
 		// finalise
 		if(!isdescsort? comphi < complo : complo < comphi){
-			curlo = curhi;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comphi < previouscomp));
+			assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 #endif
+			curlo = curhi;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(complo < previouscomp));
+		else assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 #endif
 	}else{// unfiltered input
 #if defined(_DEBUG) || defined(DEBUG)
 		U previouscur;// used for debug assertion of the sorted order
-		std::memset(&previouscur, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscur));
+		std::memset(&previouscur, !isdescsort? 0 : 0xFF, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do{
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				U out;
 				if(!isdescsort? curhi < curlo : curlo < curhi){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(curhi < previouscur));
+					assert(!(!isdescsort? curhi < previouscur : previouscur < curhi));
 					previouscur = curhi;
 #endif
 					++pdatahi;
@@ -37990,7 +37996,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curhi = *pdatahi;
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(curlo < previouscur));
+					assert(!(!isdescsort? curlo < previouscur : previouscur < curlo));
 					previouscur = curlo;
 #endif
 					++pdatalo;
@@ -38007,10 +38013,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? curhi < curlo : curlo < curhi){
-					assert(!(curhi < previouscur));
+					assert(!(!isdescsort? curhi < previouscur : previouscur < curhi));
 					previouscur = curhi;
 				}else{
-					assert(!(curlo < previouscur));
+					assert(!(!isdescsort? curlo < previouscur : previouscur < curlo));
 					previouscur = curlo;
 				}
 #endif
@@ -38043,13 +38049,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}while(--halfcount);
 		// finalise
 		if(!isdescsort? curhi < curlo : curlo < curhi){
-			curlo = curhi;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(curhi < previouscur));
+			assert(!(!isdescsort? curhi < previouscur : previouscur < curhi));
 #endif
+			curlo = curhi;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(curlo < previouscur));
+		else assert(!(!isdescsort? curlo < previouscur : previouscur < curlo));
 #endif
 	}
 	*pout = static_cast<W>(curlo);
@@ -38341,15 +38347,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2, cur1, cur0)};
 #if defined(_DEBUG) || defined(DEBUG)
 		decltype(comp2) previouscomp;// used for debug assertion of the sorted order
-		std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
-		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+		std::memset(&previouscomp, !isdescsort? 0xFF : 0, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		U out;
 		do{
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0filtered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
 				--pdata1;
@@ -38358,7 +38364,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp2 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
 				--pdata2;
@@ -38368,7 +38374,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{
 handle0filtered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 				previouscomp = comp0;
 #endif
 				--pdata0;
@@ -38384,7 +38390,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0finalfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
 				--pdata1;
@@ -38399,7 +38405,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				}
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp2 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
 				--pdata2;
@@ -38417,7 +38423,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 			}else{
 handle0finalfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 				previouscomp = comp0;
 #endif
 				--pdata0;
@@ -38434,7 +38440,7 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0oddfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
 				--pdata1;
@@ -38444,8 +38450,8 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
-				previouscomp = comp0;
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
+				previouscomp = comp2;
 #endif
 				--pdata2;
 				if(pdata2stop >= pdata2) pdata2 = pdata1;
@@ -38455,7 +38461,7 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 			}else{
 handle0oddfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 				previouscomp = comp0;
 #endif
 				--pdata0;
@@ -38478,7 +38484,7 @@ lastloopfiltered:
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp1 < previouscomp));
+					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 					previouscomp = comp1;
 #endif
 					--pdata1;
@@ -38487,7 +38493,7 @@ lastloopfiltered:
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp2 < previouscomp));
+					assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 					previouscomp = comp2;
 #endif
 					--pdata2;
@@ -38505,10 +38511,10 @@ lastloopfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-					assert(!(previouscomp < comp1));
+					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 					previouscomp = comp1;
 				}else{
-					assert(!(previouscomp < comp2));
+					assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 					previouscomp = comp2;
 				}
 #endif
@@ -38554,7 +38560,7 @@ lastloopfiltered:
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp1 < previouscomp));
+					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 					previouscomp = comp1;
 #endif
 					--pdata1;
@@ -38564,7 +38570,7 @@ lastloopfiltered:
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp2 < previouscomp));
+					assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 					previouscomp = comp2;
 #endif
 					--pdata2;
@@ -38583,10 +38589,10 @@ lastloopfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-					assert(!(previouscomp < comp1));
+					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 					previouscomp = comp1;
 				}else{
-					assert(!(previouscomp < comp2));
+					assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 					previouscomp = comp2;
 				}
 #endif
@@ -38634,26 +38640,26 @@ lastloopfiltered:
 		// finalise using only two parts
 exitfiltered:
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-			cur2 = cur1;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp1 < previouscomp));
+			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 #endif
+			cur2 = cur1;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(comp2 < previouscomp));
+		else assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 #endif
 	}else{// unfiltered input
 #if defined(_DEBUG) || defined(DEBUG)
 		U previouscur;// used for debug assertion of the sorted order
-		std::memset(&previouscur, 0xFF, sizeof(previouscur));
-		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// clear the high bit for signed values
+		std::memset(&previouscur, !isdescsort? 0xFF : 0, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do{
 			U out;
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0unfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur1 < previouscur));
+				assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 				previouscur = cur1;
 #endif
 				--pdata1;
@@ -38661,7 +38667,7 @@ exitfiltered:
 				cur1 = *pdata1;
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur2 < previouscur));
+				assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 				previouscur = cur2;
 #endif
 				--pdata2;
@@ -38670,7 +38676,7 @@ exitfiltered:
 			}else{
 handle0unfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur0 < previouscur));
+				assert(!(!isdescsort? previouscur < cur0 : cur0 < previouscur));
 				previouscur = cur0;
 #endif
 				--pdata0;
@@ -38686,7 +38692,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0finalunfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur1 < previouscur));
+				assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 				previouscur = cur1;
 #endif
 				--pdata1;
@@ -38700,7 +38706,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				}
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur2 < previouscur));
+				assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 				previouscur = cur2;
 #endif
 				--pdata2;
@@ -38717,7 +38723,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			}else{
 handle0finalunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur0 < previouscur));
+				assert(!(!isdescsort? previouscur < cur0 : cur0 < previouscur));
 				previouscur = cur0;
 #endif
 				--pdata0;
@@ -38733,7 +38739,7 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 			if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1) goto handle0oddunfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur1 < previouscur));
+				assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 				previouscur = cur1;
 #endif
 				--pdata1;
@@ -38748,7 +38754,7 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 			}else{
 handle0oddunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur0 < previouscur));
+				assert(!(!isdescsort? previouscur < cur0 : cur0 < previouscur));
 				previouscur = cur0;
 #endif
 				--pdata0;
@@ -38769,7 +38775,7 @@ lastloopunfiltered:
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur1 < previouscur));
+					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 					previouscur = cur1;
 #endif
 					--pdata1;
@@ -38777,7 +38783,7 @@ lastloopunfiltered:
 					cur1 = *pdata1;
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur2 < previouscur));
+					assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 					previouscur = cur2;
 #endif
 					--pdata2;
@@ -38794,10 +38800,10 @@ lastloopunfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
-					assert(!(previouscur < cur1));
+					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 					previouscur = cur1;
 				}else{
-					assert(!(previouscur < cur2));
+					assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 					previouscur = cur2;
 				}
 #endif
@@ -38834,7 +38840,7 @@ lastloopunfiltered:
 				// never sample beyond the three divisions (the start, one third and two thirds) of the array
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur1 < previouscur));
+					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 					previouscur = cur1;
 #endif
 					--pdata1;
@@ -38843,7 +38849,7 @@ lastloopunfiltered:
 					cur1 = *pdata1;
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur2 < previouscur));
+					assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 					previouscur = cur2;
 #endif
 					--pdata2;
@@ -38861,10 +38867,10 @@ lastloopunfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2){
-					assert(!(previouscur < cur1));
+					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 					previouscur = cur1;
 				}else{
-					assert(!(previouscur < cur2));
+					assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 					previouscur = cur2;
 				}
 #endif
@@ -38904,13 +38910,13 @@ lastloopunfiltered:
 		// finalise using only two parts
 exitunfiltered:
 		if(!isdescsort? cur2 < cur1 : cur1 < cur2){
-			cur2 = cur1;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(cur1 < previouscur));
+			assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 #endif
+			cur2 = cur1;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(cur2 < previouscur));
+		else assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 #endif
 	}
 	*pout = static_cast<W>(cur2);
@@ -38952,14 +38958,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0, cur1, cur2)};
 #if defined(_DEBUG) || defined(DEBUG)
 		decltype(comp0) previouscomp;// used for debug assertion of the sorted order
-		std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+		std::memset(&previouscomp, !isdescsort? 0 : 0xFF, sizeof(previouscomp));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 		U out;
 		do{
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2filtered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
 				++pdata1;
@@ -38968,7 +38975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
 				++pdata0;
@@ -38978,7 +38985,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{
 handle2filtered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp2 < previouscomp));
+				assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 				previouscomp = comp2;
 #endif
 				++pdata2;
@@ -38994,7 +39001,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 				if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2finalfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
 				++pdata1;
@@ -39008,7 +39015,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				}
 			}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
 				++pdata0;
@@ -39024,7 +39031,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 			}else{
 handle2finalfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp2 < previouscomp));
+				assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 				previouscomp = comp2;
 #endif
 				++pdata2;
@@ -39047,7 +39054,7 @@ lastloopfiltered:
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp1 < previouscomp));
+					assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 					previouscomp = comp1;
 #endif
 					++pdata1;
@@ -39056,7 +39063,7 @@ lastloopfiltered:
 					comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(comp0 < previouscomp));
+					assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 					previouscomp = comp0;
 #endif
 					++pdata0;
@@ -39074,10 +39081,10 @@ lastloopfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? comp1 < comp0 : comp0 < comp1){
-					assert(!(comp1 < previouscomp));
+					assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 					previouscomp = comp1;
 				}else{
-					assert(!(comp0 < previouscomp));
+					assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 					previouscomp = comp0;
 				}
 #endif
@@ -39120,25 +39127,26 @@ lastloopfiltered:
 		// finalise using only two parts
 exitfiltered:
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
-			cur0 = cur1;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp1 < previouscomp));
+			assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 #endif
+			cur0 = cur1;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(comp0 < previouscomp));
+		else assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 #endif
 	}else{// unfiltered input
 #if defined(_DEBUG) || defined(DEBUG)
 		U previouscur;// used for debug assertion of the sorted order
-		std::memset(&previouscur, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscur));
+		std::memset(&previouscur, !isdescsort? 0 : 0xFF, sizeof(previouscur));
+		if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscur ^= generatehighbit<U>();// flip the high bit for signed values
 #endif
 		do{
 			U out;
 			if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2) goto handle2unfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur1 < previouscur));
+				assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 				previouscur = cur1;
 #endif
 				++pdata1;
@@ -39146,7 +39154,7 @@ exitfiltered:
 				cur1 = *pdata1;
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur0 < previouscur));
+				assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 				previouscur = cur0;
 #endif
 				++pdata0;
@@ -39155,7 +39163,7 @@ exitfiltered:
 			}else{
 handle2unfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur2 < previouscur));
+				assert(!(!isdescsort? cur2 < previouscur : previouscur < cur2));
 				previouscur = cur2;
 #endif
 				++pdata2;
@@ -39171,7 +39179,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 				if(!isdescsort? cur2 < cur1 : cur1 < cur2) goto handle2finalunfiltered;
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur1 < previouscur));
+				assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 				previouscur = cur1;
 #endif
 				++pdata1;
@@ -39184,7 +39192,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				}
 			}else if(!(!isdescsort? cur2 < cur0 : cur0 < cur2)){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur0 < previouscur));
+				assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 				previouscur = cur0;
 #endif
 				++pdata0;
@@ -39199,7 +39207,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 			}else{
 handle2finalunfiltered:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(cur2 < previouscur));
+				assert(!(!isdescsort? cur2 < previouscur : previouscur < cur2));
 				previouscur = cur2;
 #endif
 				++pdata2;
@@ -39220,7 +39228,7 @@ lastloopunfiltered:
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1){
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur1 < previouscur));
+					assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 					previouscur = cur1;
 #endif
 					++pdata1;
@@ -39228,7 +39236,7 @@ lastloopunfiltered:
 					cur1 = *pdata1;
 				}else{
 #if defined(_DEBUG) || defined(DEBUG)
-					assert(!(cur0 < previouscur));
+					assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 					previouscur = cur0;
 #endif
 					++pdata0;
@@ -39245,10 +39253,10 @@ lastloopunfiltered:
 				std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 				if(!isdescsort? cur1 < cur0 : cur0 < cur1){
-					assert(!(cur1 < previouscur));
+					assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 					previouscur = cur1;
 				}else{
-					assert(!(cur0 < previouscur));
+					assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 					previouscur = cur0;
 				}
 #endif
@@ -39282,13 +39290,13 @@ lastloopunfiltered:
 		// finalise using only two parts
 exitunfiltered:
 		if(!isdescsort? cur1 < cur0 : cur0 < cur1){
-			cur0 = cur1;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(cur1 < previouscur));
+			assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 #endif
+			cur0 = cur1;
 		}
 #if defined(_DEBUG) || defined(DEBUG)
-		else assert(!(cur0 < previouscur));
+		else assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 #endif
 	}
 	*pout++ = static_cast<W>(cur0);
@@ -40180,15 +40188,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhiinit, curloinit)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comphi) previouscomp;// used for debug assertion of the sorted order
-	std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
-	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+	std::memset(&previouscomp, !isdescsort? 0xFF : 0, sizeof(previouscomp));
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	do{
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(complo < previouscomp));
+				assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 				previouscomp = complo;
 #endif
 				--pdatalo;
@@ -40199,7 +40207,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comphi < previouscomp));
+				assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 				previouscomp = comphi;
 #endif
 				--pdatahi;
@@ -40219,10 +40227,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comphi < complo : complo < comphi){
-				assert(!(previouscomp < complo));
+				assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 				previouscomp = complo;
 			}else{
-				assert(!(previouscomp < comphi));
+				assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 				previouscomp = comphi;
 			}
 #endif
@@ -40272,7 +40280,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// this doesn't happen to the upper half, as it has 1 more item to process in odd-count cases
 			if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(complo < previouscomp));
+				assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 				previouscomp = complo;
 #endif
 				--pdatalo;
@@ -40284,7 +40292,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comphi < previouscomp));
+				assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 				previouscomp = comphi;
 #endif
 				--pdatahi;
@@ -40305,10 +40313,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comphi < complo : complo < comphi){
-				assert(!(previouscomp < complo));
+				assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 				previouscomp = complo;
 			}else{
-				assert(!(previouscomp < comphi));
+				assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 				previouscomp = comphi;
 			}
 #endif
@@ -40359,13 +40367,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
-		phi = plo;
 #if defined(_DEBUG) || defined(DEBUG)
-		assert(!(complo < previouscomp));
+		assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 #endif
+		phi = plo;
 	}
 #if defined(_DEBUG) || defined(DEBUG)
-	else assert(!(comphi < previouscomp));
+	else assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 #endif
 	*pout = phi;
 }
@@ -40400,14 +40408,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curloinit, curhiinit)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(complo) previouscomp;// used for debug assertion of the sorted order
-	std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+	std::memset(&previouscomp, !isdescsort? 0 : 0xFF, sizeof(previouscomp));
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	do{
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			std::intptr_t out;
 			if(!isdescsort? comphi < complo : complo < comphi){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comphi < previouscomp));
+				assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 				previouscomp = comphi;
 #endif
 				++pdatahi;
@@ -40418,7 +40427,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(complo < previouscomp));
+				assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 				previouscomp = complo;
 #endif
 				++pdatalo;
@@ -40438,10 +40447,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comphi < complo : complo < comphi){
-				assert(!(comphi < previouscomp));
+				assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 				previouscomp = comphi;
 			}else{
-				assert(!(complo < previouscomp));
+				assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 				previouscomp = complo;
 			}
 #endif
@@ -40485,13 +40494,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}while(--halfcount);
 	// finalise
 	if(!isdescsort? comphi < complo : complo < comphi){
-		plo = phi;
 #if defined(_DEBUG) || defined(DEBUG)
-		assert(!(comphi < previouscomp));
+		assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 #endif
+		plo = phi;
 	}
 #if defined(_DEBUG) || defined(DEBUG)
-	else assert(!(complo < previouscomp));
+	else assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 #endif
 	*pout = plo;
 }
@@ -40782,15 +40791,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2init, cur1init, cur0init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp2) previouscomp;// used for debug assertion of the sorted order
-	std::memset(&previouscomp, 0xFF, sizeof(previouscomp));
-	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// clear the high bit for signed values
+	std::memset(&previouscomp, !isdescsort? 0xFF : 0, sizeof(previouscomp));
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	std::intptr_t out;
 	do{
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp1));
+			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 			previouscomp = comp1;
 #endif
 			--pdata1;
@@ -40801,7 +40810,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp2));
+			assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 			previouscomp = comp2;
 #endif
 			--pdata2;
@@ -40813,7 +40822,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{
 handle0:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp0));
+			assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 			previouscomp = comp0;
 #endif
 			--pdata0;
@@ -40831,7 +40840,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0final;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp1));
+			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 			previouscomp = comp1;
 #endif
 			--pdata1;
@@ -40848,7 +40857,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			}
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp2));
+			assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 			previouscomp = comp2;
 #endif
 			--pdata2;
@@ -40868,7 +40877,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 		}else{
 handle0final:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp0));
+			assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 			previouscomp = comp0;
 #endif
 			--pdata0;
@@ -40887,7 +40896,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1) goto handle0odd;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp1));
+			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 			previouscomp = comp1;
 #endif
 			--pdata1;
@@ -40899,7 +40908,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp2));
+			assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 			previouscomp = comp2;
 #endif
 			--pdata2;
@@ -40912,7 +40921,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 		}else{
 handle0odd:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(previouscomp < comp0));
+			assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 			previouscomp = comp0;
 #endif
 			--pdata0;
@@ -40937,7 +40946,7 @@ lastloop:
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(previouscomp < comp1));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
 				--pdata1;
@@ -40948,7 +40957,7 @@ lastloop:
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(previouscomp < comp2));
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
 				--pdata2;
@@ -40968,10 +40977,10 @@ lastloop:
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-				assert(!(previouscomp < comp1));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 			}else{
-				assert(!(previouscomp < comp2));
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 			}
 #endif
@@ -41019,7 +41028,7 @@ lastloop:
 			// never sample beyond the three divisions (the start, one third and two thirds) of the array
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(previouscomp < comp1));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
 				--pdata1;
@@ -41030,6 +41039,10 @@ lastloop:
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
+#if defined(_DEBUG) || defined(DEBUG)
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
+				previouscomp = comp2;
+#endif
 				--pdata2;
 				if(pdata2stop >= pdata2) pdata2 = pdata1;
 				out = p2;
@@ -41048,10 +41061,10 @@ lastloop:
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-				assert(!(previouscomp < comp1));
+				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 			}else{
-				assert(!(previouscomp < comp2));
+				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 			}
 #endif
@@ -41101,13 +41114,13 @@ lastloop:
 	// finalise using only two parts
 exit:
 	if(!isdescsort? comp2 < comp1 : comp1 < comp2){
-		p2 = p1;
 #if defined(_DEBUG) || defined(DEBUG)
-		assert(!(previouscomp < comp1));
+		assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 #endif
+		p2 = p1;
 	}
 #if defined(_DEBUG) || defined(DEBUG)
-	else assert(!(previouscomp < comp2));
+	else assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 #endif
 	*pout = p2;
 }
@@ -41150,14 +41163,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto[comp0, comp1, comp2]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0init, cur1init, cur2init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp0) previouscomp;// used for debug assertion of the sorted order
-	std::memset(&previouscomp, (!isabsvalue && issignmode && !isfltpmode)? 0xFF : 0, sizeof(previouscomp));
+	std::memset(&previouscomp, !isdescsort? 0 : 0xFF, sizeof(previouscomp));
+	if constexpr(!isabsvalue && issignmode && !isfltpmode) previouscomp ^= generatehighbit<decltype(previouscomp)>();// flip the high bit for signed values
 #endif
 	std::intptr_t out;
 	do{
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp1 < previouscomp));
+			assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 			previouscomp = comp1;
 #endif
 			++pdata1;
@@ -41168,7 +41182,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp0 < previouscomp));
+			assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 			previouscomp = comp0;
 #endif
 			++pdata0;
@@ -41180,7 +41194,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{
 handle2:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp2 < previouscomp));
+			assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 			previouscomp = comp2;
 #endif
 			++pdata2;
@@ -41198,7 +41212,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 		if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 			if(!isdescsort? comp2 < comp1 : comp1 < comp2) goto handle2final;
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp1 < previouscomp));
+			assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 			previouscomp = comp1;
 #endif
 			++pdata1;
@@ -41214,7 +41228,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			}
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp0 < previouscomp));
+			assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 			previouscomp = comp0;
 #endif
 			++pdata0;
@@ -41232,7 +41246,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 		}else{
 handle2final:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
 #if defined(_DEBUG) || defined(DEBUG)
-			assert(!(comp2 < previouscomp));
+			assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 			previouscomp = comp2;
 #endif
 			++pdata2;
@@ -41257,7 +41271,7 @@ lastloop:
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: don't flatten the branch when there's few registers
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
 				++pdata1;
@@ -41268,7 +41282,7 @@ lastloop:
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
 				++pdata0;
@@ -41288,10 +41302,10 @@ lastloop:
 			std::intptr_t notmask{~mask};
 #if defined(_DEBUG) || defined(DEBUG)
 			if(!isdescsort? comp1 < comp0 : comp0 < comp1){
-				assert(!(comp1 < previouscomp));
+				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 			}else{
-				assert(!(comp0 < previouscomp));
+				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 			}
 #endif
@@ -41336,13 +41350,13 @@ lastloop:
 	// finalise using only two parts
 exit:
 	if(!isdescsort? comp1 < comp0 : comp0 < comp1){
-		p0 = p1;
 #if defined(_DEBUG) || defined(DEBUG)
-		assert(!(comp1 < previouscomp));
+		assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 #endif
+		p0 = p1;
 	}
 #if defined(_DEBUG) || defined(DEBUG)
-	else assert(!(comp0 < previouscomp));
+	else assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 #endif
 	*pout = p0;
 }
