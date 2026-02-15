@@ -32106,9 +32106,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pfill -= length;
 					std::fill(std::execution::par_unseq, pfill, pfilloldodd, filler);
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
+					filler -= 0x80u;// only 8 bits are used
 					T *pfilloldeven{pfill};
 					pfill -= length;
-					filler -= 0x80u;// only 8 bits are used
 					std::fill(std::execution::par_unseq, pfill, pfilloldeven, filler);
 					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
 					filler += 0x80u + isdescsort * 2u - 1u;// offset the value of filler for the next loop
@@ -32304,9 +32304,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				u += 1 - isdescsort * 2;
 				unsigned j{256 / 2 - 1};
 				do{
-					T *pfillnew{pfill + length};
-					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-					pfill = pfillnew;
+					T *pfillold{pfill};
+					pfill += length;
+					std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 					length = static_cast<U>(*t) + static_cast<U>(*u);
 					filler += 1u - isdescsort * 2u;
 					t += 1 - isdescsort * 2;
@@ -32321,22 +32321,22 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					u += isdescsort * 2 - 1;// step back
 					unsigned j{256 / 4 - 1};// double the number of items per loop
 					do{
-						T *pfillnewodd{pfill + length};
-						std::fill(std::execution::par_unseq, pfill, pfillnewodd, filler);
-						pfill = pfillnewodd;
+						T *pfilloldodd{pfill};
+						pfill += length;
+						std::fill(std::execution::par_unseq, pfilloldodd, pfill, filler);
 						length = static_cast<U>(*t) + static_cast<U>(*u);// even
-						T *pfillneweven{pfill + length};
 						filler -= 0x80u;// only 8 bits are used
-						std::fill(std::execution::par_unseq, pfill, pfillneweven, filler);
-						pfill = pfillneweven;
+						T *pfilloldeven{pfill};
+						pfill += length;
+						std::fill(std::execution::par_unseq, pfilloldeven, pfill, filler);
 						length = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 						filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 						t += 2 - isdescsort * 4;// step forward twice
 						u += 2 - isdescsort * 4;
 					}while(--j);
-					T *pfillnew{pfill + length};
-					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-					pfill = pfillnew;
+					T *pfillold{pfill};
+					pfill += length;
+					std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
 					filler -= 0x80u;// only 8 bits are used
 				}else{// all other modes
@@ -32345,9 +32345,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					u += 1 - isdescsort * 2;
 					unsigned j{256 / 2 - 1};
 					do{
-						T *pfillnew{pfill + length};
-						std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-						pfill = pfillnew;
+						T *pfillold{pfill};
+						pfill += length;
+						std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 						length = static_cast<U>(*t) + static_cast<U>(*u);
 						filler += 1u - isdescsort * 2u;
 						t += 1 - isdescsort * 2;
@@ -32367,24 +32367,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			do{
-				T *pfillnew{pfill + length};
-				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-				pfill = pfillnew;
+				T *pfillold{pfill};
+				pfill += length;
+				std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 				length = *t;
 				filler += 1u - isdescsort * 2u;
 				t += 1 - isdescsort * 2;
 			}while(--j);
-			T *pfillnewmid{pfill + length};
-			std::fill(std::execution::par_unseq, pfill, pfillnewmid, filler);
-			pfill = pfillnewmid;
+			T *pfilloldmid{pfill};
+			pfill += length;
+			std::fill(std::execution::par_unseq, pfilloldmid, pfill, filler);
 			length = t[256 * (isdescsort * 2 - 1)];
 			filler += 1u - isdescsort * 2u;// only 8 bits are used
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 1;
 			do{
-				T *pfillnew{pfill + length};
-				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-				pfill = pfillnew;
+				T *pfillold{pfill};
+				pfill += length;
+				std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 				length = *t;
 				filler += 1u - isdescsort * 2u;
 				t += 1 - isdescsort * 2;
@@ -32397,21 +32397,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				t += isdescsort * 2 - 1;// step back
 				unsigned j{256 / 2 - 1};// double the number of items per loop
 				do{
-					T *pfillnewodd{pfill + length};
-					std::fill(std::execution::par_unseq, pfill, pfillnewodd, filler);
-					pfill = pfillnewodd;
+					T *pfilloldodd{pfill};
+					pfill += length;
+					std::fill(std::execution::par_unseq, pfilloldodd, pfill, filler);
 					length = *t;// even
-					T *pfillneweven{pfill + length};
 					filler -= 0x80u;// only 8 bits are used
-					std::fill(std::execution::par_unseq, pfill, pfillneweven, filler);
-					pfill = pfillneweven;
+					T *pfilloldeven{pfill};
+					pfill += length;
+					std::fill(std::execution::par_unseq, pfilloldeven, pfill, filler);
 					length = t[3 - isdescsort * 6];// odd
 					filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 					t += 2 - isdescsort * 4;// step forward twice
 				}while(--j);
-				T *pfillnew{pfill + length};
-				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-				pfill = pfillnew;
+				T *pfillold{pfill};
+				pfill += length;
+				std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 				length = *t;// even
 				filler -= 0x80u;// only 8 bits are used
 			}else{// all other modes
@@ -32419,9 +32419,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				t += 1 - isdescsort * 2;
 				unsigned j{256 - 1};
 				do{
-					T *pfillnew{pfill + length};
-					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
-					pfill = pfillnew;
+					T *pfillold{pfill};
+					pfill += length;
+					std::fill(std::execution::par_unseq, pfillold, pfill, filler);
 					length = *t;
 					filler += 1u - isdescsort * 2u;
 					t += 1 - isdescsort * 2;
