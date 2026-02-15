@@ -574,11 +574,11 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		};
 #pragma pack(pop)
 		static std::size_t constexpr sizecontainer{sizeof(Testmeclass)};
-		static_cast<void>(sizecontainer);
+		static_assert(25 == sizecontainer);
 		static std::size_t constexpr offsetco{rsbd8::getoffsetof<&Testmeclass::co>};
-		static_cast<void>(offsetco);
+		static_assert(9 == offsetco);
 		static std::size_t constexpr offsetsco{rsbd8::getoffsetof<&Testmeclass::sco>};
-		static_cast<void>(offsetsco);
+		static_assert(17 == offsetsco);
 
 		Testmeclass cin[]{8, 0, 6, 4, 0, 2, 6};
 		Testmeclass const *fin[_countof(cin)]{cin, cin + 1, cin + 2, cin + 3, cin + 4, cin + 5, cin + 6};
