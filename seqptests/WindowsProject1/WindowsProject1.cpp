@@ -25,8 +25,6 @@
 #include "..\..\Radixsortbidi8.hpp"
 #include <Aclapi.h>
 #include <cmath>
-#include <algorithm>// for std::sort() (wich strictly doesn't do the same) and std::stable_sort()
-#include <execution>// for std::execution::par_unseq (std::sort() and std::stable_sort() parameter)
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)

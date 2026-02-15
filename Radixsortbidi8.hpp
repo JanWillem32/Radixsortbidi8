@@ -492,6 +492,8 @@ RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the
 #include <climits>
 #include <cfloat>
 #include <cstring>// for std::memcpy(), std::memset() and the like, this library doesn't use actual string functions
+#include <execution>
+#include <algorithm>
 #include <future>
 #include <atomic>
 #include <array>
@@ -12065,7 +12067,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
 
 	X *offsets;
@@ -12187,7 +12190,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable){
 			// architecture: limit to one at a time when there's few registers
@@ -12633,7 +12636,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
 
 	X *offsets;
@@ -12754,7 +12758,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 			// reverse ordering is applied here because the padding bytes could matter, hence the check above
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -14389,7 +14393,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -14541,7 +14546,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -14977,7 +14982,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -15128,7 +15134,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -16184,7 +16190,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
 
 	X *offsets;
@@ -16310,7 +16317,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(ismultithreadcapable){
 			// architecture: do not limit as much when there's a reasonable amount of registers
@@ -16569,7 +16576,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
 
 	X *offsets;
@@ -16694,7 +16702,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// not in reverse order
 			T *pinput{input};
@@ -17937,7 +17945,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -18088,7 +18097,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -18551,7 +18560,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -18701,7 +18711,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -19793,7 +19803,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
 
 	X *offsets;
@@ -19919,7 +19930,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// not in reverse order
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
@@ -20124,7 +20135,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
 
 	X *offsets;
@@ -20249,7 +20261,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// not in reverse order
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
@@ -21475,7 +21487,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -21617,7 +21630,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -21981,7 +21994,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -22122,7 +22136,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -23459,7 +23473,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
 
 	X *offsets;
@@ -23581,7 +23596,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -24400,7 +24415,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
 
 	X *offsets;
@@ -24521,7 +24537,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		if constexpr(64 == CHAR_BIT * sizeof(T)){
 			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 			}else{// 64-bit, not in reverse order
@@ -27791,7 +27807,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(output);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -27927,7 +27944,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -29658,7 +29675,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -29793,7 +29811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -32057,19 +32075,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U length{static_cast<U>(*t) + static_cast<U>(*u)};
 	T *pfill{pdst + count + 1};
-	int filler;
+	unsigned filler;
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 	}else{// not reversed order
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			// note: regular floating-point mode is not relevant here
-			filler = isdescsort? 0x80 : 0x7F;
+			filler = isdescsort? 0x80u : 0x7Fu;
 			t += isdescsort * 2 - 1;
 			u += isdescsort * 2 - 1;
 			unsigned j{256 / 2 - 1};
 			do{
-				pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+				T *pfillold{pfill};
+				pfill -= length;
+				std::fill(std::execution::par_unseq, pfill, pfillold, filler);
 				length = static_cast<U>(*t) + static_cast<U>(*u);
-				filler += isdescsort * 2 - 1;
+				filler += isdescsort * 2u - 1u;
 				t += isdescsort * 2 - 1;
 				u += isdescsort * 2 - 1;
 			}while(--j);
@@ -32077,38 +32097,47 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			// note: both regular absolute modes are not relevant here
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
-				filler = isdescsort? 0x80 : 0x7F;
+				filler = isdescsort? 0x80u : 0x7Fu;
 				t += 1 - isdescsort * 2;// step back
 				u += 1 - isdescsort * 2;// step back
 				unsigned j{256 / 4 - 1};// double the number of items per loop
 				do{
-					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+					T *pfilloldodd{pfill};
+					pfill -= length;
+					std::fill(std::execution::par_unseq, pfill, pfilloldodd, filler);
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
-					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler - 0x80, length));// only 8 bits are used
+					T *pfilloldeven{pfill};
+					pfill -= length;
+					filler -= 0x80u;// only 8 bits are used
+					std::fill(std::execution::par_unseq, pfill, pfilloldeven, filler);
 					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
-					filler += isdescsort * 2 - 1;
+					filler += 0x80u + isdescsort * 2u - 1u;// offset the value of filler for the next loop
 					t += isdescsort * 4 - 2;// step forward twice
 					u += isdescsort * 4 - 2;
 				}while(--j);
-				pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+				T *pfillold{pfill};
+				pfill -= length;
+				std::fill(std::execution::par_unseq, pfill, pfillold, filler);
 				length = static_cast<U>(*t) + static_cast<U>(*u);// even
-				filler -= 0x80;// only 8 bits are used
+				filler -= 0x80u;// only 8 bits are used
 			}else{// all other modes
-				filler = isdescsort? 0 : 0xFF;
+				filler = isdescsort? 0u : 0xFFu;
 				t += isdescsort * 2 - 1;
 				u += isdescsort * 2 - 1;
 				unsigned j{256 / 2 - 1};
 				do{
-					pfill = reinterpret_cast<T *>(std::memset(pfill - length, filler, length));
+					T *pfillold{pfill};
+					pfill -= length;
+					std::fill(std::execution::par_unseq, pfill, pfillold, filler);
 					length = static_cast<U>(*t) + static_cast<U>(*u);
-					filler += isdescsort * 2 - 1;
+					filler += isdescsort * 2u - 1u;
 					t += isdescsort * 2 - 1;
 					u += isdescsort * 2 - 1;
 				}while(--j);
 			}
 		}
 	}
-	std::memset(pfill - length, filler, length);
+	std::fill(std::execution::par_unseq, pfill - length, pfill, filler);
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
@@ -32259,7 +32288,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U length{*t};
 	T *pfill{pdst};
-	int filler;
+	unsigned filler;
 	if constexpr(ismultithreadcapable) if(usemultithread){// multithreaded version
 		X const *u{offsetscompanion// low-to-high or high-to-low
 			+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
@@ -32270,14 +32299,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// not reversed order
 			if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 				// note: regular floating-point mode is not relevant here
-				filler = isdescsort? 0x7F : 0x80;
+				filler = isdescsort? 0x7Fu : 0x80u;
 				t += 1 - isdescsort * 2;
 				u += 1 - isdescsort * 2;
 				unsigned j{256 / 2 - 1};
 				do{
-					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					T *pfillnew{pfill + length};
+					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+					pfill = pfillnew;
 					length = static_cast<U>(*t) + static_cast<U>(*u);
-					filler += 1 - isdescsort * 2;
+					filler += 1u - isdescsort * 2u;
 					t += 1 - isdescsort * 2;
 					u += 1 - isdescsort * 2;
 				}while(--j);
@@ -32285,31 +32316,40 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				// note: both regular absolute modes are not relevant here
 				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 				if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
-					filler = isdescsort? 0x7F : 0x80;
+					filler = isdescsort? 0x7Fu : 0x80u;
 					t += isdescsort * 2 - 1;// step back
 					u += isdescsort * 2 - 1;// step back
 					unsigned j{256 / 4 - 1};// double the number of items per loop
 					do{
-						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+						T *pfillnewodd{pfill + length};
+						std::fill(std::execution::par_unseq, pfill, pfillnewodd, filler);
+						pfill = pfillnewodd;
 						length = static_cast<U>(*t) + static_cast<U>(*u);// even
-						pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
+						T *pfillneweven{pfill + length};
+						filler -= 0x80u;// only 8 bits are used
+						std::fill(std::execution::par_unseq, pfill, pfillneweven, filler);
+						pfill = pfillneweven;
 						length = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
-						filler += 1 - isdescsort * 2;
+						filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 						t += 2 - isdescsort * 4;// step forward twice
 						u += 2 - isdescsort * 4;
 					}while(--j);
-					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					T *pfillnew{pfill + length};
+					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+					pfill = pfillnew;
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
-					filler -= 0x80;// only 8 bits are used
+					filler -= 0x80u;// only 8 bits are used
 				}else{// all other modes
-					filler = isdescsort? 0xFF : 0;
+					filler = isdescsort? 0xFFu : 0u;
 					t += 1 - isdescsort * 2;
 					u += 1 - isdescsort * 2;
 					unsigned j{256 / 2 - 1};
 					do{
-						pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+						T *pfillnew{pfill + length};
+						std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+						pfill = pfillnew;
 						length = static_cast<U>(*t) + static_cast<U>(*u);
-						filler += 1 - isdescsort * 2;
+						filler += 1u - isdescsort * 2u;
 						t += 1 - isdescsort * 2;
 						u += 1 - isdescsort * 2;
 					}while(--j);
@@ -32323,59 +32363,74 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else{// not reversed order
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			// note: regular floating-point mode is not relevant here
-			filler = isdescsort? 0x7F : 0x80;
+			filler = isdescsort? 0x7Fu : 0x80u;
 			t += 1 - isdescsort * 2;
 			unsigned j{256 / 2 - 1};
 			do{
-				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				T *pfillnew{pfill + length};
+				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+				pfill = pfillnew;
 				length = *t;
-				filler += 1 - isdescsort * 2;
+				filler += 1u - isdescsort * 2u;
 				t += 1 - isdescsort * 2;
 			}while(--j);
-			pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+			T *pfillnewmid{pfill + length};
+			std::fill(std::execution::par_unseq, pfill, pfillnewmid, filler);
+			pfill = pfillnewmid;
 			length = t[256 * (isdescsort * 2 - 1)];
-			filler += 1 - isdescsort * 2;// only 8 bits are used
+			filler += 1u - isdescsort * 2u;// only 8 bits are used
 			t += (256 - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = 256 / 2 - 1;
 			do{
-				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				T *pfillnew{pfill + length};
+				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+				pfill = pfillnew;
 				length = *t;
-				filler += 1 - isdescsort * 2;
+				filler += 1u - isdescsort * 2u;
 				t += 1 - isdescsort * 2;
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// note: both regular absolute modes are not relevant here
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
 			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
-				filler = isdescsort? 0x7F : 0x80;
+				filler = isdescsort? 0x7Fu : 0x80u;
 				t += isdescsort * 2 - 1;// step back
 				unsigned j{256 / 2 - 1};// double the number of items per loop
 				do{
-					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					T *pfillnewodd{pfill + length};
+					std::fill(std::execution::par_unseq, pfill, pfillnewodd, filler);
+					pfill = pfillnewodd;
 					length = *t;// even
-					pfill = reinterpret_cast<T *>(std::memset(pfill, filler - 0x80, length)) + length;// only 8 bits are used
+					T *pfillneweven{pfill + length};
+					filler -= 0x80u;// only 8 bits are used
+					std::fill(std::execution::par_unseq, pfill, pfillneweven, filler);
+					pfill = pfillneweven;
 					length = t[3 - isdescsort * 6];// odd
-					filler += 1 - isdescsort * 2;
+					filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 					t += 2 - isdescsort * 4;// step forward twice
 				}while(--j);
-				pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+				T *pfillnew{pfill + length};
+				std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+				pfill = pfillnew;
 				length = *t;// even
-				filler -= 0x80;// only 8 bits are used
+				filler -= 0x80u;// only 8 bits are used
 			}else{// all other modes
-				filler = isdescsort? 0xFF : 0;
+				filler = isdescsort? 0xFFu : 0u;
 				t += 1 - isdescsort * 2;
 				unsigned j{256 - 1};
 				do{
-					pfill = reinterpret_cast<T *>(std::memset(pfill, filler, length)) + length;
+					T *pfillnew{pfill + length};
+					std::fill(std::execution::par_unseq, pfill, pfillnew, filler);
+					pfill = pfillnew;
 					length = *t;
-					filler += 1 - isdescsort * 2;
+					filler += 1u - isdescsort * 2u;
 					t += 1 - isdescsort * 2;
 				}while(--j);
 			}
 		}
 	}
 exit:
-	std::memset(pfill, filler, length);
+	std::fill(std::execution::par_unseq, pfill, pfill + length, filler);
 }
 
 // main part, multithreading companion for the radixsortcopynoallocsingle() function implementation template for single-part types without indirection
@@ -32393,7 +32448,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
 
 	X *offsets;
@@ -32458,7 +32514,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
 
 	X *offsets;
@@ -32538,7 +32595,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
@@ -32807,7 +32864,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
@@ -32951,7 +33008,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
 
 	X *offsets;
@@ -33015,7 +33073,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(input);
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
 
 	X *offsets;
@@ -33095,7 +33154,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
@@ -33362,7 +33421,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(false);
 			}
 		}
-		X offsets[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+		X offsets[offsetsstride];// a sizeable amount of indices, but it's worth it
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};// if mulitithreaded, the half count will be rounded up in the companion thread
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i -= -static_cast<std::ptrdiff_t>(usemultithread) & static_cast<std::ptrdiff_t>((count + 1 + 2) >> 2) * 2;
@@ -33837,7 +33897,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -33959,7 +34020,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -34223,7 +34284,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(buffer);
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
-	X offsetscompanion[offsetsstride]{};// a sizeable amount of indices, but it's worth it, zeroed in advance here
+	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
+	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
@@ -34345,7 +34407,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		X offsets[offsetsstride * (2 - ismultithreadcapable)];// a sizeable amount of indices, but it's worth it
-		std::memset(offsets, 0, offsetsstride * sizeof(X));// zeroed in advance here
+		std::fill(std::execution::par_unseq, offsets, offsets + offsetsstride, 0u);// zeroed in advance here
 		{// scope atomicguard, so it's always destructed before asynchandle
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
