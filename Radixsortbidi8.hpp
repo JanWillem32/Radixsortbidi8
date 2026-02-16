@@ -824,6 +824,9 @@ struct longdoubletest128{
 		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
+	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
+	}
 	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= static_cast<std::uint_least64_t>(other);
@@ -1004,6 +1007,9 @@ struct longdoubletest96{
 		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
+	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+		return{longdoubletest96<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
+	}
 	RSBD8_FUNC_INLINE longdoubletest96<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa &= static_cast<std::uint_least64_t>(other);
@@ -1170,6 +1176,9 @@ struct longdoubletest80{
 #endif
 		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
+	}
+	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+		return{longdoubletest80<isabsvalue, issignmode, isfltpmode>{~mantissa, ~signexponent}};
 	}
 	RSBD8_FUNC_INLINE longdoubletest80<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
@@ -1403,6 +1412,9 @@ struct test64{
 #endif
 		return{static_cast<std::intptr_t>(rhi)};
 	}
+	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+		return{test64<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
+	}
 	RSBD8_FUNC_INLINE test64<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
 		data[0] &= static_cast<std::uint_least32_t>(other);
 		data[1] &= static_cast<std::uint_least32_t>(other);
@@ -1601,6 +1613,9 @@ struct test128{
 		rhi -= data[0] < rlo;
 #endif
 		return{static_cast<std::intptr_t>(rhi)};
+	}
+	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> operator~()const noexcept{
+		return{test128<isabsvalue, issignmode, isfltpmode>{~data[0], ~data[1]}};
 	}
 	RSBD8_FUNC_INLINE test128<isabsvalue, issignmode, isfltpmode> &operator&=(std::intptr_t const &other)noexcept{
 		data[0] &= static_cast<std::uint_least64_t>(other);
