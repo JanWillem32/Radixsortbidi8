@@ -2767,9 +2767,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -2805,9 +2802,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -2859,9 +2853,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -2948,9 +2939,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -2986,9 +2974,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -3040,9 +3025,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -3129,9 +3111,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -3167,9 +3146,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -3270,9 +3246,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
@@ -3357,9 +3330,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		{
 			unsigned int uAux;// unused
 			u64wstop = __rdtscp(&uAux);
-			static_cast<void>(uAux);
-		}
-		{
 			int cpuInfo[4];// unused
 			__cpuid(cpuInfo, 0);// only used for serializing execution
 		}
