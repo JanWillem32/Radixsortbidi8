@@ -10106,7 +10106,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	static_assert(!isabsvalue || !issignmode, "this function variant is not entirely intended for usage on the top part in absolute signed modes");
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
 		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -10203,7 +10203,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -10265,9 +10265,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// all other modes
 			u += isdescsort * 2 - 1;
 			t += isdescsort * 2 - 1;
-			// 127 / 2 is only rounded down in the companion thread
+			// 256 / 2 - 1 is only rounded down in the companion thread
 			// the floating-point case (-1 item) is for the companion thread
-			unsigned j{256 / 2 - 1 - 127 / 2 * (isabsvalue && issignmode) - isfltpmode};
+			unsigned j{256 / 2 - 1 - (256 / 2 - 1) / 2 * (isabsvalue && issignmode) - isfltpmode};
 			U offset{static_cast<U>(count) - initdifference};
 			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do{
@@ -10349,7 +10349,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsetscompanion);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X *t{isrevorder? offsetscompanion : offsets// low-to-high or high-to-low
 		+ (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -10406,9 +10406,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// all other modes
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
-			// 127 / 2 is only rounded down in the companion thread
+			// (256 / 2 - 1) / 2 is only rounded down in the companion thread
 			// the floating-point case (-1 item) is for the companion thread
-			unsigned j{256 / 2 - 1 - (127 + 1) / 2 * (isabsvalue && issignmode)};
+			unsigned j{256 / 2 - 1 - (256 / 2 - 1 + 1) / 2 * (isabsvalue && issignmode)};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
@@ -10435,7 +10435,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X *t{offsets// low-to-high or high-to-low
 		+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -10503,7 +10503,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{t[1 - isdescsort * 2]};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				--offset;
-				unsigned j{256 - 2 - 127 * (isabsvalue && issignmode) - isfltpmode};
+				unsigned j{256 - 2 - (256 / 2 - 1) * (isabsvalue && issignmode) - isfltpmode};
 				do{
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
@@ -10563,7 +10563,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}else{// all other modes
 				t += 1 - isdescsort * 2;
-				unsigned j{256 - 2 - 127 * (isabsvalue && issignmode) - isfltpmode};
+				unsigned j{256 - 2 - (256 / 2 - 1) * (isabsvalue && issignmode) - isfltpmode};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
@@ -10590,7 +10590,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	static std::size_t constexpr typebitsize{// all templated variants need to be included here, given the usage of this function by generateoffsetsmulti()
 		(std::is_same_v<longdoubletest128<false, false, false>, T> ||
 		std::is_same_v<longdoubletest128<false, false, true>, T> ||
@@ -11660,7 +11660,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -12081,7 +12081,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
@@ -12180,7 +12180,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -12650,7 +12650,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
@@ -12748,7 +12748,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -14000,7 +14000,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		>
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -14407,7 +14407,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -14536,7 +14536,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -14996,7 +14996,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -15124,7 +15124,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -15933,7 +15933,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -16204,7 +16204,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
@@ -16307,7 +16307,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -16590,7 +16590,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
@@ -16692,7 +16692,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -17598,7 +17598,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
-	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -17959,7 +17959,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -18087,7 +18087,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -18574,7 +18574,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -18701,7 +18701,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -19510,7 +19510,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -19817,7 +19817,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, true, T, X>(count, input, output, buffer, offsetscompanion);
@@ -19920,7 +19920,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -20149,7 +20149,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, false, T, X>(count, input, buffer, nullptr, offsetscompanion);
@@ -20251,7 +20251,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -21101,7 +21101,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
-	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -21501,7 +21501,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -21620,7 +21620,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -22008,7 +22008,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -22126,7 +22126,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -23268,7 +23268,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti2threadmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -23487,7 +23487,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
@@ -23586,7 +23586,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -24429,7 +24429,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocmulti2threadinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
@@ -24527,7 +24527,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -27545,7 +27545,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmulti2threadmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
 	assert(input);
@@ -27821,7 +27821,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -27934,7 +27934,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -29689,7 +29689,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -29801,7 +29801,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -32079,7 +32079,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// the code here is mainly copied from generateoffsetssinglemtc()
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X const *t{offsets + (offsetsstride - 1)// high-to-low or low-to-high
 		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -32246,7 +32246,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offset] = static_cast<T>(out);
 		}
 	}else{// !ismultithreadcapable
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		T const *psrchi{psrclo + count};
 		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 			U outlo{*psrclo++};
@@ -32296,7 +32296,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// the code here is mainly copied from generateoffsetssingle()
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
-	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X const *t{offsets// low-to-high or high-to-low
 		+ (!isabsvalue && issignmode) * ((offsetsstride + isfltpmode) / 2 - isdescsort)
 		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -32462,7 +32462,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion);
@@ -32528,7 +32528,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
@@ -32585,7 +32585,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -32854,7 +32854,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -33019,7 +33019,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -33085,7 +33085,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(input);
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
@@ -33144,7 +33144,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -33412,7 +33412,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -33863,7 +33863,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offset] = p;
 		}
 	}else{// !ismultithreadcapable
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		V *const *psrchi{psrclo + count};
 		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 			V *plo{*psrclo++};
@@ -33911,7 +33911,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -34010,7 +34010,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -34298,7 +34298,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -34397,7 +34397,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
-		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (127 + isfltpmode)};// shrink the offsets size if possible
+		static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
