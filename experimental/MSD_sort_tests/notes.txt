@@ -1,0 +1,9 @@
+On 2026-02-06 testing started on the non-stable, in-place MSD version of the radix sort algorthm. In the three days of refining the (initially just imported) method, the results just couldn't hold a candle to the original, stable, out-of-place LSD version in any benchmark. It's always nice to experiment with new code though. Stepping stones like this can be valuable lessons, and nice sources of code snippets to re-use.
+Main examples of these findings are:
+-Initial setup of the MSD algorthm is the same as the LSD version, and can easily done with any count of multithreading.
+-The top-level sorting pass however is totally single-threaded with no viable bidirectional or similar option.
+-Passing on sorting to children nodes after every sorting pass is where this method really shines though, as it's extremely multithreading-friendly.
+
+Comment on the test sequence (the seqptests project part was used as a staging ground):
+"enable this if you have tme to waste, as even the optimised version is just over 21 times slower on 4294967311 B (just over 4 GiB) of data than the LSD radix sort, and the original version is over 100 times slower, so this is not really useful for benchmarking, but it can be used for testing and debugging"
+The actual benchmark results of the last, quick runtrough is stored as benchmark.txt.
