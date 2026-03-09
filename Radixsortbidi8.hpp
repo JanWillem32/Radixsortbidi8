@@ -1726,6 +1726,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
+
 	return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1};
 }
 template<auto indirection1, bool isindexed2, typename V, typename U, typename W>
@@ -1737,6 +1738,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
+
 	return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1))};// always reinterpret references as pointers
 }
 template<auto indirection1, bool isindexed2, typename V, typename U>
@@ -1747,6 +1749,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
+
 	if constexpr(isindexed2){
 		static_assert(std::is_pointer_v<T>, "invalid variable argument count for usage without second-level indirection");
 		return{p->*indirection1};
@@ -1762,6 +1765,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
+
 	if constexpr(isindexed2){
 		return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
 	}else{
@@ -1776,6 +1780,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p)noexcept{
 	// do not pass a nullptr here
 	assert(p);
+
 	return{p->*indirection1};
 }
 template<auto indirection1, bool isindexed2, typename V>
@@ -1787,6 +1792,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
+
 	return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
 }
 template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
@@ -1798,6 +1804,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static_cast<void>(index2);
 	// do not pass a nullptr here
 	assert(p);
+
 	return{(p->*indirection1)(varparameters...)};
 }
 template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
@@ -1810,6 +1817,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
+
 	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
 }
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
@@ -1820,6 +1828,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(p);
+
 	return{(p->*indirection1)(varparameters...)};
 }
 template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
@@ -1831,6 +1840,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
+
 	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
 }
 
@@ -1852,6 +1862,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
+
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to member
 			static_assert(!isindexed2, "only first-level indirection used, impossible combination for indicating usage of a secondary index parameter");
@@ -1890,6 +1901,7 @@ template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, typena
 RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, vararguments... varparameters)noexcept{
 	// do not pass a nullptr here
 	assert(pintermediate);
+
 	if constexpr(std::is_member_object_pointer_v<decltype(indirection1)>){
 		if constexpr(0 == sizeof...(varparameters)){// indirection to member with no indices
 			static_assert(!isindexed2, "second-level indirection used without additional parameters, impossible combination for indicating usage of a secondary index parameter");
@@ -6477,6 +6489,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> filterinput(std::uint_least64_t &curm, U &cure, T *out)noexcept{
 	// do not pass a nullptr here
 	assert(out);
+
 	using W = decltype(T::signexponent);
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
@@ -6669,6 +6682,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
+
 	using W = decltype(T::signexponent);
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
@@ -7176,6 +7190,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
+
 	using W = decltype(T::signexponent);
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
@@ -7511,6 +7526,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dsta);
 	assert(outb);
 	assert(dstb);
+
 	using W = decltype(T::signexponent);
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
@@ -7975,6 +7991,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// do not pass a nullptr here
 	assert(out);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least64_t curp{static_cast<std::int_least64_t>(curhi)};
 		if constexpr(isfltpmode){
@@ -8098,6 +8115,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least64_t curp{static_cast<std::int_least64_t>(curhi)};
 		if constexpr(isfltpmode){
@@ -8398,6 +8416,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least64_t curpa{static_cast<std::int_least64_t>(curhia)};
 		if constexpr(isfltpmode){
@@ -8596,6 +8615,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dsta);
 	assert(outb);
 	assert(dstb);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least64_t curpa{static_cast<std::int_least64_t>(curhia)};
 		if constexpr(isfltpmode){
@@ -8841,6 +8861,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> filterinput(U &cur, T *out)noexcept{
 	// do not pass a nullptr here
 	assert(out);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		*out = static_cast<T>(cur);
@@ -8875,6 +8896,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		*out = static_cast<T>(cur);
@@ -8963,6 +8985,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9021,6 +9044,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dsta);
 	assert(outb);
 	assert(dstb);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9148,6 +9172,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outa);
 	assert(outb);
 	assert(outc);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9226,6 +9251,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstb);
 	assert(outc);
 	assert(dstc);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9390,6 +9416,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outb);
 	assert(outc);
 	assert(outd);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9488,6 +9515,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstc);
 	assert(outd);
 	assert(dstd);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9737,6 +9765,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(outf);
 	assert(outg);
 	assert(outh);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -9915,6 +9944,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(dstg);
 	assert(outh);
 	assert(dsth);
+
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		*outa = static_cast<T>(cura);
@@ -10103,6 +10133,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
+
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	static_assert(!isabsvalue || !issignmode, "this function variant is not entirely intended for usage on the top part in absolute signed modes");
 	// Determining the starting point depends on several factors here.
@@ -10207,6 +10238,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
+
 	X *t{isrevorder? offsetscompanion : offsets + (offsetsstride - 1)// high-to-low or low-to-high
 		- (!isabsvalue && issignmode) * (offsetsstride / 2 - isdescsort)
 		- (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
@@ -10298,6 +10330,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
+
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
 	// the companion thread mostly handles the top sets
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
@@ -10347,6 +10380,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
+
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
@@ -10433,6 +10467,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
+
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
@@ -10588,6 +10623,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
+
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
@@ -10770,6 +10806,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
+
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if(usemultithread) b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion);
 	else b = generateoffsetssinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets);
@@ -10792,6 +10829,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
+
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
 	if constexpr(1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + (typebitsize / 8 - 1) * 256};
@@ -10841,6 +10879,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
+
 	if(usemultithread) assert(offsetscompanion);
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
 	if constexpr(1 & typebitsize / 8) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
@@ -10931,6 +10970,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 		// reverse ordering is applied here because the padding bytes could matter, hence the check above
 		if constexpr(isinputconst){
@@ -11419,6 +11459,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrchi;
 	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){
@@ -11668,6 +11709,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrclo;
 	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){
@@ -12081,6 +12123,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -12157,7 +12200,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
 	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
 	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -12177,6 +12225,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -12190,10 +12242,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -12637,6 +12685,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types without indirection
@@ -12650,6 +12701,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -12726,7 +12778,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
 	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
 	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -12745,6 +12802,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -12758,10 +12819,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -13262,6 +13319,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // Function implementation templates for 80-bit-based long double types with indirection
@@ -13298,6 +13358,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -13747,6 +13808,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrchi;
 	if constexpr(isrevorder){
@@ -14008,6 +14070,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrclo;
 	if constexpr(isrevorder){
@@ -14407,6 +14470,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -14504,7 +14568,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -14533,6 +14602,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -14546,10 +14619,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -14976,6 +15045,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for 80-bit-based long double types with indirection
@@ -14996,6 +15068,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -15093,7 +15166,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -15121,6 +15199,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -15134,10 +15216,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -15603,6 +15681,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -15630,6 +15711,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 	}else{// not in reverse order
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -15774,6 +15856,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrchi;
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
@@ -15941,6 +16024,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrclo;
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
@@ -16204,6 +16288,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -16277,7 +16362,12 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -16304,6 +16394,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -16317,10 +16411,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -16579,6 +16669,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types without indirection
@@ -16590,6 +16683,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -16663,7 +16757,12 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -16689,6 +16788,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -16702,10 +16805,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -16964,6 +17063,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // Function implementation templates for split up 128-bit types with indirection
@@ -17000,6 +17102,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -17389,6 +17492,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrchi;
 	if constexpr(isrevorder){
@@ -17606,6 +17710,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrclo;
 	if constexpr(isrevorder){
@@ -17959,6 +18064,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -18057,7 +18163,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
 	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
 	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -18084,6 +18195,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -18097,10 +18212,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -18553,6 +18664,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 128-bit types with indirection
@@ -18574,6 +18688,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -18672,7 +18787,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
 	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
 	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -18698,6 +18818,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -18711,10 +18835,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -19167,6 +19287,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 #else// 32-bit or smaller platforms
 // Function implementation templates for split up 64-bit types without indirection
@@ -19193,6 +19316,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 	}else{// not in reverse order
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -19317,6 +19441,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrchi;
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
@@ -19518,6 +19643,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrclo;
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
@@ -19817,6 +19943,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -19890,7 +20017,12 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -19917,6 +20049,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -19930,10 +20066,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -20138,6 +20270,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 64-bit types without indirection
@@ -20149,6 +20284,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -20222,7 +20358,12 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -20248,6 +20389,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -20261,10 +20406,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -20469,6 +20610,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // Function implementation templates for split up 64-bit types with indirection
@@ -20496,6 +20640,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -20855,6 +21000,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrchi;
 	if constexpr(isrevorder){
@@ -21109,6 +21255,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrclo;
 	if constexpr(isrevorder){
@@ -21501,6 +21648,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -21590,7 +21738,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -21617,6 +21770,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -21630,10 +21787,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -21996,6 +22149,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for split up 64-bit types with indirection
@@ -22008,6 +22164,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -22097,7 +22254,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -22123,6 +22285,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -22136,10 +22302,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -22533,6 +22695,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 #endif
 
@@ -22554,6 +22719,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(pout);
 	assert(offsetscompanion);
+
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
 		}else{// 64-bit, not in reverse order
@@ -23133,6 +23299,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrchi;
 	if constexpr(false){// useless when not handling indirection: isrevorder){
@@ -23276,6 +23443,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	T *psrclo;
 	if constexpr(false){// useless when not handling indirection: isrevorder){
@@ -23487,6 +23655,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -23564,7 +23733,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -23583,6 +23757,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -23596,10 +23774,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -24414,6 +24588,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types without indirection
@@ -24429,6 +24606,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -24506,7 +24684,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -24524,6 +24707,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -24537,10 +24724,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -25356,6 +25539,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			radixsortnoallocmulti2threadmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets, runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // Function implementation templates for multi-part types with indirection
@@ -25376,6 +25562,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pout);
 	if constexpr(isinputconst) assert(pdst);
 	assert(offsetscompanion);
+
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
@@ -27379,6 +27566,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsetscompanion);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrchi;
 	if constexpr(isrevorder){
@@ -27553,6 +27741,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdstnext);
 	assert(offsets);
 	assert(runsteps);
+
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 	V **psrclo;
 	if constexpr(isrevorder){
@@ -27821,6 +28010,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -27911,7 +28101,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti1thread
 #else
@@ -27931,6 +28126,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -27944,10 +28143,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -29675,6 +29870,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // multithreading companion for the radixsortnoallocmulti2thread() function implementation template for multi-part types with indirection
@@ -29689,6 +29887,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -29779,7 +29978,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti1thread
 #else
@@ -29798,6 +30002,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	std::future<void> asynchandle;
+#endif
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -29811,10 +30019,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[maybe_unused]]
 #endif
 		std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t, std::nullptr_t> atomiclightbarrier{};
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-		[[maybe_unused]]
-#endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
 
 		// count the 256 configurations, all in one go
 		if constexpr(ismultithreadcapable){
@@ -31836,6 +32040,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
+#if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
+	return{asynchandle};// let a possible parent thread wait on all of its childen
+#endif
 }
 
 // Function implementation templates for single-part types without indirection
@@ -31857,6 +32064,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(pout);
 	assert(offsetscompanion);
+
 	// unsigned counter, not zero inclusive inside the loop
 	// architecture: limit to two at a time when there's few registers
 	std::size_t i{(defaultgprfilesize < gprfilesize::large)? ((count + 1 + 2) >> 2) * 2 : ((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
@@ -31955,6 +32163,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(offsetscompanion);
+
 	// unsigned counter, not zero inclusive inside the loop
 	std::size_t i{((count + 1 + 8) >> 4) * 8};// rounded up in the companion thread
 	input += count - i;
@@ -32011,6 +32220,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(psrclo);
 	assert(pdst);
 	assert(offsetscompanion);
+
 	T const *psrchi{psrclo + count};
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
@@ -32076,6 +32286,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsets);
 	assert(offsetscompanion);
+
 	// the code here is mainly copied from generateoffsetssinglemtc()
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
@@ -32172,6 +32383,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(psrclo);
 	assert(pdst);
 	assert(offsets);
+
 	if constexpr(ismultithreadcapable){
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
@@ -32292,6 +32504,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(pdst);
 	assert(offsets);
+
 	if constexpr(ismultithreadcapable) if(usemultithread) assert(offsetscompanion);
 	// the code here is mainly copied from generateoffsetssingle()
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
@@ -32462,6 +32675,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -32528,6 +32742,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -32582,6 +32797,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -32851,6 +33067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -33023,6 +33240,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, buffer, offsetscompanion);
@@ -33088,6 +33306,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	// do not pass a nullptr here
 	assert(input);
+
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
 	radixsortnoallocsingleinitmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsetscompanion);
@@ -33141,6 +33360,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -33409,6 +33629,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 	// do not pass a nullptr here
 	assert(input);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -33572,6 +33793,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(input);
 	assert(pout);
 	assert(offsetscompanion);
+
 	// unsigned counter, not zero inclusive inside the loop
 	// architecture: limit to two at a time when there's few registers
 	std::size_t i{(defaultgprfilesize < gprfilesize::large)? ((count + 1 + 2) >> 2) * 2 : ((count + 1 + 8) >> 4) * 8};// rounded up in the top part
@@ -33697,6 +33919,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(psrclo);
 	assert(pdst);
 	assert(offsetscompanion);
+
 	V *const *psrchi{psrclo + count};
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1 + 2) >> 2};// rounded up in the top part
@@ -33771,6 +33994,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(psrclo);
 	assert(pdst);
 	assert(offsets);
+
 	if constexpr(ismultithreadcapable){
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1) >> (1 + usemultithread))};// rounded down in the bottom part
@@ -33911,6 +34135,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -34007,6 +34232,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -34298,6 +34524,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - 1 + isfltpmode)};// shrink the offsets size if possible
 	X offsetscompanion[offsetsstride];// a sizeable amount of indices, but it's worth it
 	std::fill(std::execution::par_unseq, offsetscompanion, offsetscompanion + offsetsstride, 0u);// zeroed in advance here
@@ -34394,6 +34621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+
 	// All the code in this function is adapted for count to be one below its input value here.
 	--count;
 	if(ismultithreadcapable || 0 < static_cast<std::ptrdiff_t>(count)){// a 0 or 1 count array is only allowed here in single-threaded function mode
@@ -38151,7 +38379,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
@@ -38163,6 +38396,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
+	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -38200,7 +38434,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 				if(3 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
@@ -38248,10 +38482,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
-				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+					asyncreturnhandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
@@ -38260,7 +38493,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-			return;
+			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -38282,8 +38515,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	asyncreturnhandle = pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
+	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -38297,7 +38531,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
@@ -38308,6 +38547,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
+	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -38345,7 +38585,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 				if(3 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
@@ -38398,10 +38638,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					input = buffer;
 					buffer = tmp;
 				}
-				std::future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
-					asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+					asyncreturnhandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
 				}catch(...){// std::async may fail gracefully here
 					assert(false);
 					// given the absolute rarity of this case, simply process this part in the current thread
@@ -38410,7 +38649,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-			return;
+			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -38432,8 +38671,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	asyncreturnhandle = pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
+	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 #endif// !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 
@@ -39478,7 +39718,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 				static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -39619,7 +39859,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 				static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -39736,7 +39976,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortcopynoallocmulti
 #else
@@ -39748,6 +39993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
+	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -39797,7 +40043,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<void> asynchandle;
+					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
@@ -39845,10 +40091,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that output and buffer were swapped in the initial phase
-					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
+						asyncreturnhandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -39857,7 +40102,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-				return;
+				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -39899,8 +40144,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	asyncreturnhandle = pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
+	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -39914,7 +40160,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	void>
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
+	void
+#else
+	std::future<void>
+#endif
+	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	radixsortnoallocmulti
 #else
@@ -39925,6 +40176,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
+	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -39974,7 +40226,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<void> asynchandle;
+					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
@@ -40027,10 +40279,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						input = buffer;
 						buffer = tmp;
 					}
-					std::future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
-						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
+						asyncreturnhandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
 					}catch(...){// std::async may fail gracefully here
 						assert(false);
 						// given the absolute rarity of this case, simply process this part in the current thread
@@ -40039,7 +40290,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-				return;
+				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -40081,8 +40332,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	asyncreturnhandle = pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
+	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 #endif// !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 
@@ -40152,7 +40404,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
-						std::future<void> asynchandle;
+						std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 						static std::size_t constexpr limit16way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -40341,7 +40593,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
-						std::future<void> asynchandle;
+						std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 						static std::size_t constexpr limit16way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -40885,7 +41137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 				if(3 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
@@ -41029,7 +41281,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 				if(3 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
@@ -41778,7 +42030,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 				static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -41918,7 +42170,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 			{
-				std::future<void> asynchandle;
+				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 				static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -42095,7 +42347,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<void> asynchandle;
+					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
@@ -42271,7 +42523,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<void> asynchandle;
+					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7 < reportedcores
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
@@ -42454,7 +42706,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
-						std::future<void> asynchandle;
+						std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 						static std::size_t constexpr limit16way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -42648,7 +42900,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 					{
-						std::future<void> asynchandle;
+						std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 						static std::size_t constexpr limit16way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
