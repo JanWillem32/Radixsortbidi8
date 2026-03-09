@@ -38396,7 +38396,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -38479,6 +38478,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
+			std::future<void> asyncreturnhandle;
 			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that output and buffer were swapped in the initial phase
@@ -38492,8 +38492,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
-#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -38515,9 +38515,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	asyncreturnhandle = pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	return{pcall(count, input, output, buffer)};// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
-	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -38547,7 +38546,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -38630,6 +38628,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
+			std::future<void> asyncreturnhandle;
 			if(finalcount != count){// conditionally enable multithreading here
 				// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 				// note that input and buffer were swapped in the initial phase
@@ -38648,8 +38647,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
-#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+#if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 		}else{// single-threaded
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -38671,9 +38670,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	asyncreturnhandle = pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	return{pcall(count, input, buffer, movetobuffer)};// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
-	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 #endif// !defined(RSBD8_THREAD_MAXIMUM) || 4 <= (RSBD8_THREAD_MAXIMUM)
 
@@ -39993,7 +39991,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -40088,6 +40085,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 
 				// merging phase
+				std::future<void> asyncreturnhandle;
 				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that output and buffer were swapped in the initial phase
@@ -40101,8 +40099,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
-#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -40144,9 +40142,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	asyncreturnhandle = pcall(count, input, output, buffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	return{pcall(count, input, output, buffer)};// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
-	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T
@@ -40176,7 +40173,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	std::future<void> asyncreturnhandle;
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -40271,6 +40267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 
 				// merging phase
+				std::future<void> asyncreturnhandle;
 				if(finalcount != count){// conditionally enable multithreading here
 					// This cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish.
 					// note that input and buffer were swapped in the initial phase
@@ -40289,8 +40286,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
-#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+#if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 			}else{// dual-threaded
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
@@ -40332,9 +40329,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}
-	asyncreturnhandle = pcall(count, input, buffer, movetobuffer);// architecture: indirect calls only have a modest performance penalty on most platforms
+	return{pcall(count, input, buffer, movetobuffer)};// architecture: indirect calls only have a modest performance penalty on most platforms
 #endif
-	return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
 }
 #endif// !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 
