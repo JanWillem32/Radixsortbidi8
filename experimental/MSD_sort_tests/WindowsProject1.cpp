@@ -140,7 +140,7 @@ __declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std
 				if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 					if((reportedcores & INT_MAX) > coresused){// mask out the possible high bit of reportedcores
 						++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-						vecasync.push_back(std::move(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts)));
+						vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
 					}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, pcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<std::size_t[]>{});// do the work here, mask out the possible high bit of reportedcores
 				}else insertion_sort<T>(currentcount, array);
 				n = currentindex;
@@ -161,7 +161,7 @@ __declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std
 				if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 					if((reportedcores & INT_MAX) > coresused){// mask out the possible high bit of reportedcores
 						++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-						vecasync.push_back(std::move(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts)));
+						vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
 					}else experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, pcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<std::size_t[]>{});// do the work here, mask out the possible high bit of reportedcores
 				}else insertion_sort<T>(currentcount, array);
 				n = currentindex;
@@ -256,11 +256,11 @@ __declspec(noalias safebuffers) __forceinline void experimentalMSD_sort(std::siz
 					do{
 						std::size_t partitionblocksize{partitionsize + (partitiondist >> (CHAR_BIT * sizeof(std::size_t) - 1u))};// add on the sign bit to distribute the remainder
 						++partitiondist;
-						*pcounterhandle++ = std::move(std::async(std::launch::async, experimentalMSD_sort_toplevelinit<radixbits, T>, partitionblocksize, parray));
+						*pcounterhandle++ = std::async(std::launch::async, experimentalMSD_sort_toplevelinit<radixbits, T>, partitionblocksize, parray);
 						parray += partitionblocksize;
 					}while(--i);
 					// the final partition can just be processed by this thread
-					count = std::move(experimentalMSD_sort_toplevelinit<radixbits, T>(partitionsize, parray));// the final partition never takes part in distributing the remainder
+					count = experimentalMSD_sort_toplevelinit<radixbits, T>(partitionsize, parray);// the final partition never takes part in distributing the remainder
 					// sum up the local counts into the global count
 					pcounterhandle = counterhandles.get();
 					i = reportedcores - 1u;
@@ -335,7 +335,7 @@ singlethreadinit:
 						if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 							if(reportedcores > coresused){
 								++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-								vecasync.push_back(std::move(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts)));
+								vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
 							}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, pcounts, reportedcores, coresused, std::shared_ptr<std::size_t[]>{});// do the work here
 						}else insertion_sort<T>(currentcount, array);
 						n = currentindex;
@@ -356,7 +356,7 @@ singlethreadinit:
 						if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 							if(reportedcores > coresused){
 								++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-								vecasync.push_back(std::move(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts)));
+								vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
 							}else experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, pcounts, reportedcores, coresused, std::shared_ptr<std::size_t[]>{});// do the work here
 						}else insertion_sort<T>(currentcount, array);
 						n = currentindex;
