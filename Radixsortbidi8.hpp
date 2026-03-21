@@ -1315,30 +1315,30 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 template<typename T>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128<false, false, false>, T> ||
-	std::is_same_v<longdoubletest128<false, false, true>, T> ||
-	std::is_same_v<longdoubletest128<false, true, false>, T> ||
-	std::is_same_v<longdoubletest128<false, true, true>, T> ||
-	std::is_same_v<longdoubletest128<true, false, false>, T> ||
-	std::is_same_v<longdoubletest128<true, false, true>, T> ||
-	std::is_same_v<longdoubletest128<true, true, false>, T> ||
-	std::is_same_v<longdoubletest128<true, true, true>, T> ||
-	std::is_same_v<longdoubletest96<false, false, false>, T> ||
-	std::is_same_v<longdoubletest96<false, false, true>, T> ||
-	std::is_same_v<longdoubletest96<false, true, false>, T> ||
-	std::is_same_v<longdoubletest96<false, true, true>, T> ||
-	std::is_same_v<longdoubletest96<true, false, false>, T> ||
-	std::is_same_v<longdoubletest96<true, false, true>, T> ||
-	std::is_same_v<longdoubletest96<true, true, false>, T> ||
-	std::is_same_v<longdoubletest96<true, true, true>, T> ||
-	std::is_same_v<longdoubletest80<false, false, false>, T> ||
-	std::is_same_v<longdoubletest80<false, false, true>, T> ||
-	std::is_same_v<longdoubletest80<false, true, false>, T> ||
-	std::is_same_v<longdoubletest80<false, true, true>, T> ||
-	std::is_same_v<longdoubletest80<true, false, false>, T> ||
-	std::is_same_v<longdoubletest80<true, false, true>, T> ||
-	std::is_same_v<longdoubletest80<true, true, false>, T> ||
-	std::is_same_v<longdoubletest80<true, true, true>, T>,
+	std::is_same_v<T, longdoubletest128<false, false, false>> ||
+	std::is_same_v<T, longdoubletest128<false, false, true>> ||
+	std::is_same_v<T, longdoubletest128<false, true, false>> ||
+	std::is_same_v<T, longdoubletest128<false, true, true>> ||
+	std::is_same_v<T, longdoubletest128<true, false, false>> ||
+	std::is_same_v<T, longdoubletest128<true, false, true>> ||
+	std::is_same_v<T, longdoubletest128<true, true, false>> ||
+	std::is_same_v<T, longdoubletest128<true, true, true>> ||
+	std::is_same_v<T, longdoubletest96<false, false, false>> ||
+	std::is_same_v<T, longdoubletest96<false, false, true>> ||
+	std::is_same_v<T, longdoubletest96<false, true, false>> ||
+	std::is_same_v<T, longdoubletest96<false, true, true>> ||
+	std::is_same_v<T, longdoubletest96<true, false, false>> ||
+	std::is_same_v<T, longdoubletest96<true, false, true>> ||
+	std::is_same_v<T, longdoubletest96<true, true, false>> ||
+	std::is_same_v<T, longdoubletest96<true, true, true>> ||
+	std::is_same_v<T, longdoubletest80<false, false, false>> ||
+	std::is_same_v<T, longdoubletest80<false, false, true>> ||
+	std::is_same_v<T, longdoubletest80<false, true, false>> ||
+	std::is_same_v<T, longdoubletest80<false, true, true>> ||
+	std::is_same_v<T, longdoubletest80<true, false, false>> ||
+	std::is_same_v<T, longdoubletest80<true, false, true>> ||
+	std::is_same_v<T, longdoubletest80<true, true, false>> ||
+	std::is_same_v<T, longdoubletest80<true, true, true>>,
 	T> generatehighbit()noexcept{
 	return{{0, 0x8000u}};
 }
@@ -1508,10 +1508,10 @@ struct test64{
 };
 template<typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test64<false, false, false>, T> ||
-	std::is_same_v<test64<false, true, false>, T> ||
-	std::is_same_v<test64<true, false, false>, T> ||
-	std::is_same_v<test64<true, true, false>, T>,
+	std::is_same_v<T, test64<false, false, false>> ||
+	std::is_same_v<T, test64<false, true, false>> ||
+	std::is_same_v<T, test64<true, false, false>> ||
+	std::is_same_v<T, test64<true, true, false>>,
 	T> generatehighbit()noexcept{// integral 64-bit type
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -1529,10 +1529,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 template<typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test64<false, false, true>, T> ||
-	std::is_same_v<test64<false, true, true>, T> ||
-	std::is_same_v<test64<true, false, true>, T> ||
-	std::is_same_v<test64<true, true, true>, T>,
+	std::is_same_v<T, test64<false, false, true>> ||
+	std::is_same_v<T, test64<false, true, true>> ||
+	std::is_same_v<T, test64<true, false, true>> ||
+	std::is_same_v<T, test64<true, true, true>>,
 	T> generatehighbit()noexcept{// floating-point 64-bit type
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -1719,14 +1719,14 @@ struct test128{
 };
 template<typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<false, false, false>, T> ||
-	std::is_same_v<test128<false, false, true>, T> ||
-	std::is_same_v<test128<false, true, false>, T> ||
-	std::is_same_v<test128<false, true, true>, T> ||
-	std::is_same_v<test128<true, false, false>, T> ||
-	std::is_same_v<test128<true, false, true>, T> ||
-	std::is_same_v<test128<true, true, false>, T> ||
-	std::is_same_v<test128<true, true, true>, T>,
+	std::is_same_v<T, test128<false, false, false>> ||
+	std::is_same_v<T, test128<false, false, true>> ||
+	std::is_same_v<T, test128<false, true, false>> ||
+	std::is_same_v<T, test128<false, true, true>> ||
+	std::is_same_v<T, test128<true, false, false>> ||
+	std::is_same_v<T, test128<true, false, true>> ||
+	std::is_same_v<T, test128<true, true, false>> ||
+	std::is_same_v<T, test128<true, true, true>>,
 	T> generatehighbit()noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -2007,30 +2007,30 @@ using tounifunsigned = std::conditional_t<std::is_same_v<long double, T> &&// co
 		std::conditional_t<80 == CHAR_BIT * sizeof(long double), longdoubletest80<isabsvalue, issignmode, isfltpmode>,
 		std::conditional_t<96 == CHAR_BIT * sizeof(long double), longdoubletest96<isabsvalue, issignmode, isfltpmode>,
 		std::conditional_t<128 == CHAR_BIT * sizeof(long double), longdoubletest128<isabsvalue, issignmode, isfltpmode>, void>>>,
-	std::conditional_t<std::is_same_v<longdoubletest128<false, false, false>, T> ||
-		std::is_same_v<longdoubletest128<false, false, true>, T> ||
-		std::is_same_v<longdoubletest128<false, true, false>, T> ||
-		std::is_same_v<longdoubletest128<false, true, true>, T> ||
-		std::is_same_v<longdoubletest128<true, false, false>, T> ||
-		std::is_same_v<longdoubletest128<true, false, true>, T> ||
-		std::is_same_v<longdoubletest128<true, true, false>, T> ||
-		std::is_same_v<longdoubletest128<true, true, true>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
-	std::conditional_t<std::is_same_v<longdoubletest96<false, false, false>, T> ||
-		std::is_same_v<longdoubletest96<false, false, true>, T> ||
-		std::is_same_v<longdoubletest96<false, true, false>, T> ||
-		std::is_same_v<longdoubletest96<false, true, true>, T> ||
-		std::is_same_v<longdoubletest96<true, false, false>, T> ||
-		std::is_same_v<longdoubletest96<true, false, true>, T> ||
-		std::is_same_v<longdoubletest96<true, true, false>, T> ||
-		std::is_same_v<longdoubletest96<true, true, true>, T>, longdoubletest96<isabsvalue, issignmode, isfltpmode>,
-	std::conditional_t<std::is_same_v<longdoubletest80<false, false, false>, T> ||
-		std::is_same_v<longdoubletest80<false, false, true>, T> ||
-		std::is_same_v<longdoubletest80<false, true, false>, T> ||
-		std::is_same_v<longdoubletest80<false, true, true>, T> ||
-		std::is_same_v<longdoubletest80<true, false, false>, T> ||
-		std::is_same_v<longdoubletest80<true, false, true>, T> ||
-		std::is_same_v<longdoubletest80<true, true, false>, T> ||
-		std::is_same_v<longdoubletest80<true, true, true>, T>, longdoubletest80<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<false, false, false>> ||
+		std::is_same_v<T, longdoubletest128<false, false, true>> ||
+		std::is_same_v<T, longdoubletest128<false, true, false>> ||
+		std::is_same_v<T, longdoubletest128<false, true, true>> ||
+		std::is_same_v<T, longdoubletest128<true, false, false>> ||
+		std::is_same_v<T, longdoubletest128<true, false, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, false>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest96<false, false, false>> ||
+		std::is_same_v<T, longdoubletest96<false, false, true>> ||
+		std::is_same_v<T, longdoubletest96<false, true, false>> ||
+		std::is_same_v<T, longdoubletest96<false, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, false, false>> ||
+		std::is_same_v<T, longdoubletest96<true, false, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, false>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest80<false, false, false>> ||
+		std::is_same_v<T, longdoubletest80<false, false, true>> ||
+		std::is_same_v<T, longdoubletest80<false, true, false>> ||
+		std::is_same_v<T, longdoubletest80<false, true, true>> ||
+		std::is_same_v<T, longdoubletest80<true, false, false>> ||
+		std::is_same_v<T, longdoubletest80<true, false, true>> ||
+		std::is_same_v<T, longdoubletest80<true, true, false>> ||
+		std::is_same_v<T, longdoubletest80<true, true, true>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>,
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 	std::conditional_t<128 == CHAR_BIT * sizeof(T), test128<isabsvalue, issignmode, isfltpmode>,
 #else
@@ -2705,9 +2705,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -2848,9 +2848,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -2861,9 +2861,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3119,9 +3119,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3134,9 +3134,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3596,9 +3596,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3613,9 +3613,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3748,9 +3748,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -3761,9 +3761,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -4005,9 +4005,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -4020,9 +4020,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -4463,9 +4463,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -4779,9 +4779,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -4876,9 +4876,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -5351,9 +5351,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -5507,9 +5507,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -6277,9 +6277,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -6551,9 +6551,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	8 < CHAR_BIT * sizeof(U),
@@ -6569,9 +6569,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curm, U &cure)noexcept{
@@ -6738,9 +6738,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curm, U &cure, T *out)noexcept{
@@ -6930,9 +6930,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curm, U &cure, T *out, T *dst)noexcept{
@@ -7135,9 +7135,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, std::uint_least64_t &curmb, U &cureb)noexcept{
@@ -7438,9 +7438,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, std::uint_least64_t &curmb, U &cureb, T *outb)noexcept{
@@ -7772,9 +7772,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, T *dsta, std::uint_least64_t &curmb, U &cureb, T *outb, T *dstb)noexcept{
@@ -8132,7 +8132,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -8235,7 +8235,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -8358,7 +8358,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out, T *dst)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -8494,7 +8494,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, std::uint_least64_t &curlob, std::uint_least64_t &curhib)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -8659,7 +8659,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -8856,7 +8856,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, T *dsta, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb, T *dstb)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -10581,9 +10581,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::array<unsigned, 2>> generateoffsetsmultimtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -10885,30 +10885,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	static std::size_t constexpr typebitsize{// all templated variants need to be included here, given the usage of this function by generateoffsetsmulti()
-		(std::is_same_v<longdoubletest128<false, false, false>, T> ||
-		std::is_same_v<longdoubletest128<false, false, true>, T> ||
-		std::is_same_v<longdoubletest128<false, true, false>, T> ||
-		std::is_same_v<longdoubletest128<false, true, true>, T> ||
-		std::is_same_v<longdoubletest128<true, false, false>, T> ||
-		std::is_same_v<longdoubletest128<true, false, true>, T> ||
-		std::is_same_v<longdoubletest128<true, true, false>, T> ||
-		std::is_same_v<longdoubletest128<true, true, true>, T> ||
-		std::is_same_v<longdoubletest96<false, false, false>, T> ||
-		std::is_same_v<longdoubletest96<false, false, true>, T> ||
-		std::is_same_v<longdoubletest96<false, true, false>, T> ||
-		std::is_same_v<longdoubletest96<false, true, true>, T> ||
-		std::is_same_v<longdoubletest96<true, false, false>, T> ||
-		std::is_same_v<longdoubletest96<true, false, true>, T> ||
-		std::is_same_v<longdoubletest96<true, true, false>, T> ||
-		std::is_same_v<longdoubletest96<true, true, true>, T> ||
-		std::is_same_v<longdoubletest80<false, false, false>, T> ||
-		std::is_same_v<longdoubletest80<false, false, true>, T> ||
-		std::is_same_v<longdoubletest80<false, true, false>, T> ||
-		std::is_same_v<longdoubletest80<false, true, true>, T> ||
-		std::is_same_v<longdoubletest80<true, false, false>, T> ||
-		std::is_same_v<longdoubletest80<true, false, true>, T> ||
-		std::is_same_v<longdoubletest80<true, true, false>, T> ||
-		std::is_same_v<longdoubletest80<true, true, true>, T>)? 80 :
+		(std::is_same_v<T, longdoubletest128<false, false, false>> ||
+		std::is_same_v<T, longdoubletest128<false, false, true>> ||
+		std::is_same_v<T, longdoubletest128<false, true, false>> ||
+		std::is_same_v<T, longdoubletest128<false, true, true>> ||
+		std::is_same_v<T, longdoubletest128<true, false, false>> ||
+		std::is_same_v<T, longdoubletest128<true, false, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, false>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>> ||
+		std::is_same_v<T, longdoubletest96<false, false, false>> ||
+		std::is_same_v<T, longdoubletest96<false, false, true>> ||
+		std::is_same_v<T, longdoubletest96<false, true, false>> ||
+		std::is_same_v<T, longdoubletest96<false, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, false, false>> ||
+		std::is_same_v<T, longdoubletest96<true, false, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, false>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>> ||
+		std::is_same_v<T, longdoubletest80<false, false, false>> ||
+		std::is_same_v<T, longdoubletest80<false, false, true>> ||
+		std::is_same_v<T, longdoubletest80<false, true, false>> ||
+		std::is_same_v<T, longdoubletest80<false, true, true>> ||
+		std::is_same_v<T, longdoubletest80<true, false, false>> ||
+		std::is_same_v<T, longdoubletest80<true, false, true>> ||
+		std::is_same_v<T, longdoubletest80<true, true, false>> ||
+		std::is_same_v<T, longdoubletest80<true, true, true>>)? 80 :
 		std::is_same_v<std::nullptr_t, T>? 8 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr stride{offsetsstride + (typebitsize / 8 - 1) * 256};// offsetsstride, adapted for the multi-part types
 	X *t{offsets// low-to-high or high-to-low
@@ -11081,9 +11081,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	std::array<unsigned, 2>> generateoffsetsmulti(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0, unsigned paritybool = 0)noexcept{
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
 
@@ -11131,9 +11131,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	std::array<unsigned, 2>> generateoffsetsmulti(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread, unsigned paritybool = 0)noexcept{
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	// do not pass a nullptr here
 	assert(offsets);
 
@@ -11215,9 +11215,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
@@ -11715,9 +11715,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
@@ -11964,9 +11964,9 @@ handletop8:
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
@@ -12384,9 +12384,9 @@ handletop8:
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -12491,9 +12491,9 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -13016,9 +13016,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -13122,9 +13122,9 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -13706,10 +13706,10 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -14163,10 +14163,10 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -14425,10 +14425,10 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -14838,10 +14838,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -14967,10 +14967,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -15484,10 +15484,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -15612,10 +15612,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> ||
-	std::is_same_v<long double, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -16178,7 +16178,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -16325,7 +16325,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -16492,7 +16492,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -16769,7 +16769,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -16873,7 +16873,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -17216,7 +17216,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -17319,7 +17319,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -17666,15 +17666,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -18060,15 +18059,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -18277,15 +18275,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -18644,15 +18641,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
@@ -18773,15 +18769,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -19314,15 +19309,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
@@ -19442,15 +19436,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<false, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, false, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, false>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>> &&
-	!std::is_same_v<longdoubletest128<true, true, true>, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>>,
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -19994,7 +19987,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -20122,7 +20115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -20323,7 +20316,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -20636,7 +20629,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -20740,7 +20733,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -21032,7 +21025,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
@@ -21135,7 +21128,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 	>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -37090,13 +37083,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
 #endif
 	longdoubletest96<isabsvalue, issignmode, isfltpmode>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -37279,11 +37272,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>,
+	std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>,
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
 #endif
 	longdoubletest96<isabsvalue, issignmode, isfltpmode>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -37304,13 +37297,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 2>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 2>,
 #endif
 	std::array<longdoubletest96<isabsvalue, issignmode, isfltpmode>, 2>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -37620,7 +37613,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// no assertion on the exponent here, as the comparison functions will not use it
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
 #endif
 	longdoubletest96<isabsvalue, issignmode, isfltpmode>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -37633,11 +37626,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 2>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 2>,
 #endif
 	std::array<longdoubletest96<isabsvalue, issignmode, isfltpmode>, 2>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -37660,13 +37653,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>) &&
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 3>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 3>,
 #endif
 	std::array<longdoubletest96<isabsvalue, issignmode, isfltpmode>, 3>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -38109,7 +38102,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	// no assertion on the exponent here, as the comparison functions will not use it
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>,
 #endif
 	longdoubletest96<isabsvalue, issignmode, isfltpmode>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -38122,11 +38115,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-	std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>),
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-	std::conditional_t<std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 3>,
+	std::conditional_t<std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>>, std::array<longdoubletest128<isabsvalue, issignmode, isfltpmode>, 3>,
 #endif
 	std::array<longdoubletest96<isabsvalue, issignmode, isfltpmode>, 3>
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -38151,8 +38144,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	test128<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -38254,8 +38247,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test128<isabsvalue, issignmode, isfltpmode>, 2>> convertinput(U cura, U curb)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -38419,8 +38412,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test128<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<U, test128<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test128<isabsvalue, issignmode, isfltpmode>, 3>> convertinput(U cura, U curb, U curc)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
@@ -38645,8 +38638,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #else// 32-bit or smaller platforms
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
 	test64<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -38726,8 +38719,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 2>> convertinput(U cura, U curb)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -38855,8 +38848,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, T> &&
-	std::is_same_v<test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
+	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 3>> convertinput(U cura, U curb, U curc)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -39211,9 +39204,9 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> base4waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
 	// for unfiltered 16-bit it's 80 GiB, and for half-precision floating point it's 70 GiB
 	// for unfiltered 32-bit it's 5 GiB, and for float it's 4.375 GiB
@@ -39245,9 +39238,9 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> base6waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
 	static std::size_t constexpr typebitsizecub{typebitsize * typebitsizesqr};
 	static std::size_t constexpr typebitsizequt{typebitsizesqr * typebitsizesqr};
@@ -39281,9 +39274,9 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> base8waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	// for unfiltered 16-bit it's 128 GiB, and for half-precision floating point it's 112 GiB
 	// for unfiltered 32-bit it's 32 GiB, and for float it's 28 GiB
 	// for unfiltered 64-bit it's 8 GiB, and for double it's 7 GiB
@@ -39314,9 +39307,9 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	std::size_t> base16waythreshold()noexcept{
 	// TODO: refine this formula further with more benchmarking data
 	static std::size_t constexpr typebitsize{
-		(std::is_same_v<longdoubletest128<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest96<isabsvalue, issignmode, isfltpmode>, T> ||
-		std::is_same_v<longdoubletest80<isabsvalue, issignmode, isfltpmode>, T>)? 80 : CHAR_BIT * sizeof(T)};
+		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	// for unfiltered 16-bit it's 256 GiB, and for half-precision floating point it's 224 GiB
 	// for unfiltered 32-bit it's 128 GiB, and for float it's 112 GiB
 	// for unfiltered 64-bit it's 64 GiB, and for double it's 56 GiB
@@ -44726,42 +44719,128 @@ template<sortingmode mode, typename T>
 constexpr bool isabsvalue{
 	(sortingmode::nativeabs <= mode && std::is_signed_v<T> ||
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::is_same_v<T, test128<true, false, false>> || std::is_same_v<T, test128<true, false, true>> || std::is_same_v<T, test128<true, true, false>> || std::is_same_v<T, test128<true, true, true>> ||
+		std::is_same_v<T, test128<true, false, false>> ||
+		std::is_same_v<T, test128<true, false, true>> ||
+		std::is_same_v<T, test128<true, true, false>> ||
+		std::is_same_v<T, test128<true, true, true>> ||
 #else
-		std::is_same_v<T, test64<true, false, false>> || std::is_same_v<T, test64<true, false, true>> || std::is_same_v<T, test64<true, true, false>> || std::is_same_v<T, test64<true, true, true>> ||
+		std::is_same_v<T, test64<true, false, false>> ||
+		std::is_same_v<T, test64<true, false, true>> ||
+		std::is_same_v<T, test64<true, true, false>> ||
+		std::is_same_v<T, test64<true, true, true>> ||
 #endif
-		std::is_same_v<T, longdoubletest128<true, false, false>> || std::is_same_v<T, longdoubletest128<true, false, true>> || std::is_same_v<T, longdoubletest128<true, true, false>> || std::is_same_v<T, longdoubletest128<true, true, true>> ||
-		std::is_same_v<T, longdoubletest96<true, false, false>> || std::is_same_v<T, longdoubletest96<true, false, true>> || std::is_same_v<T, longdoubletest96<true, true, false>> || std::is_same_v<T, longdoubletest96<true, true, true>> ||
-		std::is_same_v<T, longdoubletest80<true, false, false>> || std::is_same_v<T, longdoubletest80<true, false, true>> || std::is_same_v<T, longdoubletest80<true, true, false>> || std::is_same_v<T, longdoubletest80<true, true, true>>) ||
+		std::is_same_v<T, longdoubletest128<true, false, false>> ||
+		std::is_same_v<T, longdoubletest128<true, false, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, false>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, false, false>> ||
+		std::is_same_v<T, longdoubletest96<true, false, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, false>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>> ||
+		std::is_same_v<T, longdoubletest80<true, false, false>> ||
+		std::is_same_v<T, longdoubletest80<true, false, true>> ||
+		std::is_same_v<T, longdoubletest80<true, true, false>> ||
+		std::is_same_v<T, longdoubletest80<true, true, true>>) ||
 	(sortingmode::native > mode && static_cast<bool>(1 & static_cast<unsigned char>(mode)))
 };
 
 template<sortingmode mode, typename T>
 constexpr bool issignmode{
-	(sortingmode::native <= mode && sortingmode::nativeabs >= mode && std::is_signed_v<T> ||
+	(sortingmode::native <= mode && sortingmode::nativeabs >= mode &&
+		std::is_signed_v<T> ||
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::is_same_v<T, test128<false, true, false>> || std::is_same_v<T, test128<false, true, true>> || std::is_same_v<T, test128<true, true, false>> || std::is_same_v<T, test128<true, true, true>> ||
+		std::is_same_v<T, test128<false, true, false>> ||
+		std::is_same_v<T, test128<false, true, true>> ||
+		std::is_same_v<T, test128<true, true, false>> ||
+		std::is_same_v<T, test128<true, true, true>> ||
 #else
-		std::is_same_v<T, test64<false, true, false>> || std::is_same_v<T, test64<false, true, true>> || std::is_same_v<T, test64<true, true, false>> || std::is_same_v<T, test64<true, true, true>> ||
+		std::is_same_v<T, test64<false, true, false>> ||
+		std::is_same_v<T, test64<false, true, true>> ||
+		std::is_same_v<T, test64<true, true, false>> ||
+		std::is_same_v<T, test64<true, true, true>> ||
 #endif
-		std::is_same_v<T, longdoubletest128<false, true, false>> || std::is_same_v<T, longdoubletest128<false, true, true>> || std::is_same_v<T, longdoubletest128<true, true, false>> || std::is_same_v<T, longdoubletest128<true, true, true>> ||
-		std::is_same_v<T, longdoubletest96<false, true, false>> || std::is_same_v<T, longdoubletest96<false, true, true>> || std::is_same_v<T, longdoubletest96<true, true, false>> || std::is_same_v<T, longdoubletest96<true, true, true>> ||
-		std::is_same_v<T, longdoubletest80<false, true, false>> || std::is_same_v<T, longdoubletest80<false, true, true>> || std::is_same_v<T, longdoubletest80<true, true, false>> || std::is_same_v<T, longdoubletest80<true, true, true>>) ||
+		std::is_same_v<T, longdoubletest128<false, true, false>> ||
+		std::is_same_v<T, longdoubletest128<false, true, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, false>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>> ||
+		std::is_same_v<T, longdoubletest96<false, true, false>> ||
+		std::is_same_v<T, longdoubletest96<false, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, false>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>> ||
+		std::is_same_v<T, longdoubletest80<false, true, false>> ||
+		std::is_same_v<T, longdoubletest80<false, true, true>> ||
+		std::is_same_v<T, longdoubletest80<true, true, false>> ||
+		std::is_same_v<T, longdoubletest80<true, true, true>>) ||
 	(sortingmode::native > mode && static_cast<bool>(1 << 1 & static_cast<unsigned char>(mode)))
 };
 
 template<sortingmode mode, typename T>
 constexpr bool isfltpmode{
-	(sortingmode::native <= mode && std::is_floating_point_v<T> ||
+	(sortingmode::native <= mode &&
+		std::is_floating_point_v<T> ||
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::is_same_v<T, test128<false, false, true>> || std::is_same_v<T, test128<false, true, true>> || std::is_same_v<T, test128<true, false, true>> || std::is_same_v<T, test128<true, true, true>> ||
+		std::is_same_v<T, test128<false, false, true>> ||
+		std::is_same_v<T, test128<false, true, true>> ||
+		std::is_same_v<T, test128<true, false, true>> ||
+		std::is_same_v<T, test128<true, true, true>> ||
 #else
-		std::is_same_v<T, test64<false, false, true>> || std::is_same_v<T, test64<false, true, true>> || std::is_same_v<T, test64<true, false, true>> || std::is_same_v<T, test64<true, true, true>> ||
+		std::is_same_v<T, test64<false, false, true>> ||
+		std::is_same_v<T, test64<false, true, true>> ||
+		std::is_same_v<T, test64<true, false, true>> ||
+		std::is_same_v<T, test64<true, true, true>> ||
 #endif
-		std::is_same_v<T, longdoubletest128<false, false, true>> || std::is_same_v<T, longdoubletest128<false, true, true>> || std::is_same_v<T, longdoubletest128<true, false, true>> || std::is_same_v<T, longdoubletest128<true, true, true>> ||
-		std::is_same_v<T, longdoubletest96<false, false, true>> || std::is_same_v<T, longdoubletest96<false, true, true>> || std::is_same_v<T, longdoubletest96<true, false, true>> || std::is_same_v<T, longdoubletest96<true, true, true>> ||
-		std::is_same_v<T, longdoubletest80<false, false, true>> || std::is_same_v<T, longdoubletest80<false, true, true>> || std::is_same_v<T, longdoubletest80<true, false, true>> || std::is_same_v<T, longdoubletest80<true, true, true>>) ||
+		std::is_same_v<T, longdoubletest128<false, false, true>> ||
+		std::is_same_v<T, longdoubletest128<false, true, true>> ||
+		std::is_same_v<T, longdoubletest128<true, false, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>> ||
+		std::is_same_v<T, longdoubletest96<false, false, true>> ||
+		std::is_same_v<T, longdoubletest96<false, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, false, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>> ||
+		std::is_same_v<T, longdoubletest80<false, false, true>> ||
+		std::is_same_v<T, longdoubletest80<false, true, true>> ||
+		std::is_same_v<T, longdoubletest80<true, false, true>> ||
+		std::is_same_v<T, longdoubletest80<true, true, true>>) ||
 	(sortingmode::native > mode && static_cast<bool>(1 << 2 & static_cast<unsigned char>(mode)))
+};
+
+template<sortingdirection direction>
+constexpr bool isdescsort{
+	static_cast<bool>(1 & static_cast<unsigned char>(direction))
+};
+
+template<sortingdirection direction>
+constexpr bool isrevorderwithindirection{
+	static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))
+};
+
+template<sortingdirection direction, typename T, bool isabsvalue, bool issignmode, bool isfltpmode>
+constexpr bool isrevorderwithoutindirection{
+	static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction)) && (
+		// reverse ordering is useless if there are no non-uniqe value configurations (padding, sign bits)
+		std::is_same_v<T, longdoubletest128<false, false, false>> ||
+		std::is_same_v<T, longdoubletest128<false, false, true>> ||
+		std::is_same_v<T, longdoubletest128<false, true, false>> ||
+		std::is_same_v<T, longdoubletest128<false, true, true>> ||
+		std::is_same_v<T, longdoubletest128<true, false, false>> ||
+		std::is_same_v<T, longdoubletest128<true, false, true>> ||
+		std::is_same_v<T, longdoubletest128<true, true, false>> ||
+		std::is_same_v<T, longdoubletest128<true, true, true>> ||
+		std::is_same_v<T, longdoubletest96<false, false, false>> ||
+		std::is_same_v<T, longdoubletest96<false, false, true>> ||
+		std::is_same_v<T, longdoubletest96<false, true, false>> ||
+		std::is_same_v<T, longdoubletest96<false, true, true>> ||
+		std::is_same_v<T, longdoubletest96<true, false, false>> ||
+		std::is_same_v<T, longdoubletest96<true, false, true>> ||
+		std::is_same_v<T, longdoubletest96<true, true, false>> ||
+		std::is_same_v<T, longdoubletest96<true, true, true>> ||
+		(std::is_same_v<T, long double> &&
+			64 == LDBL_MANT_DIG &&
+			16384 == LDBL_MAX_EXP &&
+			128 >= CHAR_BIT * sizeof(long double) &&
+			64 < CHAR_BIT * sizeof(long double)) ||
+		(isabsvalue && issignmode) ||// both regular absolute modes
+		(!isabsvalue && issignmode && isfltpmode))// regular floating-point mode
 };
 }// namespace helper
 
@@ -44921,12 +45000,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[], T buffer[])noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	helper::radixsortcopynoallocmulti<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U const *>(input), reinterpret_cast<U *>(output), reinterpret_cast<U *>(buffer));
 }
 
@@ -44939,12 +45018,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	helper::radixsortnoallocmulti<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer), movetobuffer);
 }
 
@@ -44956,12 +45035,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[])noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	helper::radixsortcopynoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U const *>(input), reinterpret_cast<U *>(output));
 }
 
@@ -44985,12 +45064,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[])noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
 		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
 		helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
@@ -45005,12 +45084,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[])noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
 		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
 		static_assert(false, "Unsupported combination of sorting modes.");
@@ -45026,12 +45105,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
 		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
 		if(!movetobuffer) helper::radixsortnoallocsingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, U>(count, reinterpret_cast<U *>(input), reinterpret_cast<U *>(buffer));
@@ -45049,13 +45128,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], bool movetobuffer)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
-
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithoutindirection<direction, U, isabsvalue, issignmode, isfltpmode>};
 	if constexpr((isabsvalue && issignmode) ||// both regular absolute modes
 		(!isabsvalue && issignmode && isfltpmode)){// regular floating-point mode
 		static_assert(false, "Unsupported combination of sorting modes.");
@@ -45199,11 +45277,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
 	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
@@ -45221,11 +45299,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
 	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
@@ -45242,11 +45320,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], vararguments... varparameters)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
 	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
@@ -45275,11 +45353,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], vararguments... varparameters)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
 	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
@@ -45297,11 +45375,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
 	using V = std::conditional_t<std::is_const_v<T> && std::is_volatile_v<T>, const volatile helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
@@ -45440,11 +45518,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	helper::radixsortcopynoallocmulti<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, output, buffer, varparameters...);
 }
 
@@ -45457,11 +45535,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	helper::radixsortnoallocmulti<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, buffer, movetobuffer, varparameters...);
 }
 
@@ -45478,11 +45556,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	helper::radixsortcopynoallocsingle<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
 
@@ -45509,11 +45587,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	helper::radixsortnoallocsingle<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 }
 
@@ -45526,12 +45604,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
-	using U = helper::tounifunsigned<T, isabsvalue, issignmode, isfltpmode>;
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	if(!movetobuffer){
 		helper::radixsortnoallocsingle<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V>(count, input, buffer, varparameters...);
 	}else{
@@ -45660,11 +45737,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
@@ -45680,11 +45757,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
@@ -45704,11 +45781,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
@@ -45737,11 +45814,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
@@ -45757,11 +45834,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
-	static bool constexpr isdescsort{static_cast<bool>(1 & static_cast<unsigned char>(direction))};
-	static bool constexpr isrevorder{static_cast<bool>(1 << 1 & static_cast<unsigned char>(direction))};
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
+	static bool constexpr isdescsort{helper::isdescsort<direction>};
+	static bool constexpr isrevorder{helper::isrevorderwithindirection<direction>};
 	using W = helper::tounifunsigned<std::remove_pointer_t<T>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<std::is_const_v<V> && std::is_volatile_v<V>, const volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
