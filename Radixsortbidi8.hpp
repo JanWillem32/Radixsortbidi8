@@ -11388,8 +11388,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
-		// reverse ordering is applied here because the padding bytes could matter, hence the check above
+	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -11890,12 +11889,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi;
-	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){
-		psrchi = pdstnext + count;// reverse ordering is applied here because the padding bytes could matter
-	}else{// no reverse ordering applied
-		psrchi = const_cast<T *>(input) + count;// psrchi will never be written to
-	}
+	T *psrchi{isrevorder? pdstnext : const_cast<T *>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -12140,12 +12134,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo;
-	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){
-		psrclo = pdstnext;// reverse ordering is applied here because the padding bytes could matter
-	}else{// no reverse ordering applied
-		psrclo = const_cast<T *>(input);// psrclo will never be written to
-	}
+	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -12739,8 +12728,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-			if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
-				// reverse ordering is applied here because the padding bytes could matter, hence the check above
+			if constexpr(isrevorder){
 				T const *pinput{input + count};
 				T *poutput{output};
 				T *pbuffer{buffer};
@@ -13368,8 +13356,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
-			if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
-				// reverse ordering is applied here because the padding bytes could matter, hence the check above
+			if constexpr(isrevorder){
 				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
@@ -13900,7 +13887,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(isrevorder){// also reverse the array at the same time
+	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -14359,12 +14346,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi;
-	if constexpr(isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
-	}
+	V **psrchi{isrevorder? pdstnext : const_cast<V **>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -14621,12 +14603,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo;
-	if constexpr(isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<V **>(input);// psrclo will never be written to
-	}
+	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -15245,7 +15222,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						V *const *pinput{input + (count - i)};
@@ -15888,7 +15865,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
@@ -16370,7 +16347,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	if constexpr(isrevorder){
 		T *pdst{splitparameter<false>(varparameters...)};
 	}else{// not in reverse order
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -16496,7 +16473,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // main part, multithreading companion for the radixsortnoallocmultimain() function implementation template for split up 128-bit types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
@@ -16519,12 +16496,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi;
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
-		psrchi = pdstnext + count;
-	}else{// no reverse ordering applied
-		psrchi = const_cast<T *>(input) + count;// psrchi will never be written to
-	}
+	T *psrchi{isrevorder? pdstnext : const_cast<T *>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -16663,7 +16635,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 }
 
 // main part for the radixsortcopynoallocmulti() and radixsortnoallocmultimain() function implementation templates for split up 128-bit types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
@@ -16687,12 +16659,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo;
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
-		psrclo = pdstnext;
-	}else{// no reverse ordering applied
-		psrclo = const_cast<T *>(input);// psrclo will never be written to
-	}
+	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -17039,7 +17006,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -17140,7 +17107,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			if constexpr(isrevorder){
 			}else{// not in reverse order
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 				// architecture: do not limit as much when there's a reasonable amount of registers
@@ -17383,7 +17350,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst = output;
 				pdstnext = buffer;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -17486,7 +17453,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -17585,7 +17552,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			if constexpr(isrevorder){
 			}else{// not in reverse order
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 				// architecture: do not limit as much when there's a reasonable amount of registers
@@ -17828,7 +17795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = buffer;
 				pdst = input;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -17872,7 +17839,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(isrevorder){// also reverse the array at the same time
+	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -18267,12 +18234,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi;
-	if constexpr(isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
-	}
+	V **psrchi{isrevorder? pdstnext : const_cast<V **>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -18484,12 +18446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo;
-	if constexpr(isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<V **>(input);// psrclo will never be written to
-	}
+	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -19059,7 +19016,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 					// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -19725,7 +19682,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
@@ -20193,7 +20150,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	if constexpr(isrevorder){
 		T *pdst{splitparameter<false>(varparameters...)};
 	}else{// not in reverse order
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -20323,12 +20280,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi;
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
-		psrchi = pdstnext + count;
-	}else{// no reverse ordering applied
-		psrchi = const_cast<T *>(input) + count;// psrchi will never be written to
-	}
+	T *psrchi{isrevorder? pdstnext : const_cast<T *>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -20525,12 +20477,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo;
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
-		psrclo = pdstnext;
-	}else{// no reverse ordering applied
-		psrclo = const_cast<T *>(input);// psrclo will never be written to
-	}
+	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -20913,7 +20860,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -21014,7 +20961,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			if constexpr(isrevorder){
 			}else{// not in reverse order
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -21206,7 +21153,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst = output;
 				pdstnext = buffer;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -21309,7 +21256,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -21408,7 +21355,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-			if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			if constexpr(isrevorder){
 			}else{// not in reverse order
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -21600,7 +21547,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = buffer;
 				pdst = input;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -21636,7 +21583,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
-	if constexpr(isrevorder){// also reverse the array at the same time
+	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -22006,12 +21953,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi;
-	if constexpr(isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
-	}
+	V **psrchi{isrevorder? pdstnext : const_cast<V **>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -22261,12 +22203,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo;
-	if constexpr(isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<V **>(input);// psrclo will never be written to
-	}
+	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -22867,7 +22804,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -23426,7 +23363,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
-				if constexpr(isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
@@ -23832,7 +23769,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 64-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -23939,7 +23876,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 56-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24037,7 +23974,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 48-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24126,7 +24063,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 40-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24204,7 +24141,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 32-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24273,7 +24210,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 24-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24344,7 +24281,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 16-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -24415,7 +24352,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // main part, multithreading companion for the radixsortnoallocmultimain() function implementation template for multi-part types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -24434,12 +24371,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi;
-	if constexpr(false){// useless when not handling indirection: isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<T *>(input) + count;// psrchi will never be written to
-	}
+	T *psrchi{isrevorder? pdstnext : const_cast<T *>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -24558,7 +24490,7 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 }
 
 // main part for the radixsortcopynoallocmulti() and radixsortnoallocmultimain() function implementation templates for multi-part types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -24578,12 +24510,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo;
-	if constexpr(false){// useless when not handling indirection: isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<T *>(input);// psrclo will never be written to
-	}
+	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -24878,7 +24805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pdst = output;
 			pdstnext = buffer;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, pdst, pdstnext, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -24976,7 +24903,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(64 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 64-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25105,7 +25032,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 56-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25222,7 +25149,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 48-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25327,7 +25254,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 40-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25418,7 +25345,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 32-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25497,7 +25424,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 24-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25607,7 +25534,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 16-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -25772,7 +25699,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst = output;
 				pdstnext = buffer;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, pdst, pdstnext, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -25879,7 +25806,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			psrclo = buffer;
 			pdst = input;
 		}
-		radixsortnoallocmultisortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
+		radixsortnoallocmultisortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, psrclo, pdst, psrclo, offsetscompanion.data(), runsteps, atomiclightbarrier);
 	}
 }
 
@@ -25975,7 +25902,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(64 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 64-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26104,7 +26031,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 56-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26221,7 +26148,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 48-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26326,7 +26253,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 40-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26417,7 +26344,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 32-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26496,7 +26423,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 24-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26606,7 +26533,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-				if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+				if constexpr(isrevorder){
 				}else{// 16-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26771,7 +26698,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				psrclo = buffer;
 				pdst = input;
 			}
-			radixsortnoallocmultisortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
+			radixsortnoallocmultisortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, psrclo, pdst, psrclo, offsets.data(), runsteps, usemultithread, atomiclightbarrier);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
@@ -26801,7 +26728,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -27163,7 +27090,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -27495,7 +27422,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -27797,7 +27724,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -28065,7 +27992,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -28301,7 +28228,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -28597,7 +28524,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-		if constexpr(isrevorder){// also reverse the array at the same time
+		if constexpr(isrevorder){
 			if constexpr(isinputconst){
 				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
@@ -28861,12 +28788,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi;
-	if constexpr(isrevorder){
-		psrchi = pdstnext + count;
-	}else{
-		psrchi = const_cast<V **>(input) + count;// psrchi will never be written to
-	}
+	V **psrchi{isrevorder? pdstnext : const_cast<V **>(input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsetscompanion + static_cast<std::size_t>(shifter) * 256};
@@ -29036,12 +28958,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo;
-	if constexpr(isrevorder){
-		psrclo = pdstnext;
-	}else{
-		psrclo = const_cast<V **>(input);// psrclo will never be written to
-	}
+	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *poffset{offsets + static_cast<std::size_t>(shifter) * 256};
@@ -29514,7 +29431,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(64 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -29787,7 +29704,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -30036,7 +29953,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -30261,7 +30178,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -30458,7 +30375,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -30631,7 +30548,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -30876,7 +30793,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
@@ -31400,7 +31317,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				if constexpr(64 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -31715,7 +31632,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(56 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -32003,7 +31920,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(48 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -32261,7 +32178,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(40 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -32491,7 +32408,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(32 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -32694,7 +32611,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(24 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						std::size_t initialcount;
 						if constexpr(!ismultithreadcapable){
@@ -33077,7 +32994,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else if constexpr(16 == CHAR_BIT * sizeof(T)){
-					if constexpr(isrevorder){// also reverse the array at the same time
+					if constexpr(isrevorder){
 						V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 						if constexpr(!ismultithreadcapable){
 							pinputlo = input;
@@ -33414,7 +33331,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // Function implementation templates for single-part types without indirection
 
 // initialisation part, multithreading companion for the radixsortcopynoallocsinglemain() and radixsortnoallocsinglemain() function implementation templates for single-part types without indirection
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -33520,7 +33437,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // initialisation part, multithreading companion for the radixsortcopynoallocsinglemain() and radixsortnoallocsinglemain() function implementation templates for single-part types without indirection
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -33599,7 +33516,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // main part, multithreading companion for the radixsortcopynoallocsinglemain() and radixsortnoallocsinglemain() function implementation templates for single-part types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -33625,7 +33542,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi -= 2;
 			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
+			if constexpr(isrevorder){
 				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
 				offsetb = offsetscompanion[curb]++;
 			}else{
@@ -33645,7 +33562,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi -= 4;
 			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
+			if constexpr(isrevorder){
 				offseta = offsetscompanion[cura]++;// the next item will be placed one higher
 				offsetb = offsetscompanion[curb]++;
 				offsetc = offsetscompanion[curc]++;
@@ -33674,7 +33591,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesortmtc(std::size_t count, T pdst[], X const offsets[], X const offsetscompanion[])noexcept{
+	void> radixsortnoallocsinglesimplesortmtc(std::size_t count, T pdst[], X const offsets[], X const offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
 	// do not pass a nullptr here
@@ -33697,7 +33614,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	U length{static_cast<U>(*t) + static_cast<U>(*u)};
 	T *pfill{pdst + count + 1};
 	unsigned filler;
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	if constexpr(false){// impossible: isrevorder){
 	}else{// not reversed order
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			// note: regular floating-point mode is not relevant here
@@ -33762,7 +33679,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -33788,7 +33705,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				psrclo += 2;
 				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-				if constexpr(false){// useless if not using indirection: isrevorder){
+				if constexpr(isrevorder){
 					offseta = offsets[cura]--;// the next item will be placed one lower
 					offsetb = offsets[curb]--;
 				}else{
@@ -33808,7 +33725,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
-				if constexpr(false){// useless if not using indirection: isrevorder){
+				if constexpr(isrevorder){
 					offseta = offsets[cura]--;// the next item will be placed one lower
 					offsetb = offsets[curb]--;
 					offsetc = offsets[curc]--;
@@ -33830,7 +33747,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				psrclo += 2;
 				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
-				if constexpr(false){// useless if not using indirection: isrevorder){
+				if constexpr(isrevorder){
 					offseta = offsets[cura]--;// the next item will be placed one lower
 					offsetb = offsets[curb]--;
 				}else{
@@ -33845,7 +33762,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U out{psrclo[0]};
 			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
+			if constexpr(isrevorder){
 				offset = offsets[cur]--;// the next item will be placed one lower
 			}else{
 				offset = offsets[cur]++;// the next item will be placed one higher
@@ -33860,7 +33777,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U outhi{*psrchi--};
 			auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
+			if constexpr(isrevorder){
 				offsetlo = offsets[curlo + offsetsstride]--;// the next item will be placed one lower
 				offsethi = offsets[curhi]++;// the next item will be placed one higher
 			}else{
@@ -33874,7 +33791,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U out{*psrclo};
 			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
-			if constexpr(false){// useless if not using indirection: isrevorder){
+			if constexpr(isrevorder){
 				offset = offsets[cur + offsetsstride];
 			}else{
 				offset = offsets[cur];
@@ -33885,7 +33802,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -33894,7 +33811,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesortmain(T pdst[], X const offsets[], X const offsetscompanion[], unsigned usemultithread)noexcept{
+	void> radixsortnoallocsinglesimplesortmain(T pdst[], X const offsets[], X const offsetscompanion[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(pdst);
@@ -33918,7 +33835,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			+ (isdescsort && (isabsvalue || !issignmode)) * (offsetsstride - 1)
 			+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 		length += *u;
-		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		if constexpr(false){// impossible: isrevorder){
 		}else{// not reversed order
 			if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 				// note: regular floating-point mode is not relevant here
@@ -33982,7 +33899,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto exit;
 	}
 	// single-threaded version
-	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+	if constexpr(false){// impossible: isrevorder){
 	}else{// not reversed order
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			// note: regular floating-point mode is not relevant here
@@ -34082,7 +33999,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34090,9 +34007,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
+		offsetscompanion = radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, output)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, output)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -34118,7 +34035,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion.data())};// isrevorder is set to false because it's useless when not using indirection
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion.data())};// isrevorder is set to false because it's useless when not using indirection
 
 	{// barrier and allareidentical value exchange with the main thread
 		++allareidentical;// send over a 1 or a 2
@@ -34144,12 +34061,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglesortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion.data());
+		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, input, output, offsetscompanion.data());
 	}
 }
 
 // main part, multithreading companion for the radixsortcopynoallocsinglemain() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -34158,7 +34075,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -34174,7 +34091,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34182,9 +34099,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input);
+		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -34207,7 +34124,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// perform the bidirectional 8-bit fill sequence
-	radixsortnoallocsinglesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, output, offsets, offsetscompanion.data());
+	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, output, offsets, offsetscompanion.data());
 }
 
 // radixsortcopynoalloc() function implementation template for single-part types without indirection
@@ -34284,7 +34201,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34471,7 +34388,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets.data(), offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets.data(), offsetscompanion, usemultithread)};
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -34499,7 +34416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{// perform the bidirectional 8-bit sorting sequence
-			radixsortnoallocsinglesortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets.data(), usemultithread);
+			radixsortnoallocsinglesortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, input, output, offsets.data(), usemultithread);
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
@@ -34572,13 +34489,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), count / ((0xFFu + 1) / 2)));// simple safety limit on the maximum thread count
 				assignedslice = allowedthreads + 1;// the half of the thread count is rounded up in the main thread, and rounded down in the companion thread
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
 					assignedslice >>= 1;
 					usemultithread = 1;
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34714,7 +34631,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 		// perform the bidirectional 8-bit fill sequence
-		radixsortnoallocsinglesortmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(output, offsets.data(), offsetscompanion, usemultithread);
+		radixsortnoallocsinglesimplesortmain<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(output, offsets.data(), offsetscompanion, usemultithread);
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 }
 
@@ -34744,7 +34661,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34752,9 +34669,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
+		offsetscompanion = radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, buffer)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, buffer)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -34780,7 +34697,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}
 
 	// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion.data())};// isrevorder is set to false because it's useless when not using indirection
+	unsigned allareidentical{generateoffsetssinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, X>(count, offsets, offsetscompanion.data())};
 
 	{// barrier and allareidentical value exchange with the main thread
 		++allareidentical;// send over a 1 or a 2
@@ -34806,12 +34723,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 	{// perform the bidirectional 8-bit sorting sequence
-		radixsortnoallocsinglesortmtc<isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, offsetscompanion.data());
+		radixsortnoallocsinglesortmtc<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(count, buffer, input, offsetscompanion.data());
 	}
 }
 
 // main part, multithreading companion for the radixsortnoallocsinglemain() function implementation template for single-part types without indirection
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+template<bool isdescsort, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -34820,7 +34737,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 
@@ -34835,7 +34752,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -34843,9 +34760,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input);
+		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1, allowedthreads, count, input);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -34868,7 +34785,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 	// perform the bidirectional 8-bit fill sequence
-	radixsortnoallocsinglesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsets, offsetscompanion.data());
+	radixsortnoallocsinglesimplesortmtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>(count, input, offsets, offsetscompanion.data());
 }
 
 // radixsortnoalloc() function implementation template for single-part types without indirection
@@ -34945,7 +34862,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -35132,7 +35049,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else offsetscompanion = nullptr;
 
 		// transform counts into base offsets for each set of 256 items, both for the low and high half of offsets here
-		unsigned allareidentical{generateoffsetssingle<isdescsort, false, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets.data(), offsetscompanion, usemultithread)};// isrevorder is set to false because it's useless when not using indirection
+		unsigned allareidentical{generateoffsetssingle<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, std::nullptr_t, X>(count, offsets.data(), offsetscompanion, usemultithread)};
 
 		// barrier and allareidentical value exchange with the companion thread
 		if constexpr(ismultithreadcapable){
@@ -35160,7 +35077,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 		{// perform the bidirectional 8-bit sorting sequence
-			radixsortnoallocsinglesortmain<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, buffer, input, offsets.data(), usemultithread);
+			radixsortnoallocsinglesortmain<isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(count, buffer, input, offsets.data(), usemultithread);
 		}
 	}
 }
@@ -35232,13 +35149,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), count / ((0xFFu + 1) / 2)));// simple safety limit on the maximum thread count
 				assignedslice = allowedthreads + 1;// the half of the thread count is rounded up in the main thread, and rounded down in the companion thread
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, std::ref(atomiclightbarrier));
+					asynchandle = std::async(std::launch::async, radixsortnoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, std::ref(atomiclightbarrier));
 					assignedslice >>= 1;
 					usemultithread = 1;
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -35364,14 +35281,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 		// the single-part version without indirection here only has to do a linear fill based on the offsets, making this simpler than any other version
 		// perform the bidirectional 8-bit fill sequence
-		radixsortnoallocsinglesortmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(input, offsets.data(), offsetscompanion, usemultithread);
+		radixsortnoallocsinglesimplesortmain<isdescsort, isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X>(input, offsets.data(), offsetscompanion, usemultithread);
 	}
 }
 
 // Function implementation templates for single-part types with indirection
 
 // initialisation part, multithreading companion for the radixsortcopynoallocsinglemain() and radixsortnoallocsinglemain() function implementation templates for single-part types with indirection
-template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
+template<auto indirection1, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
@@ -35751,7 +35668,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, output, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, output, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -35759,9 +35676,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
+		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, output, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, output, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -35910,7 +35827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -36193,7 +36110,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -36201,9 +36118,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
+		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -36348,7 +36265,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
