@@ -1759,13 +1759,152 @@ struct memberobjectgenerator{
 #pragma pack(pop)
 
 // Utility templates to call the getter function
-
 // These can optionally split off the second-level indirection index parameter, or dereference the member object pointer.
 // These will all reinterpret references as pointers.
-template<auto indirection1, bool isindexed2, typename V, typename U, typename W>
+
+// versions that will split off the first parameter (pointer only)
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U, typename W>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
+	isextraparam &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded, U index1, W index2)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	// do not pass a nullptr here
+	assert(p);
+
+	return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1};
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	isextraparam &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded, U index1, W index2)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	// do not pass a nullptr here
+	assert(p);
+
+	return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1))};// always reinterpret references as pointers
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isextraparam &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded, U index)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	// do not pass a nullptr here
+	assert(p);
+
+	if constexpr(isindexed2){
+		static_assert(std::is_pointer_v<T>, "invalid variable argument count for usage without second-level indirection");
+		return{p->*indirection1};
+	}else{
+		return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1};
+	}
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isextraparam &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded, U index)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	// do not pass a nullptr here
+	assert(p);
+
+	if constexpr(isindexed2){
+		return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
+	}else{
+		return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1))};// always reinterpret references as pointers
+	}
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	isextraparam &&
+	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded)noexcept{
+	// do not pass a nullptr here
+	assert(p);
+
+	return{p->*indirection1};
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	isextraparam &&
+	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded)noexcept{
+	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
+	// do not pass a nullptr here
+	assert(p);
+
+	return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	isextraparam &&
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	static_cast<void>(index2);
+	// do not pass a nullptr here
+	assert(p);
+
+	return{(p->*indirection1)(varparameters...)};
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	isextraparam &&
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	static_cast<void>(index2);
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	// do not pass a nullptr here
+	assert(p);
+
+	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	isextraparam &&
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	// do not pass a nullptr here
+	assert(p);
+
+	return{(p->*indirection1)(varparameters...)};
+}
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename isdiscarded, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_function_pointer_v<decltype(indirection1)> &&
+	!isindexed2 &&
+	isextraparam &&
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	// do not pass a nullptr here
+	assert(p);
+
+	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
+}
+// versions that will not split off the first parameter
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U, typename W>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	isindexed2 &&
+	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
@@ -1774,10 +1913,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1};
 }
-template<auto indirection1, bool isindexed2, typename V, typename U, typename W>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U, typename W>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
+	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
@@ -1786,9 +1926,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index1)->*indirection1))};// always reinterpret references as pointers
 }
-template<auto indirection1, bool isindexed2, typename V, typename U>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
@@ -1802,9 +1943,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		return{reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1};
 	}
 }
-template<auto indirection1, bool isindexed2, typename V, typename U>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
+	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
@@ -1817,10 +1959,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		return{reinterpret_cast<T *>(&(reinterpret_cast<V *>(reinterpret_cast<T *>(p) + index)->*indirection1))};// always reinterpret references as pointers
 	}
 }
-template<auto indirection1, bool isindexed2, typename V>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
+	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p)noexcept{
 	// do not pass a nullptr here
@@ -1828,10 +1971,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{p->*indirection1};
 }
-template<auto indirection1, bool isindexed2, typename V>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
+	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
 	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
@@ -1840,10 +1984,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{reinterpret_cast<T *>(&(p->*indirection1))};// always reinterpret references as pointers
 }
-template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
+	!isextraparam &&
 	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
 	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
@@ -1852,10 +1997,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{(p->*indirection1)(varparameters...)};
 }
-template<auto indirection1, bool isindexed2, typename V, typename W, typename... vararguments>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
+	!isextraparam &&
 	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
 	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
@@ -1865,10 +2011,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
 }
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
+	!isextraparam &&
 	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
 	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	// do not pass a nullptr here
@@ -1876,10 +2023,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	return{(p->*indirection1)(varparameters...)};
 }
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
+	!isextraparam &&
 	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
 	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
@@ -1891,20 +2039,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // Utility templates to split off the first parameter
 
-template<typename W, typename... vararguments>
-RSBD8_FUNC_INLINE W splitparameter(W first, vararguments...)noexcept{
+template<bool isextraparam, typename isdiscarded, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	isextraparam,
+	W> splitparameter(isdiscarded, W first, vararguments...)noexcept{
 	return{first};
 }
+template<bool isextraparam, typename W, typename... vararguments>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!isextraparam,
+	W> splitparameter(W first, vararguments...)noexcept{
+	return{first};
+}
+template<bool isextraparam>
 RSBD8_FUNC_INLINE void splitparameter()noexcept{
 	// This function is a dummy, but it does allow the version without any extra arguments to exist.
 }
 
 // Utility template to retrieve the data sources from classes
 
-// utility template to either retrieve the first-level source
-template<auto indirection1, bool isindexed2, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
+// utility template to either retrieve the first-level source or output another pointer for second-level indirection
+template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
+RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
 
@@ -1913,7 +2070,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 			static_assert(!isindexed2, "only first-level indirection used, impossible combination for indicating usage of a secondary index parameter");
 			static_assert(sizeof(T) == sizeof(U), "misinterpreted indirection input type");
 			if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
-				return reinterpret_cast<V *>(reinterpret_cast<T const *>(p) + splitparameter(varparameters...))->*reinterpret_cast<T V:: *>(indirection1);
+				return reinterpret_cast<V *>(reinterpret_cast<T const *>(p) + splitparameter<isextraparam>(varparameters...))->*reinterpret_cast<T V:: *>(indirection1);
 			}else if constexpr(0 == sizeof...(varparameters)){// indirection to member without an index
 				return p->*reinterpret_cast<T V:: *>(indirection1);
 			}else static_assert(false, "impossible first-level indirection indexing parameter count");
@@ -1921,7 +2078,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 			// no assertion on the number of variable arguments here, as the follow-up function indirectinput2() will handle that
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V>(p, varparameters...));
+			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, isextraparam, V>(p, varparameters...));
 		}
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		if constexpr(!std::is_pointer_v<U>){// indirection directly to item
@@ -1937,12 +2094,12 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 			// no assertion on the number of variable arguments here, as the getter function can be variadic and the extra parameters can be intended for that, instead of indicating second-level indexing
 			static_assert(!std::is_pointer_v<std::remove_pointer_t<U>> && !std::is_reference_v<std::remove_pointer_t<U>>, "third level indirection is not supported");
 			static_assert(sizeof(T) == sizeof(std::remove_pointer_t<U>), "misinterpreted indirection input type");
-			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, V>(p, varparameters...));
+			return reinterpret_cast<std::byte const *>(splitget<indirection1, isindexed2, false, V>(p, varparameters...));
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
-// utility templates to either retrieve the second-level source or pass though results for full outputs
-template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, typename T, typename... vararguments>
+// utility template to retrieve the second-level source
+template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, bool isextraparam, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, vararguments... varparameters)noexcept{
 	// do not pass a nullptr here
 	assert(pintermediate);
@@ -1953,7 +2110,7 @@ RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, varargumen
 			return *reinterpret_cast<T const *>(pintermediate + indirection2);
 		}else if constexpr(1 == sizeof...(varparameters)){// indirection to member with an index
 			if constexpr(isindexed2){// second level extra index
-				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+				return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter<isextraparam>(varparameters...)];
 			}else{// first level extra index
 				return *reinterpret_cast<T const *>(pintermediate + indirection2);
 			}
@@ -1964,13 +2121,14 @@ RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, varargumen
 		}else static_assert(false, "impossible second-level indirection indexing parameter count");
 	}else if constexpr(std::is_member_function_pointer_v<decltype(indirection1)>){
 		if constexpr(isindexed2){// second level extra index
-			return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter(varparameters...)];
+			return reinterpret_cast<T const *>(pintermediate + indirection2)[splitparameter<isextraparam>(varparameters...)];
 		}else{// second level without an index
 			return *reinterpret_cast<T const *>(pintermediate + indirection2);
 		}
 	}else static_assert(false, "unsupported indirection input type");
 }
-template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, typename T, typename... vararguments>
+// utility template to pass though results for full outputs
+template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, bool isextraparam, typename T, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_pointer_v<T>,
 	T> indirectinput2(T passthrough, vararguments...)noexcept{
@@ -1979,19 +2137,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // Utility templates to get either the member object type or the member function return type
 
-template<auto indirection1, bool isindexed2, typename V, typename dummy = void, typename... vararguments> struct memberpointerdeducebody;
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename dummy = void, typename... vararguments> struct memberpointerdeducebody;
 // partial specialisation, by std::is_member_function_pointer_v
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
-struct memberpointerdeducebody<indirection1, isindexed2, V, std::enable_if_t<std::is_member_function_pointer_v<decltype(indirection1)>>, vararguments...>{
-	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>;
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
+struct memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, std::enable_if_t<std::is_member_function_pointer_v<decltype(indirection1)>>, vararguments...>{
+	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;
 };
 // partial specialisation, by std::is_member_object_pointer_v
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
-struct memberpointerdeducebody<indirection1, isindexed2, V, std::enable_if_t<std::is_member_object_pointer_v<decltype(indirection1)>>, vararguments...>{
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
+struct memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, std::enable_if_t<std::is_member_object_pointer_v<decltype(indirection1)>>, vararguments...>{
 	using type = std::remove_reference_t<decltype(std::declval<V>().*indirection1)>;
 };
-template<auto indirection1, bool isindexed2, typename V, typename... vararguments>
-using memberpointerdeduce = typename memberpointerdeducebody<indirection1, isindexed2, V, void, vararguments...>::type;
+template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
+using memberpointerdeduce = typename memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, void, vararguments...>::type;
 
 // Utility template to pick an unsigned type of the lowest rank with the same size
 
@@ -11212,26 +11370,28 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // initialisation part, multithreading companion for the radixsortnoallocmultimain() function implementation template for 80-bit-based long double types without indirection
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
+	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(isrevorder && 80 < CHAR_BIT * sizeof(T)){// also reverse the array at the same time
 		// reverse ordering is applied here because the padding bytes could matter, hence the check above
 		if constexpr(isinputconst){
+			T *pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -12404,7 +12564,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -12412,9 +12573,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output, buffer)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
+			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -12565,7 +12729,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -13035,7 +13200,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -13043,9 +13208,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr);
+		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer, nullptr)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -13195,7 +13360,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -13706,16 +13871,17 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -13730,12 +13896,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
+			V **pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -13745,10 +13912,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pdst += loc;
 				do{
 					V *p{*input++};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 					pout[i] = p;
 					pdst[i] = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 					std::uint64_t curm{cur.mantissa};
 					U cure{static_cast<U>(cur.signexponent)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -13793,14 +13960,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{input[0]};
 					V *phi{input[1]};
 					input += 2;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 					pout[i] = plo;
 					pdst[i] = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 					pout[i - 1] = phi;
 					pdst[i - 1] = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 					std::uint64_t curmlo{curlo.mantissa};
 					U curelo{static_cast<U>(curlo.signexponen)};
 					std::uint64_t curmhi{curhi.mantissa};
@@ -13876,10 +14043,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{pinputlo[0]};
 					V *phi{pinputhi[0]};
 					// register pressure performance issue on several platforms: first do the low half here
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*poutputhi-- = plo;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					std::uint64_t curmlo{curlo.mantissa};
 					U curelo{static_cast<U>(curlo.signexponent)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -13913,10 +14080,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsetscompanion[5 * 256 + static_cast<std::size_t>(curmlo5)];
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curmlo6)];
 					// register pressure performance issue on several platforms: do the high half here second
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					*pinputlo++ = phi;
 					*poutputlo++ = phi;
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					std::uint64_t curmhi{curhi.mantissa};
 					U curehi{static_cast<U>(curhi.signexponent)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -13954,14 +14121,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *plo{pinputlo[0]};
 					V *phi{pinputhi[0]};
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*poutputhi-- = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					*pinputlo++ = phi;
 					*poutputlo++ = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					std::uint64_t curmlo{curlo.mantissa};
 					U curelo{static_cast<U>(curlo.signexponent)};
 					std::uint64_t curmhi{curhi.mantissa};
@@ -14037,9 +14204,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				V *p{input[i]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				pout[i] = p;
-				auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::uint64_t curm{cur.mantissa};
 				U cure{static_cast<U>(cur.signexponent)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14082,12 +14249,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *phi{input[i]};
 				V *plo{input[i - 1]};
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				pout[i] = phi;
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				pout[i - 1] = plo;
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				std::uint64_t curmhi{curhi.mantissa};
 				U curehi{static_cast<U>(curhi.signexponent)};
 				std::uint64_t curmlo{curlo.mantissa};
@@ -14163,16 +14330,16 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -14222,10 +14389,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
 				psrchi -= 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -14240,14 +14407,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -14279,7 +14446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -14309,10 +14476,10 @@ handletop16:
 						V *pa{psrchi[0]};
 						V *pb{psrchi[-1]};
 						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
 						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
@@ -14327,14 +14494,14 @@ handletop16:
 						V *pc{psrchi[-2]};
 						V *pd{psrchi[-3]};
 						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 						std::size_t offseta{offsetscompanion[cura + (80 - 16) * 256 / 8]--};// the next item will be placed one lower
 						std::size_t offsetb{offsetscompanion[curb + (80 - 16) * 256 / 8]--};
@@ -14358,7 +14525,7 @@ handletop16:
 					pdst = pdstnext;
 					// unused: pdstnext = psrchi;
 					psrchi += count;
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(!old) do{
 							spinpause();
 						}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -14377,10 +14544,10 @@ handletop8:
 						V *pa{psrchi[0]};
 						V *pb{psrchi[-1]};
 						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
 						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
@@ -14395,14 +14562,14 @@ handletop8:
 						V *pc{psrchi[-2]};
 						V *pd{psrchi[-3]};
 						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 						std::size_t offseta{offsetscompanion[cura + (80 - 8) * 256 / 8]--};// the next item will be placed one lower
 						std::size_t offsetb{offsetscompanion[curb + (80 - 8) * 256 / 8]--};
@@ -14425,16 +14592,16 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t,
@@ -14485,10 +14652,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -14503,14 +14670,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
 					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -14525,10 +14692,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -14538,8 +14705,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -14549,10 +14716,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -14561,8 +14728,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -14592,7 +14759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -14624,10 +14791,10 @@ handletop16:
 							V *pa{psrclo[0]};
 							V *pb{psrclo[1]};
 							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
@@ -14642,14 +14809,14 @@ handletop16:
 							V *pc{psrclo[2]};
 							V *pd{psrclo[3]};
 							psrclo += 4;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+							auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+							auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 							auto[cura, curb, curc, curd]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
@@ -14664,10 +14831,10 @@ handletop16:
 							V *pa{psrclo[0]};
 							V *pb{psrclo[1]};
 							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 							auto[cura, curb]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 							std::size_t offseta{offsets[cura + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 							std::size_t offsetb{offsets[curb + (80 - 16) * 256 / 8]++};
@@ -14677,8 +14844,8 @@ handletop16:
 					}
 					if(!(1 & count)){// fill in the final item for odd counts
 						V *p{psrclo[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
 						pdst[offset] = p;
@@ -14688,10 +14855,10 @@ handletop16:
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						V *plo{*psrclo++};
 						V *phi{*psrchi--};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 						auto[curlo, curhi]{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 						std::size_t offsetlo{offsets[curlo + (80 - 16) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsethi{offsets[curhi + (80 - 16) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -14700,8 +14867,8 @@ handletop16:
 					}while(psrclo < psrchi);
 					if(psrclo == psrchi){// fill in the final item for odd counts
 						V *p{*psrclo};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 						std::size_t cur{filterbelowtop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 						std::size_t offset{offsets[cur + (80 - 16) * 256 / 8]};
 						pdst[offset] = p;
@@ -14724,7 +14891,7 @@ handletop16:
 				pdst = pdstnext;
 				// unused: pdstnext = psrclo;
 				if constexpr(ismultithreadcapable){
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(!old) do{
 							spinpause();
 						}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -14745,10 +14912,10 @@ handletop8:
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
@@ -14763,14 +14930,14 @@ handletop8:
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
 						psrclo += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
@@ -14785,10 +14952,10 @@ handletop8:
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsets[cura + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (80 - 8) * 256 / 8]++};
@@ -14798,8 +14965,8 @@ handletop8:
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -14809,10 +14976,10 @@ handletop8:
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 					std::size_t offsetlo{offsets[curlo + (80 - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + (80 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -14821,8 +14988,8 @@ handletop8:
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *p{*psrclo};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 					std::size_t offset{offsets[cur + (80 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -14838,16 +15005,16 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -14858,7 +15025,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -14870,7 +15037,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -14878,9 +15046,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
+			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -14893,7 +15064,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -14902,7 +15073,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -14967,10 +15138,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -14984,8 +15155,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -15039,7 +15210,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -15064,7 +15235,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -15079,10 +15251,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *const *pinput{input + (count - i)};
 						do{
 							V *p{*pinput++};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15123,14 +15295,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *plo{pinput[0]};
 							V *phi{pinput[1]};
 							pinput += 2;
-							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
 							buffer[i] = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i - 1] = phi;
 							buffer[i - 1] = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							std::uint64_t curmlo{curlo.mantissa};
 							U curelo{static_cast<U>(curlo.signexponent)};
 							std::uint64_t curmhi{curhi.mantissa};
@@ -15198,10 +15370,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{pinput[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15241,9 +15413,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15282,12 +15454,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							std::uint64_t curmhi{curhi.mantissa};
 							U curehi{static_cast<U>(curhi.signexponent)};
 							std::uint64_t curmlo{curlo.mantissa};
@@ -15355,9 +15527,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15406,7 +15578,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -15416,7 +15588,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -15484,16 +15656,16 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
 	64 < CHAR_BIT * sizeof(long double)),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -15503,7 +15675,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -15515,7 +15687,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -15523,9 +15695,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr, varparameters...);
+		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -15538,7 +15710,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -15547,7 +15719,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -15612,10 +15784,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, long double> &&
+	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
 	64 == LDBL_MANT_DIG &&
 	16384 == LDBL_MAX_EXP &&
 	128 >= CHAR_BIT * sizeof(long double) &&
@@ -15629,8 +15801,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	using W = decltype(T::signexponent);
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -15683,7 +15855,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -15708,7 +15880,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -15736,10 +15908,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *plo{pinputlo[0]};
 							V *phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
-							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							std::uint64_t curmlo{curlo.mantissa};
 							U curelo{static_cast<U>(curlo.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15773,10 +15945,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[5 * 256 + static_cast<std::size_t>(curmlo5)];
 							++offsets[6 * 256 + static_cast<std::size_t>(curmlo6)];
 							// register pressure performance issue on several platforms: do the high half here second
-							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							*pinputlo++ = phi;
 							*pbufferlo++ = phi;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							std::uint64_t curmhi{curhi.mantissa};
 							U curehi{static_cast<U>(curhi.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15814,14 +15986,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *plo{pinputlo[0]};
 							V *phi{pinputhi[0]};
-							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							*pinputlo++ = phi;
 							*pbufferlo++ = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							std::uint64_t curmlo{curlo.mantissa};
 							U curelo{static_cast<U>(curlo.signexponent)};
 							std::uint64_t curmhi{curhi.mantissa};
@@ -15890,9 +16062,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
 						// no write to input, as this is the midpoint
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						*pbufferhi = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::uint64_t curm{cur.mantissa};
 						U cure{static_cast<U>(cur.signexponent)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15932,9 +16104,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -15973,12 +16145,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							buffer[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							std::uint64_t curmhi{curhi.mantissa};
 							U curehi{static_cast<U>(curhi.signexponent)};
 							std::uint64_t curmlo{curlo.mantissa};
@@ -16046,9 +16218,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							std::uint64_t curm{cur.mantissa};
 							U cure{static_cast<U>(cur.signexponent)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -16097,7 +16269,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -16107,7 +16279,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -16175,11 +16347,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // all these functions are disabled on 32-bit or smaller platforms
 
 // initialisation part, multithreading companion for the radixsortnoallocmultimain() function implementation template for split up 128-bit types without indirection
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
+	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -16193,11 +16366,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		T *pdst{splitparameter<false>(varparameters...)};
 	}else{// not in reverse order
 		static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 		// architecture: do not limit as much when there's a reasonable amount of registers
@@ -16787,7 +16961,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -16795,9 +16970,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output, buffer)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
+			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -16952,7 +17130,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -17233,7 +17412,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -17241,9 +17420,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr);
+		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer, nullptr)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -17397,7 +17576,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -17665,16 +17844,17 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
-	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -17688,12 +17868,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
+			V **pdst{splitparameter<false>(varparameters...)};
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -17706,14 +17887,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *phi{input[0]};
 				V *plo{input[1]};
 				input += 2;
-				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, true, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 				pout[i] = phi;
 				pdst[i] = phi;
-				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, true, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 				pout[i - 1] = plo;
 				pdst[i - 1] = plo;
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 						curhi.data[LO], curhi.data[HI],
@@ -17823,14 +18004,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *plo{pinputlo[0]};
 				V *phi{pinputhi[0]};
-				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 				*pinputhi-- = plo;
 				*poutputhi-- = plo;
-				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 				*pinputlo++ = phi;
 				*poutputlo++ = phi;
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 						curlo.data[LO], curlo.data[HI],
@@ -17943,12 +18124,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			V *phi{input[i]};
 			V *plo{input[i - 1]};
-			auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+			auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 			pout[i] = phi;
-			auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+			auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 			pout[i - 1] = plo;
-			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 					curhi.data[LO], curhi.data[HI],
@@ -18058,16 +18239,16 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -18113,14 +18294,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			V *pc{psrchi[-2]};
 			V *pd{psrchi[-3]};
 			psrchi -= 4;
-			auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-			auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-			auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-			auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-			auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-			auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-			auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+			auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+			auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+			auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 			auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 			std::size_t offsetb{poffset[curb]--};
@@ -18150,7 +18331,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * 8;
 		poffset += static_cast<std::size_t>(index) * 256;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(!old) do{
 				spinpause();
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -18179,14 +18360,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -18218,7 +18399,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -18246,14 +18427,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 				std::size_t offseta{offsetscompanion[cura + (128 - 8) * 256 / 8]--};// the next item will be placed one lower
 				std::size_t offsetb{offsetscompanion[curb + (128 - 8) * 256 / 8]--};
@@ -18274,16 +18455,16 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -18331,14 +18512,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
 				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
@@ -18353,10 +18534,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
 				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 				auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
@@ -18365,8 +18546,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -18376,10 +18557,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
 				auto[curlo, curhi]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -18388,8 +18569,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im)};
 				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -18418,7 +18599,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * 8;
 		poffset += static_cast<std::size_t>(index) * 256;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -18448,14 +18629,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
 				psrclo += 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
@@ -18470,10 +18651,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
 				psrclo += 2;
-				auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 				auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
@@ -18482,8 +18663,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -18493,10 +18674,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
 				auto[curlo, curhi]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -18505,8 +18686,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im)};
 				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -18536,7 +18717,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -18566,14 +18747,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
 					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 					std::size_t offseta{offsets[cura + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsetb{offsets[curb + (128 - 8) * 256 / 8]++};
@@ -18588,10 +18769,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI])};
 					std::size_t offseta{offsets[cura + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsetb{offsets[curb + (128 - 8) * 256 / 8]++};
@@ -18600,8 +18781,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
-					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
 					std::size_t offset{offsets[cur + (128 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -18611,10 +18792,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
-					auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-					auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
-					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi)};
 					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outlo.data[HI], outhi.data[HI])};
 					std::size_t offsetlo{offsets[curlo + (128 - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + (128 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -18623,8 +18804,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *p{*psrclo};
-					auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im)};
+					auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
 					std::size_t offset{offsets[cur + (128 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -18640,16 +18821,16 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -18660,7 +18841,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -18672,7 +18853,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -18680,9 +18862,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
+			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -18695,7 +18880,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -18704,7 +18889,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -18768,15 +18953,15 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -18786,7 +18971,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -18839,7 +19024,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -18864,7 +19049,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -18882,14 +19068,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinput[0]};
 						V *plo{pinput[1]};
 						pinput += 2;
-						auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 						output[i] = phi;
 						buffer[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 						output[i - 1] = plo;
 						buffer[i - 1] = plo;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 								curhi.data[LO], curhi.data[HI],
@@ -18993,10 +19179,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
 						V *p{pinput[0]};
-						auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 						output[0] = p;
 						buffer[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
 						}
@@ -19054,12 +19240,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
-						auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 						output[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 						output[i - 1] = plo;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 								curhi.data[LO], curhi.data[HI],
@@ -19163,9 +19349,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 						output[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
 						}
@@ -19230,7 +19416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -19240,7 +19426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -19308,16 +19494,16 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -19327,7 +19513,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -19339,7 +19525,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -19347,9 +19533,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr, varparameters...);
+		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -19362,7 +19548,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -19371,7 +19557,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -19435,15 +19621,15 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
+	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -19453,7 +19639,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -19505,7 +19691,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -19531,7 +19717,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -19559,14 +19745,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*pbufferhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*pbufferlo++ = phi;
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 								curlo.data[LO], curlo.data[HI],
@@ -19669,10 +19855,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
-						auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
 						}
@@ -19731,12 +19917,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
-						auto imhi{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 						buffer[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 						buffer[i - 1] = plo;
-						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(
 								curhi.data[LO], curhi.data[HI],
@@ -19840,9 +20026,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 						buffer[0] = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test128<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>(cur.data[LO], cur.data[HI]);
 						}
@@ -19907,7 +20093,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -19917,7 +20103,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -19984,11 +20170,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // all these functions are disabled on 64-bit platforms and onwards
 
 // initialisation part, multithreading companion for the radixsortnoallocmultimain() function implementation template for split up 64-bit types without indirection
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
+	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -20002,11 +20189,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+		T *pdst{splitparameter<false>(varparameters...)};
 	}else{// not in reverse order
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -20647,7 +20835,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -20655,9 +20844,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output, buffer)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
+			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -20812,7 +21004,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -21042,7 +21235,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -21050,9 +21243,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr);
+		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer, nullptr)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -21206,7 +21399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -21423,8 +21616,9 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
+	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -21438,12 +21632,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, 64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(isrevorder){// also reverse the array at the same time
 		if constexpr(isinputconst){
+			V **pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -21454,10 +21649,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *p{input[0]};
 					input += 2;
-					auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 					pout[i] = p;
 					pdst[i] = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 					}
@@ -21494,14 +21689,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *phi{input[0]};
 					V *plo{input[1]};
 					input += 2;
-					auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 					pout[i] = phi;
 					pdst[i] = phi;
-					auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
 					pdst[i - 1] = plo;
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t &>(curlo));
 					}
@@ -21561,10 +21756,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{pinputlo[0]};
 					V *phi{pinputhi[0]};
 					// register pressure performance issue on several platforms: first do the low half here
-					auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*poutputhi-- = plo;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
 					}
@@ -21590,10 +21785,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 					++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo.data[HI])];
 					// register pressure performance issue on several platforms: do the high half here second
-					auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 					*pinputlo++ = phi;
 					*poutputlo++ = phi;
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
 					}
@@ -21623,14 +21818,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *plo{pinputlo[0]};
 					V *phi{pinputhi[0]};
-					auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*poutputhi-- = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 					*pinputlo++ = phi;
 					*poutputlo++ = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t &>(curhi));
 					}
@@ -21690,9 +21885,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				V *p{input[i]};
-				auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 				pout[i] = p;
-				auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 				}
@@ -21727,12 +21922,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *phi{input[i]};
 				V *plo{input[i - 1]};
-				auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 				pout[i] = phi;
-				auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 				pout[i - 1] = plo;
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t &>(curlo));
 				}
@@ -21791,8 +21986,8 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -21835,10 +22030,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
 				psrchi -= 2;
-				auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 				auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -21853,14 +22048,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -21891,7 +22086,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * 8;
 		poffset += static_cast<std::size_t>(index) * 256;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(!old) do{
 				spinpause();
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -21916,10 +22111,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
 				psrchi -= 2;
-				auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 				auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -21934,14 +22129,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-				auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-				auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-				auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-				auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -21973,7 +22168,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -21998,10 +22193,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pa{psrchi[0]};
 					V *pb{psrchi[-1]};
 					psrchi -= 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI])};
 					std::size_t offseta{offsetscompanion[cura + (64 - 8) * 256 / 8]--};// the next item will be placed one lower
 					std::size_t offsetb{offsetscompanion[curb + (64 - 8) * 256 / 8]--};
@@ -22016,14 +22211,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pc{psrchi[-2]};
 					V *pd{psrchi[-3]};
 					psrchi -= 4;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 					std::size_t offseta{offsetscompanion[cura + (64 - 8) * 256 / 8]--};// the next item will be placed one lower
 					std::size_t offsetb{offsetscompanion[curb + (64 - 8) * 256 / 8]--};
@@ -22045,8 +22240,8 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -22091,10 +22286,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22109,14 +22304,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
 					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22131,10 +22326,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22144,8 +22339,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -22155,10 +22350,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
 				auto[curlo, curhi]{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -22167,8 +22362,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im)};
 				std::size_t cur{filtershiftlo8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -22197,7 +22392,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * 8;
 		poffset += static_cast<std::size_t>(index) * 256;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -22224,10 +22419,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22242,14 +22437,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
 					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22264,10 +22459,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 					auto[cura, curb]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -22277,8 +22472,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -22288,10 +22483,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
-				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
 				auto[curlo, curhi]{filtershifthi8<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -22300,8 +22495,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-				auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im)};
 				std::size_t cur{filtershifthi8<isabsvalue, issignmode, isfltpmode>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -22331,7 +22526,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * 8;
 			poffset += static_cast<std::size_t>(index) * 256;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -22358,10 +22553,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI])};
 						std::size_t offseta{offsets[cura + (64 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (64 - 8) * 256 / 8]++};
@@ -22376,14 +22571,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
 						psrclo += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pd, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imc, varparameters...)};
+						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imd, varparameters...)};
 						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 						std::size_t offseta{offsets[cura + (64 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (64 - 8) * 256 / 8]++};
@@ -22398,10 +22593,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(pb, varparameters...)};
+						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(ima, varparameters...)};
+						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI])};
 						std::size_t offseta{offsets[cura + (64 - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (64 - 8) * 256 / 8]++};
@@ -22411,8 +22606,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
-					auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(out.data[HI])};
 					std::size_t offset{offsets[cur + (64 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -22422,10 +22617,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
-					auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
-					auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
-					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
-					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo)};
+					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi)};
 					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outlo.data[HI], outhi.data[HI])};
 					std::size_t offsetlo{offsets[curlo + (64 - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + (64 - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -22434,8 +22629,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *p{*psrclo};
-					auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
-					auto out{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im)};
+					auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(out.data[HI])};
 					std::size_t offset{offsets[cur + (64 - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -22451,8 +22646,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -22463,7 +22658,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -22475,7 +22670,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -22483,9 +22679,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
+			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -22498,7 +22697,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -22507,7 +22706,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -22571,7 +22770,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -22581,7 +22780,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -22634,7 +22833,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -22659,7 +22858,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -22673,10 +22873,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
 							V *p{*pinput++};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -22707,14 +22907,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *plo{pinput[0]};
 							V *phi{pinput[1]};
 							pinput += 2;
-							auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 							output[i] = plo;
 							buffer[i] = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 							output[i - 1] = phi;
 							buffer[i - 1] = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t &>(curhi));
 							}
@@ -22766,10 +22966,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{pinput[0]};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -22801,9 +23001,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							output[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -22834,12 +23034,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 							output[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 							output[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t &>(curlo));
 							}
@@ -22891,9 +23091,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							output[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -22934,7 +23134,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -22944,7 +23144,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -23012,8 +23212,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -23023,7 +23223,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -23035,7 +23235,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -23043,9 +23243,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr, varparameters...);
+		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -23058,7 +23258,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -23067,7 +23267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -23131,7 +23331,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -23141,7 +23341,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -23193,7 +23393,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -23218,7 +23418,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -23245,10 +23445,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *plo{pinputlo[0]};
 							V *phi{pinputhi[0]};
-							auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
 							}
@@ -23275,10 +23475,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 							++offsets[7 * 256 + static_cast<std::size_t>(curlo.data[HI])];
 							// register pressure performance issue on several platforms: do the high half here second
-							auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 							*pinputlo++ = phi;
 							*pbufferlo++ = phi;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
 							}
@@ -23308,14 +23508,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *plo{pinputlo[0]};
 							V *phi{pinputhi[0]};
-							auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 							*pinputlo++ = phi;
 							*pbufferlo++ = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t &>(curhi));
 							}
@@ -23367,10 +23567,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
-						auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 						}
@@ -23402,9 +23602,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -23435,12 +23635,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
+							auto imhi{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(phi, varparameters...)};
 							buffer[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
+							auto imlo{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(plo, varparameters...)};
 							buffer[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
+							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imhi, varparameters...)};
+							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t &>(curlo));
 							}
@@ -23492,9 +23692,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
 							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>, V>(p, varparameters...)};
 							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
+							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
 							}
@@ -23535,7 +23735,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -23545,7 +23745,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -23612,7 +23812,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 // Function implementation templates for multi-part types without indirection
 
 // initialisation part, multithreading companion for the radixsortnoallocmultimain() function implementation template for multi-part types without indirection
-template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X>
+template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool isinputconst, typename T, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	!std::is_same_v<bool, T> &&
@@ -23620,18 +23820,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
-	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], std::conditional_t<isinputconst, T *, std::nullptr_t> pdst)noexcept{
+	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 64-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -23738,6 +23940,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 56-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -23835,6 +24038,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 48-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -23923,6 +24127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 40-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -24000,6 +24205,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 32-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -24068,6 +24274,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 24-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -24138,6 +24345,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 		if constexpr(false){// useless when not handling indirection: isrevorder){// also reverse the array at the same time
+			T *pdst{splitparameter<false>(varparameters...)};
 		}else{// 16-bit, not in reverse order
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 				// unsigned counter, not zero inclusive inside the loop
@@ -24592,7 +24800,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -24600,9 +24809,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1, allowedthreads, count, input, output, buffer);
+		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1, allowedthreads, count, input, output);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output, buffer)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
+			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -24753,7 +24965,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output, buffer));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -25592,7 +25805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -25600,9 +25813,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr);
+		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1, allowedthreads, count, input, buffer);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer, nullptr)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -25752,7 +25965,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(--assignedslice){
 						initasynchandlesvector.reserve(assignedslice);
 						do{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer, nullptr));
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
 						}while(--assignedslice);// slice 0 is handled by the current thread
 					}
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -26573,22 +26786,24 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	std::array<X, CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], std::conditional_t<isinputconst, V **, std::nullptr_t> pdst, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
+	std::array<X, CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
-	if constexpr(isinputconst) assert(pdst);
+	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
 	std::array<X, CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)> offsetscompanion;
 	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
 	if constexpr(64 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -26598,10 +26813,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -26640,14 +26855,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{input[0]};
 						V *plo{input[1]};
 						input += 2;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
 						pdst[i - 1] = plo;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
@@ -26711,10 +26926,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -26742,10 +26957,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo6)];
 						++offsetscompanion[7 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -26777,14 +26992,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
@@ -26848,9 +27063,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -26887,12 +27102,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
@@ -26950,6 +27165,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(56 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -26959,10 +27175,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -26998,14 +27214,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{input[0]};
 						V *plo{input[1]};
 						input += 2;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
 						pdst[i - 1] = plo;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
@@ -27063,10 +27279,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -27091,10 +27307,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo5)];
 						++offsetscompanion[6 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -27123,14 +27339,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
@@ -27188,9 +27404,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -27224,12 +27440,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
@@ -27281,6 +27497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(48 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -27290,10 +27507,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -27326,14 +27543,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{input[0]};
 						V *plo{input[1]};
 						input += 2;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
 						pdst[i - 1] = plo;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
@@ -27385,10 +27602,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -27410,10 +27627,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo4)];
 						++offsetscompanion[5 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -27439,14 +27656,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
@@ -27498,9 +27715,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -27531,12 +27748,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
@@ -27582,6 +27799,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -27591,10 +27809,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -27624,14 +27842,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{input[0]};
 						V *plo{input[1]};
 						input += 2;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
 						pdst[i - 1] = plo;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 						}
@@ -27677,10 +27895,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -27699,10 +27917,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo3)];
 						++offsetscompanion[4 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -27725,14 +27943,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 						}
@@ -27776,9 +27994,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -27806,12 +28024,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
-					U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-					U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 					}
@@ -27849,6 +28067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(32 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -27858,10 +28077,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -27888,14 +28107,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pa{input[0]};
 						V *pb{input[1]};
 						input += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
 						pdst[i] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, true, T, V>(pb, varparameters...)};
 						pout[i - 1] = pb;
 						pdst[i - 1] = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -27933,10 +28152,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -27952,10 +28171,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo2)];
 						++offsetscompanion[3 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -27975,14 +28194,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *pa{pinputlo[0]};
 						V *pb{pinputhi[0]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						*pinputhi-- = pa;
 						*poutputhi-- = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						*pinputlo++ = pb;
 						*poutputlo++ = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -28020,9 +28239,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -28047,12 +28266,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *pa{input[i]};
 					V *pb{input[i - 1]};
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 					pout[i - 1] = pb;
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
@@ -28084,6 +28303,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(24 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -28093,10 +28313,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -28121,18 +28341,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{input[1]};
 						V *pc{input[2]};
 						input += 3;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
 						pdst[i] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, true, T, V>(pb, varparameters...)};
 						pout[i - 1] = pb;
 						pdst[i - 1] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, true, T, V>(pc, varparameters...)};
 						pout[i - 2] = pc;
 						pdst[i - 2] = pc;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imc, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 						}
@@ -28172,10 +28392,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -28188,10 +28408,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[256 + static_cast<std::size_t>(curlo1)];
 						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -28214,18 +28434,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{pinputhi[0]};
 						V *pc{pinputlo[1]};
 						V *pd{pinputhi[-1]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						pinputhi[0] = pa;
 						poutputhi[0] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						pinputlo[0] = pb;
 						poutputlo[0] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 						pinputhi[1] = pc;
 						poutputhi[1] = pc;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 						// register pressure performance issue on several platforms: first do the high half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
@@ -28256,22 +28476,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[2 * 256 + static_cast<std::size_t>(curc)];
 						V *pe{pinputlo[2]};
 						V *pf{pinputhi[-2]};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 						pinputlo[1] = pd;
 						poutputlo[1] = pd;
-						auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+						auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 						pinputhi[-2] = pe;
 						pinputhi -= 3;
 						poutputhi[-2] = pe;
 						poutputhi -= 3;
-						auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+						auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 						pinputlo[2] = pf;
 						pinputlo += 3;
 						poutputlo[2] = pf;
 						poutputlo += 3;
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-						U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-						U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+						U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+						U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
 						// register pressure performance issue on several platforms: do the low half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
@@ -28312,9 +28532,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -28337,15 +28557,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *pa{input[i]};
 					V *pb{input[i - 1]};
 					V *pc{input[i - 2]};
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 					pout[i - 1] = pb;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 					pout[i - 2] = pc;
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 					}
@@ -28379,6 +28599,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(16 == CHAR_BIT * sizeof(T)){
 		if constexpr(isrevorder){// also reverse the array at the same time
 			if constexpr(isinputconst){
+				V **pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -28388,10 +28609,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pdst += loc;
 					do{
 						V *p{*input++};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
 						pdst[i] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -28414,22 +28635,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pc{input[2]};
 						V *pd{input[3]};
 						input += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
 						pdst[i] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, true, T, V>(pb, varparameters...)};
 						pout[i - 1] = pb;
 						pdst[i - 1] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, true, T, V>(pc, varparameters...)};
 						pout[i - 2] = pc;
 						pdst[i - 2] = pc;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, true, T, V>(pd, varparameters...)};
 						pout[i - 3] = pd;
 						pdst[i - 3] = pd;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imd, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
@@ -28465,10 +28686,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
-						auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*poutputhi-- = plo;
-						U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 						}
@@ -28478,10 +28699,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
 						++offsetscompanion[256 + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
-						auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						*pinputlo++ = phi;
 						*poutputlo++ = phi;
-						U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 						}
@@ -28501,26 +28722,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{pinputhi[0]};
 						V *pc{pinputlo[1]};
 						V *pd{pinputhi[-1]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						pinputhi[0] = pa;
 						poutputhi[0] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						pinputlo[0] = pb;
 						poutputlo[0] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 						pinputhi[-1] = pc;
 						pinputhi -= 2;
 						poutputhi[-1] = pc;
 						poutputhi -= 2;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 						pinputlo[1] = pd;
 						pinputlo += 2;
 						poutputlo[1] = pd;
 						poutputlo += 2;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
@@ -28556,9 +28777,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
-					U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 					}
@@ -28579,18 +28800,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *pb{input[i - 1]};
 					V *pc{input[i - 2]};
 					V *pd{input[i - 3]};
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 					pout[i - 1] = pb;
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 					pout[i - 2] = pc;
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 					pout[i - 3] = pd;
-					U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 					}
@@ -28626,10 +28847,10 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
 	// do not pass a nullptr here
@@ -28665,10 +28886,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
 				psrchi -= 2;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 				auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -28683,14 +28904,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
 				psrchi -= 4;
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 				auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
@@ -28728,7 +28949,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * 8;
 				poffset += static_cast<std::size_t>(index) * 256;
 			}
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -28753,10 +28974,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pa{psrchi[0]};
 					V *pb{psrchi[-1]};
 					psrchi -= 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
 					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
@@ -28771,14 +28992,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 					V *pc{psrchi[-2]};
 					V *pd{psrchi[-3]};
 					psrchi -= 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+					U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 					std::size_t offseta{offsetscompanion[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};// the next item will be placed one lower
 					std::size_t offsetb{offsetscompanion[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]--};
@@ -28800,10 +29021,10 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != MAXSIZE_T);
@@ -28841,10 +29062,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -28859,14 +29080,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
 					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-					U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-					U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-					U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+					U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 					auto[cura, curb, curc, curd]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -28881,10 +29102,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
 					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-					U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-					U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					auto[cura, curb]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 					std::size_t offsetb{poffset[curb]++};
@@ -28894,8 +29115,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			if(!(1 & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -28905,10 +29126,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				V *plo{*psrclo++};
 				V *phi{*psrchi--};
-				auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-				auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-				U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-				U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+				U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+				U outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 				auto[curlo, curhi]{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetsstride]--};// the next item will be placed one lower
@@ -28917,8 +29138,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				V *p{*psrclo};
-				auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-				U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 				std::size_t cur{filtershift8<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
@@ -28954,7 +29175,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				poffset += static_cast<std::size_t>(index) * 256;
 			}
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -28981,10 +29202,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
@@ -28999,14 +29220,14 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
 						psrclo += 4;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-						U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+						U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
@@ -29021,10 +29242,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
 						psrclo += 2;
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-						U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+						U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsets[cura + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};
@@ -29034,8 +29255,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}
 				if(!(1 & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+					U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -29045,10 +29266,10 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					V *plo{*psrclo++};
 					V *phi{*psrchi--};
-					auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-					auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-					U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-					U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+					U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+					U outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 					auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 					std::size_t offsetlo{offsets[curlo + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + (CHAR_BIT * sizeof(T) - 8) * 256 / 8 + offsetsstride]--};// the next item will be placed one lower
@@ -29057,8 +29278,8 @@ handletop8:// this prevents "!isabsvalue && isfltpmode" to be made constexpr her
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
 					V *p{*psrclo};
-					auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-					U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+					U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 					std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 					std::size_t offset{offsets[cur + (CHAR_BIT * sizeof(T) - 8) * 256 / 8]};
 					pdst[offset] = p;
@@ -29074,10 +29295,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -29088,7 +29309,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -29100,7 +29321,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -29108,9 +29330,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, buffer, varparameters...);
+		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, output, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...)};
+			std::array<X, offsetsstride> localoffsets;
+			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
+			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -29123,7 +29348,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -29132,7 +29357,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -29196,8 +29421,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -29207,8 +29432,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -29253,7 +29478,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -29278,7 +29503,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -29294,10 +29520,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29332,14 +29558,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
 								pinput += 2;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
 								buffer[i - 1] = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -29395,10 +29621,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29432,9 +29658,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29467,12 +29693,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -29528,9 +29754,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29567,10 +29793,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29602,14 +29828,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
 								pinput += 2;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
 								buffer[i - 1] = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -29659,10 +29885,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29693,9 +29919,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29725,12 +29951,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -29780,9 +30006,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29816,10 +30042,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29848,14 +30074,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
 								pinput += 2;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
 								buffer[i - 1] = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -29899,10 +30125,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29930,9 +30156,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -29959,12 +30185,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -30008,9 +30234,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30041,10 +30267,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30070,14 +30296,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
 								pinput += 2;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
 								buffer[i - 1] = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -30113,10 +30339,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30141,9 +30367,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30167,12 +30393,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -30208,9 +30434,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30238,10 +30464,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30264,14 +30490,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{pinput[0]};
 								V *pb{pinput[1]};
 								pinput += 2;
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i] = pa;
 								buffer[i] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i - 1] = pb;
 								buffer[i - 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30301,10 +30527,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30326,9 +30552,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30349,12 +30575,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *pa{input[i]};
 								V *pb{input[i - 1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i - 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30384,9 +30610,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30411,10 +30637,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30440,18 +30666,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{pinput[1]};
 								V *pc{pinput[2]};
 								pinput += 3;
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
 								buffer[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
 								buffer[i + 1] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
 								buffer[i] = pc;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 								}
@@ -30486,14 +30712,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{pinput[0]};
 								V *pb{pinput[1]};
 								pinput += 2;
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
 								buffer[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
 								buffer[i + 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30515,10 +30741,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 							}else if(-2 <= i){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30537,9 +30763,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30563,15 +30789,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 								}
@@ -30605,12 +30831,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if(-2 < i){// fill in the final two items for a remainder of 2
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30632,9 +30858,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 							}else if(-2 <= i){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30656,10 +30882,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *const *pinput{input + (count - i)};
 							do{
 								V *p{*pinput++};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30683,22 +30909,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pc{pinput[2]};
 								V *pd{pinput[3]};
 								pinput += 4;
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
 								buffer[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 2] = pb;
 								buffer[i + 2] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i + 1] = pc;
 								buffer[i + 1] = pc;
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								output[i] = pd;
 								buffer[i] = pd;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 								}
@@ -30728,14 +30954,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{pinput[0]};
 								V *pb{pinput[1]};
 								pinput += 2;
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
 								buffer[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 2] = pb;
 								buffer[i + 2] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30752,10 +30978,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							if(1 & i){// fill in the final item for odd counts
 								V *p{pinput[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30771,9 +30997,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30795,18 +31021,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{input[i + 2]};
 								V *pc{input[i + 1]};
 								V *pd{input[i]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 2] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i + 1] = pc;
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								output[i] = pd;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 								}
@@ -30835,12 +31061,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if(2 & i){// fill in the final two items for a remainder of 2 or 3
 								V *pa{input[i + 3]};
 								V *pb{input[i + 2]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 2] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -30857,9 +31083,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							if(1 & i){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -30885,7 +31111,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -30895,7 +31121,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -30963,10 +31189,10 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -30976,7 +31202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -30988,7 +31214,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			try{
 				initasynchandlesvector.reserve(i);
 				do{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 					--assignedslice;
 				}while(--i);
 			}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -30996,9 +31222,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}
 		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, nullptr, varparameters...);
+		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1, allowedthreads, count, input, buffer, varparameters...);
 		if(i) do{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...)};
+			std::array<X, offsetsstride> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
 			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
 			--assignedslice;
 		}while(--i);
@@ -31011,7 +31237,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -31020,7 +31246,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -31084,8 +31310,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -31095,8 +31321,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -31140,7 +31366,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -31165,7 +31391,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if(--assignedslice){
 							initasynchandlesvector.reserve(assignedslice);
 							do{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, nullptr, varparameters...));
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
 							}while(--assignedslice);// slice 0 is handled by the current thread
 						}
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
@@ -31193,10 +31419,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -31225,10 +31451,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[6 * 256 + static_cast<std::size_t>(curlo6)];
 								++offsets[7 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -31260,14 +31486,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -31323,10 +31549,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -31360,9 +31586,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -31395,12 +31621,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -31456,9 +31682,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -31508,10 +31734,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -31537,10 +31763,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[5 * 256 + static_cast<std::size_t>(curlo5)];
 								++offsets[6 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -31569,14 +31795,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -31626,10 +31852,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -31660,9 +31886,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -31692,12 +31918,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -31747,9 +31973,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer);
 								}
@@ -31796,10 +32022,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -31822,10 +32048,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[4 * 256 + static_cast<std::size_t>(curlo4)];
 								++offsets[5 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -31851,14 +32077,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -31930,9 +32156,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -31959,12 +32185,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -32008,9 +32234,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32054,10 +32280,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -32077,10 +32303,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[3 * 256 + static_cast<std::size_t>(curlo3)];
 								++offsets[4 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -32103,14 +32329,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, curhi);
 								}
@@ -32146,10 +32372,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -32174,9 +32400,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32200,12 +32426,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, curlo);
 								}
@@ -32241,9 +32467,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32284,10 +32510,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -32304,10 +32530,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[2 * 256 + static_cast<std::size_t>(curlo2)];
 								++offsets[3 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -32327,14 +32553,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *pa{pinputlo[0]};
 								V *pb{pinputhi[0]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								*pinputhi-- = pa;
 								*pbufferhi-- = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								*pinputlo++ = pb;
 								*pbufferlo++ = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -32364,10 +32590,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -32389,9 +32615,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32412,12 +32638,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *pa{input[i]};
 								V *pb{input[i - 1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i - 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -32447,9 +32673,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}while(0 < i);
 							if(!(1 & i)){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32491,10 +32717,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -32508,10 +32734,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[256 + static_cast<std::size_t>(curlo1)];
 								++offsets[2 * 256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -32531,26 +32757,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{pinputhi[0]};
 								V *pc{pinputlo[1]};
 								V *pd{pinputhi[-1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
 								pbufferhi[0] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								pinputlo[0] = pb;
 								pbufferlo[0] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								pinputhi[1] = pc;
 								pinputhi -= 2;
 								pbufferhi[1] = pc;
 								pbufferhi -= 2;
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[-1] = pd;
 								pinputlo += 2;
 								pbufferlo[-1] = pd;
 								pbufferlo += 2;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 								}
@@ -32589,14 +32815,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}else if(2 & initialcount){// possibly initialise with 2 entries before the loop below
 								V *pa{pinputlo[0]};
 								V *pb{pinputhi[0]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								*pinputhi-- = pa;
 								*pbufferhi-- = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								*pinputlo++ = pb;
 								*pbufferlo++ = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -32626,18 +32852,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{pinputhi[0]};
 								V *pc{pinputlo[1]};
 								V *pd{pinputhi[-1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
 								pbufferhi[0] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								pinputlo[0] = pb;
 								pbufferlo[0] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								pinputhi[1] = pc;
 								pbufferhi[1] = pc;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 								// register pressure performance issue on several platforms: first do the high half here
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
@@ -32668,22 +32894,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[2 * 256 + static_cast<std::size_t>(curc)];
 								V *pe{pinputlo[2]};
 								V *pf{pinputhi[-2]};
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
 								pbufferlo[1] = pd;
-								auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+								auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 								pinputhi[-2] = pe;
 								pinputhi -= 3;
 								pbufferhi[-2] = pe;
 								pbufferhi -= 3;
-								auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+								auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 								pinputlo[2] = pf;
 								pinputlo += 3;
 								pbufferlo[2] = pf;
 								pbufferlo += 3;
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-								U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-								U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+								U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
 								// register pressure performance issue on several platforms: do the low half here second
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curd, cure, curf);
@@ -32716,10 +32942,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -32738,9 +32964,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32764,15 +32990,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 1] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								buffer[i] = pc;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc);
 								}
@@ -32806,12 +33032,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if(-2 < i){// fill in the final two items for a remainder of 2
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 2] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 1] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -32833,9 +33059,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[2 * 256 + static_cast<std::size_t>(curb)];
 							}else if(-2 <= i){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -32871,10 +33097,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
-								auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
+								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								*pinputhi-- = plo;
 								*pbufferhi-- = plo;
-								U curlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo, varparameters...)};
+								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
 								}
@@ -32885,10 +33111,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								if constexpr(isabsvalue && issignmode && isfltpmode) curlo &= 0x7Fu;
 								++offsets[256 + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
-								auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
+								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								*pinputlo++ = phi;
 								*pbufferlo++ = phi;
-								U curhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi, varparameters...)};
+								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
 								}
@@ -32902,14 +33128,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if(2 & count + 1){// possibly initialise with 2 entries before the loop below
 								V *pa{pinputlo[0]};
 								V *pb{pinputhi[0]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								*pinputhi-- = pa;
 								*pbufferhi-- = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								*pinputlo++ = pb;
 								*pbufferlo++ = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -32933,26 +33159,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{pinputhi[0]};
 								V *pc{pinputlo[1]};
 								V *pd{pinputhi[-1]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
 								pbufferhi[0] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								pinputlo[0] = pb;
 								pbufferlo[0] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								pinputhi[-1] = pc;
 								pinputhi -= 2;
 								pbufferhi[-1] = pc;
 								pbufferhi -= 2;
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
 								pinputlo += 2;
 								pbufferlo[1] = pd;
 								pbufferlo += 2;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 								}
@@ -32980,10 +33206,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						if(pinputlo == pinputhi){// fill in the final item for odd counts
 							V *p{pinputlo[0]};
-							auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							// no write to input, as this is the midpoint
 							*pbufferhi = p;
-							U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 							}
@@ -32999,9 +33225,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -33023,18 +33249,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{input[i + 2]};
 								V *pc{input[i + 1]};
 								V *pd{input[i]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 2] = pb;
-								auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								buffer[i + 1] = pc;
-								auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								buffer[i] = pd;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-								U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-								U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 								}
@@ -33063,12 +33289,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if(2 & i){// fill in the final two items for a remainder of 2 or 3
 								V *pa{input[i + 3]};
 								V *pb{input[i + 2]};
-								auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 3] = pa;
-								auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 2] = pb;
-								U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-								U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 								}
@@ -33085,9 +33311,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							if(1 & i){// fill in the final item for odd counts
 								V *p{input[0]};
-								auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[0] = p;
-								U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 								}
@@ -33112,7 +33338,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -33122,7 +33348,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -35149,9 +35375,9 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	std::array<X, 8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const input[], V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	std::array<X, 8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const input[], V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
 	// do not pass a nullptr here
@@ -35169,12 +35395,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			V *pa{input[i]};
 			V *pb{input[i - 1]};
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			pout[i] = pa;
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 			pout[i - 1] = pb;
-			U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+			U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+			U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 			if constexpr(isabsvalue || isfltpmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 			}
@@ -35193,18 +35419,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			V *pc{input[i - 2]};
 			V *pd{input[i - 3]};
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				pout[i] = pa;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				pout[i - 1] = pb;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 				pout[i - 2] = pc;
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 				pout[i - 3] = pd;
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 				// register pressure performance issue on several platforms: first do the high half here
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 				++offsetscompanion[cura];
@@ -35217,18 +35443,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			V *pg{input[i - 6]};
 			V *ph{input[i - 7]};
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
-				auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+				auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 				pout[i - 4] = pe;
-				auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+				auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 				pout[i - 5] = pf;
-				auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+				auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 				pout[i - 6] = pg;
-				auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+				auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 				pout[i - 7] = ph;
-				U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-				U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-				U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-				U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+				U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+				U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+				U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+				U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 				// register pressure performance issue on several platforms: do the low half here second
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
 				++offsetscompanion[cure];
@@ -35236,30 +35462,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsetscompanion[curg];
 				++offsetscompanion[curh];
 			}else{
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				pout[i] = pa;
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				pout[i - 1] = pb;
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 				pout[i - 2] = pc;
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 				pout[i - 3] = pd;
-				auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+				auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 				pout[i - 4] = pe;
-				auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+				auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 				pout[i - 5] = pf;
-				auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+				auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 				pout[i - 6] = pg;
-				auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+				auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 				pout[i - 7] = ph;
-				U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-				U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-				U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-				U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-				U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-				U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-				U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-				U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+				U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+				U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+				U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+				U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+				U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 				if constexpr(isabsvalue && isfltpmode){// one-register filters only
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 				}
@@ -35282,9 +35508,9 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const psrclo[], V *pdst[], X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const psrclo[], V *pdst[], X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
 	// do not pass a nullptr here
@@ -35299,10 +35525,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			V *pa{psrchi[0]};
 			V *pb{psrchi[-1]};
 			psrchi -= 2;
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+			U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+			U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 			auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -35323,14 +35549,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			V *pc{psrchi[-2]};
 			V *pd{psrchi[-3]};
 			psrchi -= 4;
-			auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-			auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-			auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-			auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-			U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-			U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-			U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-			U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+			auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+			auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+			U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+			U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+			U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+			U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 			auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -35357,9 +35583,9 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmain(std::size_t count, V *const psrclo[], V *pdst[], X offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocsinglesortmain(std::size_t count, V *const psrclo[], V *pdst[], X offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != MAXSIZE_T);
 	// do not pass a nullptr here
@@ -35373,10 +35599,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			while(0 <= --j){// fill the array, two at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
-				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb)};
 				psrclo += 2;
 				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
@@ -35397,14 +35623,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrclo[1]};
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
-				auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
-				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
-				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
-				U outc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc)};
-				U outd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb)};
+				U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc)};
+				U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd)};
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
@@ -35427,10 +35653,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(2 & count + 1){// fill in the final two items for a remainder of 2 or 3
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
-				auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
-				auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
-				U outa{indirectinput2<indirection1, indirection2, isindexed2, T>(ima)};
-				U outb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb)};
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima)};
+				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb)};
 				psrclo += 2;
 				auto[cura, curb]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
@@ -35447,8 +35673,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		if(!(1 & count)){// fill in the final item for odd counts
 			V *p{psrclo[0]};
-			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-			U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+			U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -35464,10 +35690,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 			V *plo{*psrclo++};
 			V *phi{*psrchi--};
-			auto imlo{indirectinput1<indirection1, isindexed2, T, V>(plo, varparameters...)};
-			auto imhi{indirectinput1<indirection1, isindexed2, T, V>(phi, varparameters...)};
-			U outlo{indirectinput2<indirection1, indirection2, isindexed2, T>(imlo)};
-			U outhi{indirectinput2<indirection1, indirection2, isindexed2, T>(imhi)};
+			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+			U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo)};
+			U outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi)};
 			auto[curlo, curhi]{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -35482,8 +35708,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}while(psrclo < psrchi);
 		if(psrclo == psrchi){// fill in the final item for odd counts
 			V *p{*psrclo};
-			auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
-			U out{indirectinput2<indirection1, indirection2, isindexed2, T>(im)};
+			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+			U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im)};
 			std::size_t cur{filtertop8<isabsvalue, issignmode, isfltpmode, T, U>(out)};
 			std::size_t offset;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -35501,9 +35727,9 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -35513,7 +35739,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -35548,7 +35774,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -35557,7 +35783,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -35609,13 +35835,13 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocsinglemain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -35660,7 +35886,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -35698,12 +35924,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *pa{input[i]};
 						V *pb{input[i - 1]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						output[i] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						output[i - 1] = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -35713,9 +35939,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[0] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -35734,18 +35960,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pc{input[i + 5]};
 						V *pd{input[i + 4]};
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 7] = pa;
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 							output[i + 6] = pb;
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 							output[i + 5] = pc;
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 							output[i + 4] = pd;
-							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 							// register pressure performance issue on several platforms: first do the high half here
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 							++offsets[cura];
@@ -35758,18 +35984,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pg{input[i + 1]};
 						V *ph{input[i]};
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
-							auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							output[i + 3] = pe;
-							auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+							auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 							output[i + 2] = pf;
-							auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+							auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 							output[i + 1] = pg;
-							auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							output[i] = ph;
-							U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-							U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-							U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-							U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+							U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 							// register pressure performance issue on several platforms: do the low half here second
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
 							++offsets[cure];
@@ -35777,30 +36003,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[curg];
 							++offsets[curh];
 						}else{
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 7] = pa;
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 							output[i + 6] = pb;
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 							output[i + 5] = pc;
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 							output[i + 4] = pd;
-							auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							output[i + 3] = pe;
-							auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+							auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 							output[i + 2] = pf;
-							auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+							auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 							output[i + 1] = pg;
-							auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							output[i] = ph;
-							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-							U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-							U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-							U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-							U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+							U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 							if constexpr(isabsvalue && isfltpmode){// one-register filters only
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 							}
@@ -35820,19 +36046,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{input[i + 6]};
 						V *pc{input[i + 5]};
 						V *pd{input[i + 4]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						output[i + 7] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						output[i + 6] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 						output[i + 5] = pc;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 						output[i + 4] = pd;
 						i -= 4;// required for the "if(2 & i){" part
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
@@ -35844,12 +36070,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(2 & i){// fill in the final two items for a remainder of 2 or 3
 						V *pa{input[i + 7]};
 						V *pb{input[i + 6]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						output[i + 7] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						output[i + 6] = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -35858,9 +36084,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					if(1 & i){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[0] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -35880,7 +36106,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -35890,7 +36116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -35943,9 +36169,9 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -35955,7 +36181,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	{// count the 256 configurations, all in one go
@@ -35990,7 +36216,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -35999,7 +36225,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -36051,13 +36277,13 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortnoallocsinglemain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -36097,7 +36323,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -36136,12 +36362,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *pa{input[i]};
 						V *pb{input[i - 1]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						buffer[i] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						buffer[i - 1] = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -36151,9 +36377,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[0] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -36172,18 +36398,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pc{input[i + 5]};
 						V *pd{input[i + 4]};
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 7] = pa;
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 							buffer[i + 6] = pb;
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 							buffer[i + 5] = pc;
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 							buffer[i + 4] = pd;
-							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 							// register pressure performance issue on several platforms: first do the high half here
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 							++offsets[cura];
@@ -36196,18 +36422,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pg{input[i + 1]};
 						V *ph{input[i]};
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
-							auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							buffer[i + 3] = pe;
-							auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+							auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 							buffer[i + 2] = pf;
-							auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+							auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 							buffer[i + 1] = pg;
-							auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							buffer[i] = ph;
-							U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-							U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-							U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-							U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+							U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 							// register pressure performance issue on several platforms: do the low half here second
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
 							++offsets[cure];
@@ -36215,30 +36441,30 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[curg];
 							++offsets[curh];
 						}else{
-							auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 7] = pa;
-							auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 							buffer[i + 6] = pb;
-							auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 							buffer[i + 5] = pc;
-							auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 							buffer[i + 4] = pd;
-							auto ime{indirectinput1<indirection1, isindexed2, T, V>(pe, varparameters...)};
+							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							buffer[i + 3] = pe;
-							auto imf{indirectinput1<indirection1, isindexed2, T, V>(pf, varparameters...)};
+							auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 							buffer[i + 2] = pf;
-							auto img{indirectinput1<indirection1, isindexed2, T, V>(pg, varparameters...)};
+							auto img{indirectinput1<indirection1, isindexed2, false, T, V>(pg, varparameters...)};
 							buffer[i + 1] = pg;
-							auto imh{indirectinput1<indirection1, isindexed2, T, V>(ph, varparameters...)};
+							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							buffer[i] = ph;
-							U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-							U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-							U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-							U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
-							U cure{indirectinput2<indirection1, indirection2, isindexed2, T>(ime, varparameters...)};
-							U curf{indirectinput2<indirection1, indirection2, isindexed2, T>(imf, varparameters...)};
-							U curg{indirectinput2<indirection1, indirection2, isindexed2, T>(img, varparameters...)};
-							U curh{indirectinput2<indirection1, indirection2, isindexed2, T>(imh, varparameters...)};
+							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+							U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
+							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
+							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
+							U curh{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imh, varparameters...)};
 							if constexpr(isabsvalue && isfltpmode){// one-register filters only
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 							}
@@ -36258,19 +36484,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{input[i + 6]};
 						V *pc{input[i + 5]};
 						V *pd{input[i + 4]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						buffer[i + 7] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						buffer[i + 6] = pb;
-						auto imc{indirectinput1<indirection1, isindexed2, T, V>(pc, varparameters...)};
+						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 						buffer[i + 5] = pc;
-						auto imd{indirectinput1<indirection1, isindexed2, T, V>(pd, varparameters...)};
+						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 						buffer[i + 4] = pd;
 						i -= 4;// required for the "if(2 & i){" part
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
-						U curc{indirectinput2<indirection1, indirection2, isindexed2, T>(imc, varparameters...)};
-						U curd{indirectinput2<indirection1, indirection2, isindexed2, T>(imd, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+						U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd);
 						}
@@ -36282,12 +36508,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(2 & i){// fill in the final two items for a remainder of 2 or 3
 						V *pa{input[i + 7]};
 						V *pb{input[i + 6]};
-						auto ima{indirectinput1<indirection1, isindexed2, T, V>(pa, varparameters...)};
+						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						buffer[i + 7] = pa;
-						auto imb{indirectinput1<indirection1, isindexed2, T, V>(pb, varparameters...)};
+						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						buffer[i + 6] = pb;
-						U cura{indirectinput2<indirection1, indirection2, isindexed2, T>(ima, varparameters...)};
-						U curb{indirectinput2<indirection1, indirection2, isindexed2, T>(imb, varparameters...)};
+						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 						}
@@ -36296,9 +36522,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					if(1 & i){// fill in the final item for odd counts
 						V *p{input[0]};
-						auto im{indirectinput1<indirection1, isindexed2, T, V>(p, varparameters...)};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[0] = p;
-						U cur{indirectinput2<indirection1, indirection2, isindexed2, T>(im, varparameters...)};
+						U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
 						}
@@ -36318,7 +36544,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -36328,7 +36554,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -36620,8 +36846,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -36694,8 +36920,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -36929,9 +37155,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -37004,9 +37230,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42341,10 +42567,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> mergehalvesmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> mergehalvesmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
@@ -42359,10 +42585,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdatalo{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? (count - 1) : halfcount)};
 	std::intptr_t phi{*pdatahi}, plo{*pdatalo};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto imhiinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-	auto imloinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imhiinit, varparameters...)};
-	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imloinit, varparameters...)};
+	auto imhiinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+	auto imloinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhiinit, varparameters...)};
+	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imloinit, varparameters...)};
 	auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhiinit, curloinit)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comphi) previouscomp;// used for debug assertion of the sorted order
@@ -42380,8 +42606,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				--pdatalo;
 				out = plo;
 				plo = *pdatalo;
-				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -42391,8 +42617,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				--pdatahi;
 				out = phi;
 				phi = *pdatahi;
-				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -42431,8 +42657,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			*pout-- = outlo;
 			phi &= mask;
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			std::intptr_t latesthi{latestlo};
 			latestlo &= mask;
@@ -42465,8 +42691,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(!isrevorder) if(pdatalo < reinterpret_cast<std::intptr_t const *>(input)) pdatalo = pdatahi;
 				out = plo;
 				plo = *pdatalo;
-				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -42477,8 +42703,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder) if(pdatahi < reinterpret_cast<std::intptr_t const *>(input)) pdatahi = pdatalo;
 				out = phi;
 				phi = *pdatahi;
-				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -42525,8 +42751,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::intptr_t latestlo{*reinterpret_cast<std::intptr_t const *>(platestlo)};
 			comphi &= static_cast<M>(mask);
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			std::intptr_t latesthi{latestlo};
 			latestlo &= mask;
@@ -42561,10 +42787,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> mergehalvesmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> mergehalvesmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
@@ -42579,10 +42805,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdatahi{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * halfcount};
 	std::intptr_t plo{*pdatalo}, phi{*pdatahi};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto imloinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-	auto imhiinit{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imloinit, varparameters...)};
-	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, W>(imhiinit, varparameters...)};
+	auto imloinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+	auto imhiinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+	auto curloinit{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imloinit, varparameters...)};
+	auto curhiinit{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhiinit, varparameters...)};
 	auto[complo, comphi]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curloinit, curhiinit)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(complo) previouscomp;// used for debug assertion of the sorted order
@@ -42600,8 +42826,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++pdatahi;
 				out = phi;
 				phi = *pdatahi;
-				auto imhi{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, W>(imhi, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -42611,8 +42837,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++pdatalo;
 				out = plo;
 				plo = *pdatalo;
-				auto imlo{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, W>(imlo, varparameters...)};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}
 			*pout++ = out;
@@ -42651,8 +42877,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			comphi &= static_cast<M>(notmask);
 			*pout++ = outhi;
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latesthi), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latesthi), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatesthi{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			complo &= static_cast<M>(mask);
 			std::intptr_t latestlo{latesthi};
@@ -42692,8 +42918,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false//defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM) disabed in favour of 6-thread version
 	radixsortcopynoallocmulti
@@ -42704,8 +42930,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -42848,8 +43074,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false//defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM) disabed in favour of 6-thread version
 	radixsortnoallocmulti
@@ -42860,8 +43086,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -43010,10 +43236,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> mergethirdsmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> mergethirdsmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
@@ -43031,12 +43257,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t const *pdata1{reinterpret_cast<std::intptr_t const *>(input) + (thirdcount + thirdcountmid)};
 	std::intptr_t const *pdata0{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1 : thirdcount)};
 	std::intptr_t p2{*pdata2}, p1{*pdata1}, p0{*pdata0};
-	auto im2init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-	auto im1init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-	auto im0init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, W>(im2init, varparameters...)};
-	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, W>(im1init, varparameters...)};
-	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, W>(im0init, varparameters...)};
+	auto im2init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+	auto im1init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+	auto im0init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2init, varparameters...)};
+	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1init, varparameters...)};
+	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0init, varparameters...)};
 	std::intptr_t const *pdata2stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
 	std::intptr_t const *pdata1stop{!isrevorder? pdata0 : pdata2};
 	std::intptr_t const *pdata0stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
@@ -43057,8 +43283,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--pdata1;
 			out = p1;
 			p1 = *pdata1;
-			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43068,8 +43294,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--pdata2;
 			out = p2;
 			p2 = *pdata2;
-			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}else{
 handle0:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -43080,8 +43306,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			--pdata0;
 			out = p0;
 			p0 = *pdata0;
-			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -43099,8 +43325,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			out = p1;
 			if(pdata1stop < pdata1){
 				p1 = *pdata1;
-				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 				pdata1 = pdata0;
@@ -43116,8 +43342,8 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			out = p2;
 			if(pdata2stop < pdata2){
 				p2 = *pdata2;
-				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}else{
 				pdata2 = pdata1;
@@ -43136,8 +43362,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			out = p0;
 			if(pdata0stop >= pdata0) goto lastloop;
 			p0 = *pdata0;
-			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -43155,8 +43381,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			if(pdata1stop >= pdata1) pdata1 = pdata2;
 			out = p1;
 			p1 = *pdata1;
-			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43167,8 +43393,8 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			if(pdata2stop >= pdata2) pdata2 = pdata1;
 			out = p2;
 			p2 = *pdata2;
-			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}else{
 handle0odd:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -43180,8 +43406,8 @@ handle0odd:// architecture: jump label reuse (from the else branch, including po
 			if(pdata0stop >= pdata0) pdata0 = pdata1;
 			out = p0;
 			p0 = *pdata0;
-			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
 		*pout-- = out;
@@ -43204,8 +43430,8 @@ lastloop:
 				--pdata1;
 				out = p1;
 				p1 = *pdata1;
-				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43215,8 +43441,8 @@ lastloop:
 				--pdata2;
 				out = p2;
 				p2 = *pdata2;
-				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -43255,8 +43481,8 @@ lastloop:
 			*pout-- = out1;
 			p2 &= mask;
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatest1{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			std::intptr_t latest2{latest1};
 			latest1 &= mask;
@@ -43287,8 +43513,8 @@ lastloop:
 				if(pdata1stop >= pdata1) pdata1 = pdata2;
 				out = p1;
 				p1 = *pdata1;
-				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43299,8 +43525,8 @@ lastloop:
 				if(pdata2stop >= pdata2) pdata2 = pdata1;
 				out = p2;
 				p2 = *pdata2;
-				auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
 			*pout-- = out;
@@ -43345,8 +43571,8 @@ lastloop:
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
 			comp2 &= static_cast<M>(mask);
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatest1{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			std::intptr_t latest2{latest1};
 			latest1 &= mask;
@@ -43382,10 +43608,10 @@ exit:
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> mergethirdsmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> mergethirdsmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
@@ -43403,12 +43629,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::intptr_t p0{*pdata0}, p1{*pdata1}, p2{*pdata2};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
-	auto im0init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-	auto im1init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-	auto im2init{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, W>(im0init, varparameters...)};
-	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, W>(im1init, varparameters...)};
-	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, W>(im2init, varparameters...)};
+	auto im0init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+	auto im1init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+	auto im2init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0init, varparameters...)};
+	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1init, varparameters...)};
+	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2init, varparameters...)};
 	std::intptr_t const *const pdata0stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) + count};
 	std::intptr_t const *const pdata1stop{!isrevorder? pdata2 : pdata0};
 	std::intptr_t const *const pdata2stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) + count};
@@ -43429,8 +43655,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			++pdata1;
 			out = p1;
 			p1 = *pdata1;
-			auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 			comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 		}else if(!(!isdescsort? comp2 < comp0 : comp0 < comp2)){
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43440,8 +43666,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			++pdata0;
 			out = p0;
 			p0 = *pdata0;
-			auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}else{
 handle2:// architecture: jump label reuse (from the else branch, including possible alignment padding instructions)
@@ -43452,8 +43678,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			++pdata2;
 			out = p2;
 			p2 = *pdata2;
-			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
 		*pout++ = out;
@@ -43471,8 +43697,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			out = p1;
 			if(pdata1stop > pdata1){
 				p1 = *pdata1;
-				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 				pdata1 = pdata2;
@@ -43487,8 +43713,8 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			out = p0;
 			if(pdata0stop > pdata0){
 				p0 = *pdata0;
-				auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}else{
 				pdata0 = pdata1;
@@ -43505,8 +43731,8 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			out = p2;
 			if(pdata2stop <= pdata2) goto lastloop;
 			p2 = *pdata2;
-			auto im2{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
-			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, W>(im2, varparameters...)};
+			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
+			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
 		*pout++ = out;
@@ -43529,8 +43755,8 @@ lastloop:
 				++pdata1;
 				out = p1;
 				p1 = *pdata1;
-				auto im1{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
-				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, W>(im1, varparameters...)};
+				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
+				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
 				comp1 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur1);// convert the value for integer comparison
 			}else{
 #if defined(_DEBUG) || defined(DEBUG)
@@ -43540,8 +43766,8 @@ lastloop:
 				++pdata0;
 				out = p0;
 				p0 = *pdata0;
-				auto im0{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
-				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, W>(im0, varparameters...)};
+				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
+				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
 			*pout++ = out;
@@ -43580,8 +43806,8 @@ lastloop:
 			comp1 &= static_cast<M>(notmask);
 			*pout++ = out1;
 
-			auto im{indirectinput1<indirection1, isindexed2, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
-			auto cur{indirectinput2<indirection1, indirection2, isindexed2, W>(im, varparameters...)};
+			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
 			auto complatest1{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur)};// convert the value for integer comparison
 			comp0 &= static_cast<M>(mask);
 			std::intptr_t latest0{latest1};
@@ -43618,16 +43844,16 @@ exit:
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if true// set the 6-thread version as default
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti6thread
 #endif
-	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -43766,16 +43992,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if true// set the 6-thread version as default
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti6thread
 #endif
-	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -43926,8 +44152,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false//defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM) disabled in favour of 6-thread version
 	radixsortcopynoallocmulti
@@ -43938,8 +44164,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -44114,8 +44340,8 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 	, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false//defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM) disabled in favour of 6-thread version
 	radixsortnoallocmulti
@@ -44126,8 +44352,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -44306,16 +44532,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false// disabled in favour of 6-thread version
 	radixsortcopynoallocmulti
 #else
 	radixsortcopynoallocmulti16thread
 #endif
-	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -44508,16 +44734,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void>
 #if false// disabled in favour of 6-thread version
 	radixsortnoallocmulti
 #else
 	radixsortnoallocmulti16thread
 #endif
-	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -45513,10 +45739,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
@@ -45530,10 +45756,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
@@ -45547,14 +45773,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
-		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
+		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
-			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
-			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
+			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
+	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
@@ -45568,8 +45794,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	helper::radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
@@ -45578,14 +45804,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movetobuffer argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
-		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
+		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
-			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
-			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
+			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
+	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
@@ -45600,9 +45826,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
-	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>;
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
+	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
@@ -45624,14 +45850,14 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	bool> radixsort(std::size_t count, V *input[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, std::size_t largepagesize = 0
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -45667,15 +45893,15 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>) &&
-	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
+	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	bool> radixsortcopy(std::size_t count, V *const input[], V output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, std::size_t largepagesize = 0
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -45711,14 +45937,14 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, V, vararguments...>>>),
+	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	bool> radixsortcopy(std::size_t count, V *const input[], V *output[]
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 		, std::size_t largepagesize = 0
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 	assert(!(largepagesize - 1 & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
@@ -45774,11 +46000,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
-		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
+		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0 < sizeof...(vararguments),
-			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
-			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
+			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
+			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
@@ -45807,11 +46033,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movetobuffer argument here, and do not allow active compile-time template evaluation with it
 	!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
-		std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>> &&
+		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0 < sizeof...(vararguments),
-			std::invoke_result_t<decltype(helper::splitparameter<vararguments...>), vararguments...>, void>>,
-			helper::memberpointerdeducebody<indirection1, isindexed2, V, vararguments...>>::type>>),
+			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
+			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
