@@ -2060,7 +2060,7 @@ RSBD8_FUNC_INLINE void splitparameter()noexcept{
 
 // utility template to either retrieve the first-level source or output another pointer for second-level indirection
 template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>){
 	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
@@ -30262,7 +30262,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else if constexpr(40 == CHAR_BIT * sizeof(T)){
 					if constexpr(isrevorder){// also reverse the array at the same time
-						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers	
+						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
