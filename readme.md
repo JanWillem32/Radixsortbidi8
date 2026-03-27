@@ -3,7 +3,7 @@ This library implements an efficient stable sort on arrays using an 8-bit indexe
 This is currently a single-file library, with some additional folders and files only used for its test suite.
 Sorting functionality is available for unsigned integer, signed integer, floating-point and enumeration types.
 All these sorting functions can sort ascending or descending, order forwards or reverse, and optionally filter by absolute value.
-Several filters are available, such as two types of absolute, and an inverse pattern for signed integer and floating point types.
+Several filters are available, such as two types of absolute, and an inverse pattern for signed integer and floating-point types.
 See "Modes of operation for the template functions" for more details on that.
 Implemented function optimisations include the ability to skip sorting steps, using multithreaded parallel (bidirectional) indexing and copying while sorting, and usage of platform-specific intrinsic functions.
 Radix sort in general can be used to sort all array sizes, but is more efficient when applied to somewhat larger arrays compared to other efficient (and stable) comparison-based methods, like introsort.
@@ -29,22 +29,24 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Per-compiler function attributes
 - Include statements and the last checks for compatibility
 ### Internal functions implementation block (rsbd8::helper namespace):
-- Helper constants and functions
-- Concurrency tools
-- General purpose register count constant
-- Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
-- Endianess detection
-- Utility structures to provide piecewise support and tests for 64- or 128-bit types
-- Utility templates to call the getter function
-- Utility templates to split off the first parameter
-- Utility template to retrieve the data sources from classes
-- Utility templates to get either the member object type or the member function return type
-- Utility template to pick an unsigned type of the lowest rank with the same size
-- Utility templates to use bit carry operations for the operators less than, and less than or equal
-- Utility template of bit scan forward
-- Utility templates of rotate left or right by a compile-time constant amount
-- Helper functions to implement the 8 main modes
-- Helper functions to implement the offset transforms
+- Utilities for multithreaded concurrency
+- Utilities for general purpose register count compile-time detection
+- Utilities to provide piecewise support and tests for the often padded 80-bit long double types
+- Utilities to either pass through a type or allow std::underlying_type to do its work for enum types
+- Utilities for endianess compile-time detection
+- Utilities to provide piecewise support and tests for 64- or 128-bit types
+- Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
+- Utilities to call the user-provided getter functions
+- Utilities to split off the first parameter
+- Utilities to retrieve the data sources from user-provided classes
+- Utilities to get either the user-provided member object type or the user-provided member function return type
+- Utilities to reinterpret a type into a sortable struct type or an unsigned type of the lowest rank with the same size
+- Utilities to perform bit carry operations onto an accumulator for the operators less than, and less than or equal
+- Utilities for providing portable bit scan forward functionality
+- Utilities for providing portable rotate left or right by a compile-time constant amount functionality
+- Utilities to implement input array data slices based on the array length divided by the thread count
+- Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
+- Utilities to implement the index counts to offsets transforms
 - Function implementation templates for 80-bit-based long double types without indirection
 - Function implementation templates for 80-bit-based long double types with indirection
 - Function implementation templates for split up 128-bit types without indirection

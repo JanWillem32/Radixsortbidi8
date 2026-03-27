@@ -10,7 +10,7 @@
 // This is currently a single-file library, with some additional folders and files only used for its test suite.
 // Sorting functionality is available for unsigned integer, signed integer, floating-point and enumeration types.
 // All these sorting functions can sort ascending or descending, order forwards or reverse, and optionally filter by absolute value.
-// Several filters are available, such as two types of absolute, and an inverse pattern for signed integer and floating point types.
+// Several filters are available, such as two types of absolute, and an inverse pattern for signed integer and floating-point types.
 // See "Modes of operation for the template functions" for more details on that.
 // Implemented function optimisations include the ability to skip sorting steps, using multithreaded parallel (bidirectional) indexing and copying while sorting, and usage of platform-specific intrinsic functions.
 // Radix sort in general can be used to sort all array sizes, but is more efficient when applied to somewhat larger arrays compared to other efficient (and stable) comparison-based methods, like introsort.
@@ -36,22 +36,24 @@
 // - Per-compiler function attributes
 // - Include statements and the last checks for compatibility
 // ### Internal functions implementation block (rsbd8::helper namespace):
-// - Helper constants and functions
-// - Concurrency tools
-// - General purpose register count constant
-// - Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
-// - Endianess detection
-// - Utility structures to provide piecewise support and tests for 64- or 128-bit types
-// - Utility templates to call the getter function
-// - Utility templates to split off the first parameter
-// - Utility template to retrieve the data sources from classes
-// - Utility templates to get either the member object type or the member function return type
-// - Utility template to pick an unsigned type of the lowest rank with the same size
-// - Utility templates to use bit carry operations for the operators less than, and less than or equal
-// - Utility template of bit scan forward
-// - Utility templates of rotate left or right by a compile-time constant amount
-// - Helper functions to implement the 8 main modes
-// - Helper functions to implement the offset transforms
+// - Utilities for multithreaded concurrency
+// - Utilities for general purpose register count compile-time detection
+// - Utilities to provide piecewise support and tests for the often padded 80-bit long double types
+// - Utilities to either pass through a type or allow std::underlying_type to do its work for enum types
+// - Utilities for endianess compile-time detection
+// - Utilities to provide piecewise support and tests for 64- or 128-bit types
+// - Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
+// - Utilities to call the user-provided getter functions
+// - Utilities to split off the first parameter
+// - Utilities to retrieve the data sources from user-provided classes
+// - Utilities to get either the user-provided member object type or the user-provided member function return type
+// - Utilities to reinterpret a type into a sortable struct type or an unsigned type of the lowest rank with the same size
+// - Utilities to perform bit carry operations onto an accumulator for the operators less than, and less than or equal
+// - Utilities for providing portable bit scan forward functionality
+// - Utilities for providing portable rotate left or right by a compile-time constant amount functionality
+// - Utilities to implement input array data slices based on the array length divided by the thread count
+// - Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
+// - Utilities to implement the index counts to offsets transforms
 // - Function implementation templates for 80-bit-based long double types without indirection
 // - Function implementation templates for 80-bit-based long double types with indirection
 // - Function implementation templates for split up 128-bit types without indirection
@@ -569,10 +571,13 @@ RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the
 #include <intrin.h>
 #if (defined(_M_IX86) && !defined(_M_HYBRID_X86_ARM64)) || (defined(_M_X64) && !defined(_M_ARM64EC))
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
+
 #elif defined(_M_ARM64) || defined(_M_ARM64EC) || defined(_M_HYBRID_X86_ARM64)
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM64_BARRIER_ISHST); __yield();}
+
 #elif defined(_M_ARM)
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM_BARRIER_ISHST); __yield();}
+
 #else
 #error Unsupported system architecture for this compiler. Edit this library to add support for it.
 #endif
@@ -656,11 +661,9 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
 #endif
 namespace rsbd8{// Avoid putting any include files into this library's namespace.
-
-// Helper constants and functions
 namespace helper{// This libary defines a number of helper items, so categorise them as such.
 
-// Concurrency tools
+// Utilities for multithreaded concurrency
 
 // Atomic light barrier for spinpause()-based loops (see above for that function)
 // This assumes that the initial state of atomiclightbarrier is zero.
@@ -694,9 +697,9 @@ struct atomicvarwrapper{
 	}
 	atomicvarwrapper(atomicvarwrapper const &) = delete;
 	atomicvarwrapper &operator=(atomicvarwrapper const &) = delete;
-}
+};
 
-// General purpose register count constant
+// Utilities for general purpose register count compile-time detection
 
 // This is a generalisation of the purpose register count per architecture.
 enum struct gprfilesize : unsigned char{
@@ -733,7 +736,7 @@ gprfilesize constexpr defaultgprfilesize{
 #endif
 };
 
-// Utility structures to provide piecewise support and tests for the often padded 80-bit long double types
+// Utilities to provide piecewise support and tests for the often padded 80-bit long double types
 
 // Platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here.
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
@@ -1333,11 +1336,12 @@ struct longdoubletest80{
 };
 #pragma pack(pop)// longdoubletest96 and longdoubletest80 must be unpadded
 
-// Utility template to either pass through a type or allow std::underlying_type to do its work
+// Utilities to either pass through a type or allow std::underlying_type to do its work for enum types
+
 template<typename T>
 using stripenum = typename std::conditional_t<std::is_enum_v<T>, std::underlying_type<T>, std::enable_if<true, T>>::type;
 
-// Endianess detection
+// Utilities for endianess compile-time detection
 // A dirty method that heavily relies on proper inlining and compiler optimisation of that, but it at least can detect the floating-point mixed endianness cases if used properly
 
 template<typename T>
@@ -1406,7 +1410,7 @@ RSBD8_FUNC_INLINE std::uint_least64_t recompose64(std::uint_least32_t lo, std::u
 	return{*reinterpret_cast<std::uint_least64_t *>(alittle)};
 }
 
-// Utility structures to provide piecewise support and tests for 64- or 128-bit types
+// Utilities to provide piecewise support and tests for 64- or 128-bit types
 
 // This one can be big-, mixed- and little-endian.
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
@@ -1826,7 +1830,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 }
 #endif
 
-// Utility templates to create an immediate member object pointer for the type and offset indirection wrapper functions
+// Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
 
 #pragma pack(push, 1)
 template<typename T, std::ptrdiff_t indirection1> struct memberobjectgenerator;
@@ -1842,7 +1846,7 @@ struct memberobjectgenerator{
 };
 #pragma pack(pop)
 
-// Utility templates to call the getter function
+// Utilities to call the user-provided getter functions
 // These can optionally split off the second-level indirection index parameter, or dereference the member object pointer.
 // These will all reinterpret references as pointers.
 
@@ -2142,7 +2146,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{reinterpret_cast<T *>(&(p->*indirection1)(varparameters...))};// always reinterpret references as pointers
 }
 
-// Utility templates to split off the first parameter
+// Utilities to split off the first parameter
 
 template<bool isextraparam, typename isdiscarded, typename W, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -2163,7 +2167,7 @@ RSBD8_FUNC_INLINE void splitparameter()noexcept{
 	// This function is a dummy, but it does allow the version without any extra arguments to exist.
 }
 
-// Utility template to retrieve the data sources from classes
+// Utilities to retrieve the data sources from user-provided classes
 
 // utility template to either retrieve the first-level source or output another pointer for second-level indirection
 template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
@@ -2244,7 +2248,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{passthrough};
 }
 
-// Utility templates to get either the member object type or the member function return type
+// Utilities to get either the user-provided member object type or the user-provided member function return type
 
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename dummy = void, typename... vararguments>
 struct memberpointerdeducebody;
@@ -2264,7 +2268,7 @@ struct memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, std::e
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
 using memberpointerdeduce = typename memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, void, vararguments...>::type;
 
-// Utility template to pick an unsigned type of the lowest rank with the same size
+// Utilities to reinterpret a type into a sortable struct type or an unsigned type of the lowest rank with the same size
 
 // This can alternatively allow std::make_unsigned to do its work, too.
 // This does not require using stripenum first to work.
@@ -2316,7 +2320,7 @@ using tounifunsigned = std::conditional_t<std::is_same_v<long double, T> &&// co
 	std::conditional_t<std::is_class_v<T> || std::is_union_v<T>, T,// pass these through if oddly-sized
 	typename std::conditional_t<std::is_integral_v<T> || std::is_enum_v<T>, std::make_unsigned<T>, std::enable_if<true, void>>::type>>>>>>>>>>>>;
 
-// Utility templates to use bit carry operations for the operators less than, and less than or equal
+// Utilities to perform bit carry operations onto an accumulator for the operators less than, and less than or equal
 // these are currently limited to the unsigned and std::size_t types, but can be expanded to other unsigned types if required
 
 template<typename U>
@@ -2406,9 +2410,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 }
 
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<std::size_t, unsigned> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
 	void> addcarryofless(std::size_t &accumulator, U minuend, U subtrahend)noexcept{
@@ -2450,6 +2454,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 template<typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<std::size_t, unsigned> &&
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
 	void> addcarryoflessorequal(std::size_t &accumulator, U minuend, U subtrahend)noexcept{
@@ -2489,9 +2494,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	accumulator += minuend <= subtrahend;
 #endif
 }
-#endif
 
-// Utility template of bit scan forward
+// Utilities for providing portable bit scan forward functionality
 
 template<typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -2562,7 +2566,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 }
 
-// Utility templates of rotate left or right by a compile-time constant amount
+// Utilities for providing portable rotate left or right by a compile-time constant amount functionality
 
 template<unsigned char amount, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -2616,7 +2620,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 }
 
-// Helper functions to implement input data slices based on thread count
+// Utilities to implement input array data slices based on the array length divided by the thread count
 // These are used for the multi-threaded loop initialisation, and are designed to be used in a way that allows the main thread to handle slice 0, and the supporting threads to handle slices 1 and above, with the ability to expand the main thread's slice range if threads failed to spawn.
 // In essence, these functions determine the slice size and location for each thread.
 // The version for the main thread is different from the general version.
@@ -2747,7 +2751,7 @@ RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtsliceswapsmt(unsigne
 	return{i, loc};
 }
 
-// Helper functions to implement the 8 main modes
+// Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
 
 // The filtertop8() and filtershift8() template functions are customised for the sorting phase, and have no need for variants with pointers.
 // These also only output std::size_t (or multiple) for direct use as indices.
@@ -2761,7 +2765,7 @@ RSBD8_FUNC_INLINE std::pair<std::size_t, std::size_t> initmtsliceswapsmt(unsigne
 // - absolute floating-point and also unsigned integer without using the top bit
 // - absolute floating-point, but negative inputs will sort just below their positive counterparts
 // ### modes with two-pass filtering here:
-// - regular floating point
+// - regular floating-point
 // - inside-out floating-point
 // - absolute signed integer
 // - absolute signed integer, but negative inputs will sort just below their positive counterparts
@@ -10661,7 +10665,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// Helper functions to implement the offset transforms
+// Utilities to implement the index counts to offsets transforms
 
 // version for both threads when multithreading is used at run time (writes a full set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X>
@@ -44340,11 +44344,11 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
 	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
-	// for unfiltered 16-bit it's 80 GiB, and for half-precision floating point it's 70 GiB
+	// for unfiltered 16-bit it's 80 GiB, and for half-precision floating-point it's 70 GiB
 	// for unfiltered 32-bit it's 5 GiB, and for float it's 4.375 GiB
 	// for unfiltered 64-bit it's 320 MiB, and for double it's 280 MiB
-	// for unfiltered 80-bit it's 131.072 MiB, and for 80-bit floating point it's 114.688 MiB
-	// for unfiltered 128-bit it's 20 MiB, and for quadruple-precision floating point it's 17.5 MiB
+	// for unfiltered 80-bit it's 131.072 MiB, and for 80-bit floating-point it's 114.688 MiB
+	// for unfiltered 128-bit it's 20 MiB, and for quadruple-precision floating-point it's 17.5 MiB
 	static double constexpr base{// inverse quintic exponential scaling
 		0x5p53 / static_cast<double>(typebitsize * typebitsizesqr * typebitsizesqr)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
@@ -44355,7 +44359,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
-	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
@@ -44376,11 +44380,11 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	static std::size_t constexpr typebitsizesqr{typebitsize * typebitsize};
 	static std::size_t constexpr typebitsizecub{typebitsize * typebitsizesqr};
 	static std::size_t constexpr typebitsizequt{typebitsizesqr * typebitsizesqr};
-	// for unfiltered 16-bit it's 8 TiB, and for half-precision floating point it's 7 TiB
+	// for unfiltered 16-bit it's 8 TiB, and for half-precision floating-point it's 7 TiB
 	// for unfiltered 32-bit it's 8 GiB, and for float it's 7 GiB
 	// for unfiltered 64-bit it's 8 MiB, and for double it's 7 MiB
-	// for unfiltered 80-bit it's 879.609 KiB, and for 80-bit floating point it's 769.658 KiB
-	// for unfiltered 128-bit it's 8 KiB, and for quadruple-precision floating point it's 7 KiB
+	// for unfiltered 80-bit it's 879.609 KiB, and for 80-bit floating-point it's 769.658 KiB
+	// for unfiltered 128-bit it's 8 KiB, and for quadruple-precision floating-point it's 7 KiB
 	static double constexpr base{// inverse unodecic exponential scaling
 		0x1p86 / static_cast<double>(typebitsizecub * typebitsizequt * typebitsizequt)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
@@ -44391,7 +44395,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
-	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
@@ -44409,11 +44413,11 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
-	// for unfiltered 16-bit it's 128 GiB, and for half-precision floating point it's 112 GiB
+	// for unfiltered 16-bit it's 128 GiB, and for half-precision floating-point it's 112 GiB
 	// for unfiltered 32-bit it's 32 GiB, and for float it's 28 GiB
 	// for unfiltered 64-bit it's 8 GiB, and for double it's 7 GiB
-	// for unfiltered 80-bit it's 5.12 GiB, and for 80-bit floating point it's 4.48 GiB
-	// for unfiltered 128-bit it's 2 GiB, and for quadruple-precision floating point it's 1.75 GiB
+	// for unfiltered 80-bit it's 5.12 GiB, and for 80-bit floating-point it's 4.48 GiB
+	// for unfiltered 128-bit it's 2 GiB, and for quadruple-precision floating-point it's 1.75 GiB
 	static double constexpr base{// inverse cubic exponential scaling
 		0x1p48 / static_cast<double>(typebitsize * typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
@@ -44424,7 +44428,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
-	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
@@ -44442,11 +44446,11 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
-	// for unfiltered 16-bit it's 256 GiB, and for half-precision floating point it's 224 GiB
+	// for unfiltered 16-bit it's 256 GiB, and for half-precision floating-point it's 224 GiB
 	// for unfiltered 32-bit it's 128 GiB, and for float it's 112 GiB
 	// for unfiltered 64-bit it's 64 GiB, and for double it's 56 GiB
-	// for unfiltered 80-bit it's 51.2 GiB, and for 80-bit floating point it's 44.8 GiB
-	// for unfiltered 128-bit it's 32 GiB, and for quadruple-precision floating point it's 28 GiB
+	// for unfiltered 80-bit it's 51.2 GiB, and for 80-bit floating-point it's 44.8 GiB
+	// for unfiltered 128-bit it's 32 GiB, and for quadruple-precision floating-point it's 28 GiB
 	static double constexpr base{// inverse square scaling
 		0x1p45 / static_cast<double>(typebitsize * typebitsize)
 		* (isdescsort? 15. / 16. : 1.)// descending sort requires slightly more work in the intermediate sorting phase
@@ -44457,7 +44461,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
-	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating point
+	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
 
