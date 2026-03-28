@@ -319,6 +319,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // - TODO, currently all functions here are guarded with an upper limit of 8-, 64-, 80, 96- or 128-bit (using std::enable_if sections). Future functionality will either require lifting the limits on current functions, or adding another set of functions for the larger data types. Given that radix sort variants excel at processing large data types compared to comparison-based sorting methods, do give this some priority in development.
 //
 // ### TODO, document computer system architecture-dependent code parts and add more options
+// - TODO, add support for native 128-bit for architectures that support these. (meaning: a system with 128 bits in single general-purpose registers)
 // - TODO, investigate SIMD, in all of its shapes and sizes. Some experimentation has been done with x64+AVX-512 in an early version, but compared to other optimisations and strategies it never yielded much for these test functions.
 // - TODO, the current version of this library does not provide much optimisation for processing any 64-bit (or larger) types on 32-bit systems at all. This can be documented, and later on optimised.
 // - TODO, similarly, 16-bit systems still exist. (Even though these often do include a capable 32-bit capable data path line, see the history of x86 in this regard for example.) If this library can be optimised for use in a reasonably current 16-bit microcontroller, document and later on optimise for it.
