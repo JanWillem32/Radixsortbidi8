@@ -3228,7 +3228,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3314,7 +3314,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3400,7 +3400,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3486,7 +3486,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3572,7 +3572,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t **>(out), reinterpret_cast<std::uint16_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3707,7 +3707,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t **>(out), reinterpret_cast<std::uint8_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring

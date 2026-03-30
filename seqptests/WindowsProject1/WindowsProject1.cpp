@@ -666,32 +666,161 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		u64init = u64stop - u64start;
 
-		srand(static_cast<unsigned>(u64start));// prepare a seed for rand()
+		std::srand(static_cast<unsigned>(u64start));// prepare a seed for rand()
 	}
 	{
 		// filled initialization of the input part (only done once)
 		static_assert(RAND_MAX == 0x7FFF, L"RAND_MAX changed from 0x7FFF (15 bits of data), update this part of the code");
-		std::uint64_t *pFIin{reinterpret_cast<std::uint64_t *>(in)};
-		std::size_t j{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) / 8};
-		do{
-			*pFIin++ = static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 60
-				| static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 30
-				| static_cast<std::uint64_t>(static_cast<unsigned>(rand()) << 15) | static_cast<std::uint64_t>(static_cast<unsigned>(rand()));
-		}while(--j);
-		if(7 & (RSBD8_TEST_BATCH_SIZE)){
-			// this will not set the top 4 bits, but only 7 bytes are needed at most, so this is not an issue
-			std::uint64_t fill{static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 45 | static_cast<std::uint64_t>(static_cast<unsigned>(rand())) << 30
-				| static_cast<std::uint64_t>(static_cast<unsigned>(rand()) << 15) | static_cast<std::uint64_t>(static_cast<unsigned>(rand()))};
-			if(4 & (RSBD8_TEST_BATCH_SIZE)){
-				*reinterpret_cast<std::uint32_t *&>(pFIin)++ = static_cast<std::uint32_t>(fill);
-				fill >>= 32;
+		auto filllambda{[](std::size_t i, std::uint32_t *pFIin)noexcept{// the work is currently split over 16 threads
+			do{
+				std::uint32_t split{static_cast<std::uint32_t>(static_cast<unsigned>(std::rand()))};// 15 bits of data, one bit wasted
+				// discard float (and double as a consequence) infinity and NaN to not mess up std::sort() and std::stable_sort()
+				std::uint32_t r0;
+				do{
+					r0 = (split & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r0));
+				pFIin[0] = r0;
+				std::uint32_t r1;
+				do{
+					r1 = (split >> 2 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r1));
+				pFIin[1] = r1;
+				std::uint32_t r2;
+				do{
+					r2 = (split >> 4 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r2));
+				pFIin[2] = r2;
+				std::uint32_t r3;
+				do{
+					r3 = (split >> 6 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r3));
+				pFIin[3] = r3;
+				std::uint32_t r4;
+				do{
+					r4 = (split >> 8 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r4));
+				pFIin[4] = r4;
+				std::uint32_t r5;
+				do{
+					r5 = (split >> 10 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r5));
+				pFIin[5] = r5;
+				std::uint32_t r6;
+				do{
+					r6 = (split >> 12 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r6));
+				pFIin[6] = r6;
+				pFIin += 7;
+			}while(--i);
+			return;
+		}};
+		std::future<void> fut[15];
+		std::uint32_t *pFIin{reinterpret_cast<std::uint32_t *>(in)};
+		if(std::size_t j{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) / (4 * 7)}){
+			if(16 <= j){// split over 16 threads
+				std::size_t part0{(j + 15) >> 4};// rounded up in the companion thread
+				fut[0] = std::async(std::launch::async, filllambda, part0, pFIin);// this can technically throw...
+				pFIin += 7 * part0;
+				std::size_t part1{(j + 14) >> 4};// rounded up in the companion thread
+				fut[1] = std::async(std::launch::async, filllambda, part1, pFIin);// this can technically throw...
+				pFIin += 7 * part1;
+				std::size_t part2{(j + 13) >> 4};// rounded up in the companion thread
+				fut[2] = std::async(std::launch::async, filllambda, part2, pFIin);// this can technically throw...
+				pFIin += 7 * part2;
+				std::size_t part3{(j + 12) >> 4};// rounded up in the companion thread
+				fut[3] = std::async(std::launch::async, filllambda, part3, pFIin);// this can technically throw...
+				pFIin += 7 * part3;
+				std::size_t part4{(j + 11) >> 4};// rounded up in the companion thread
+				fut[4] = std::async(std::launch::async, filllambda, part4, pFIin);// this can technically throw...
+				pFIin += 7 * part4;
+				std::size_t part5{(j + 10) >> 4};// rounded up in the companion thread
+				fut[5] = std::async(std::launch::async, filllambda, part5, pFIin);// this can technically throw...
+				pFIin += 7 * part5;
+				std::size_t part6{(j + 9) >> 4};// rounded up in the companion thread
+				fut[6] = std::async(std::launch::async, filllambda, part6, pFIin);// this can technically throw...
+				pFIin += 7 * part6;
+				std::size_t part7{(j + 8) >> 4};// rounded up in the companion thread
+				fut[7] = std::async(std::launch::async, filllambda, part7, pFIin);// this can technically throw...
+				pFIin += 7 * part7;
+				std::size_t part8{(j + 7) >> 4};// rounded up in the companion thread
+				fut[8] = std::async(std::launch::async, filllambda, part8, pFIin);// this can technically throw...
+				pFIin += 7 * part8;
+				std::size_t part9{(j + 6) >> 4};// rounded up in the companion thread
+				fut[9] = std::async(std::launch::async, filllambda, part9, pFIin);// this can technically throw...
+				pFIin += 7 * part9;
+				std::size_t part10{(j + 5) >> 4};// rounded up in the companion thread
+				fut[10] = std::async(std::launch::async, filllambda, part10, pFIin);// this can technically throw...
+				pFIin += 7 * part10;
+				std::size_t part11{(j + 4) >> 4};// rounded up in the companion thread
+				fut[11] = std::async(std::launch::async, filllambda, part11, pFIin);// this can technically throw...
+				pFIin += 7 * part11;
+				std::size_t part12{(j + 3) >> 4};// rounded up in the companion thread
+				fut[12] = std::async(std::launch::async, filllambda, part12, pFIin);// this can technically throw...
+				pFIin += 7 * part12;
+				std::size_t part13{(j + 2) >> 4};// rounded up in the companion thread
+				fut[13] = std::async(std::launch::async, filllambda, part13, pFIin);// this can technically throw...
+				pFIin += 7 * part13;
+				std::size_t part14{(j + 1) >> 4};// rounded up in the companion thread
+				fut[14] = std::async(std::launch::async, filllambda, part14, pFIin);// this can technically throw...
+				pFIin += 7 * part14;
+				j >>= 4;// rounded down in the main thread
 			}
-			if(2 & (RSBD8_TEST_BATCH_SIZE)){
-				*reinterpret_cast<std::uint16_t *&>(pFIin)++ = static_cast<std::uint16_t>(fill);
-				fill >>= 16;
+			filllambda(j, pFIin);// handle the last part in the main thread
+		}
+		// handle the remaining items in the main thread
+		if(std::size_t rem{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) % (4 * 7)}){
+			std::uint32_t split{static_cast<std::uint32_t>(static_cast<unsigned>(std::rand()))};
+			static_assert(4 * 7 <= 32, L"remainder terms handled incorrectly, update this part of the code");
+			// discard float (and double as a consequence) infinity and NaN to not mess up std::sort() and std::stable_sort()
+			if(16u & rem){
+				std::uint32_t r0;
+				do{
+					r0 = (split & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r0));
+				pFIin[0] = r0;
+				std::uint32_t r1;
+				do{
+					r1 = (split >> 2 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r1));
+				pFIin[1] = r1;
+				std::uint32_t r2;
+				do{
+					r2 = (split >> 4 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r2));
+				pFIin[2] = r2;
+				std::uint32_t r3;
+				do{
+					r3 = (split >> 6 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r3));
+				pFIin[3] = r3;
+				pFIin += 4;
 			}
-			if(1 & (RSBD8_TEST_BATCH_SIZE)){
-				*reinterpret_cast<std::uint8_t *>(pFIin) = static_cast<std::uint8_t>(fill);
+			if(8u & rem){
+				std::uint32_t r4;
+				do{
+					r4 = (split >> 8 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r4));
+				pFIin[0] = r4;
+				std::uint32_t r5;
+				do{
+					r5 = (split >> 10 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r5));
+				pFIin[1] = r5;
+				pFIin += 2;
+			}
+			if(4u & rem){
+				std::uint32_t r6;
+				do{
+					r6 = (split >> 12 & 3u) | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 2 | static_cast<std::uint32_t>(static_cast<unsigned>(std::rand())) << 17;
+				}while(0x7F800000u == (0x7F800000u & r6));
+				*pFIin++ = r6;
+			}
+			// infinity and NaN filtering is currently not used for 16- and 8-bit floating-point values
+			if(2u & rem){
+				*reinterpret_cast<std::uint16_t *&>(pFIin)++ = static_cast<std::uint16_t>(split >> 14 | static_cast<unsigned>(std::rand()));
+			}
+			if(1u & rem){
+				*reinterpret_cast<std::uint8_t *>(pFIin) = static_cast<std::uint8_t>(static_cast<unsigned>(std::rand()));
 			}
 		}
 	}
@@ -2805,7 +2934,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint64_t **>(out), reinterpret_cast<std::uint64_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -2894,7 +3023,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<double **>(out), reinterpret_cast<double **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -2983,7 +3112,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint32_t **>(out), reinterpret_cast<std::uint32_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3072,7 +3201,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<float **>(out), reinterpret_cast<float **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3161,7 +3290,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint16_t **>(out), reinterpret_cast<std::uint16_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3302,7 +3431,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 		std::uint64_t u64wstart{__rdtsc()};
 
-		auto indlesslambda{[]<typename T>(T a, T b){return *a < *b;}};
+		auto indlesslambda{[]<typename T>(T a, T b)noexcept{return *a < *b;}};
 		std::stable_sort(std::execution::par_unseq, reinterpret_cast<std::uint8_t **>(out), reinterpret_cast<std::uint8_t **>(out) + testsize, indlesslambda);
 
 		// stop measuring
@@ -3320,58 +3449,6 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		OutputDebugStringW(szTicksRu64Text);
 	}
 #endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	do{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
-		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		std::size_t i{testsize};
-		do{
-			*pDest++ = pSource++;
-		}while(--i);
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"mini, indirect rsbd8::radixsort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}while(!succeeded);
-#ifdef _DEBUG
-	{// verify if sorted
-		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
-		std::size_t k{testsize - 1};// -1 for the intial bounds
-		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
-		auto lo{*piter++};
-		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*lo)};
-		do{
-			auto hi{*piter++};
-			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*hi)};
-			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
-			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
-			// shift up by one
-			lo = hi;
-			curlo = curhi;
-		}while(--k);
-	}
-#endif
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3416,6 +3493,58 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		do{
 			auto hi{*piter++};
 			auto curhi{*hi};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+	}
+#endif
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::uint8_t const *pSource{reinterpret_cast<std::uint8_t const *>(in)};
+		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort<rsbd8::sortingdirection::ascfwdorder, rsbd8::sortingmode::forcefloatingp>(testsize, reinterpret_cast<std::uint8_t **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"mini, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t testsize{(RSBD8_TEST_BATCH_SIZE) / std::max(sizeof(std::uint8_t), sizeof(void *))};
+		std::size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*lo)};
+		do{
+			auto hi{*piter++};
+			auto curhi{rsbd8::helper::convertinput<false, true, true, std::uint8_t>(*hi)};
 			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
 			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
 			// shift up by one

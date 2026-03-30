@@ -47,6 +47,7 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Utilities to implement input array data slices based on the array length divided by the thread count
 - Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
 - Utilities to implement the index counts to offsets transforms
+- Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading
 - Function implementation templates for 80-bit-based long double types without indirection
 - Function implementation templates for 80-bit-based long double types with indirection
 - Function implementation templates for split up 128-bit types without indirection
@@ -62,7 +63,6 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Reroutes to the 1- or 2-thread functions (variants without indirection)
 - Reroutes to the 1- or 2-thread functions (variants with indirection)
 - Helper functions for converting inputs to perform unsigned comparisons in a final merging phase
-- Functions to establish the initial treshold for beyond 2-way multithreading
 - Helper functions for merging the halves from multithreading inputs without indirection
 - Up to 4-way multithreading functions without indirection
 - Helper functions for merging the thirds from multithreading inputs without indirection
