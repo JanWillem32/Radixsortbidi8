@@ -2650,7 +2650,7 @@ RSBD8_FUNC_INLINE std::ptrdiff_t initmtslicemain(unsigned unassignedslice, unsig
 		i *= unassignedslice + 1;// unassignedslice will usually be zero at this point
 		slicerem -= slicesother;
 		i += std::min(slicerem, unassignedslice);// only add on the remainder terms for this half
-		i = i * itemsperloop + rem - 1;// include the final remainder term for outside of the loop in the next part
+		i = i * static_cast<std::ptrdiff_t>(itemsperloop) + rem - 1;// include the final remainder term for outside of the loop in the next part
 	}else{// single item per loop
 		unsigned slicerem{static_cast<unsigned>(static_cast<std::size_t>(i) % allowedthreads)};
 		i = static_cast<std::ptrdiff_t>(static_cast<std::size_t>(i) / allowedthreads);
@@ -22252,7 +22252,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do{
 						T cur{*pinput++};
-						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, test64<isabsvalue, issignmode, isfltpmode>>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), output + i, buffer + i);
 						}
@@ -22293,7 +22292,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pinput += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
-								reinterpret_cast<std::uint_least64_t &>(curlo), output + i, buffer + i
+								reinterpret_cast<std::uint_least64_t &>(curlo), output + i, buffer + i,
 								reinterpret_cast<std::uint_least64_t &>(curhi), output + i - 1, buffer + i - 1);
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -22888,7 +22887,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						T curhi{pinputhi[0]};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
-								reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, pbufferhi
+								reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, pbufferhi,
 								reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, pbufferlo);
 							--pinputhi;
 							--pbufferhi;
@@ -24438,6 +24437,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(isrevorder){
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
@@ -44057,7 +44057,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
-	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	test64<isabsvalue, issignmode, isfltpmode>> convertinput(U cur)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -44138,7 +44138,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
-	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 2>> convertinput(U cura, U curb)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
@@ -44267,7 +44267,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>> &&
-	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>, U>,
+	std::is_same_v<U, test64<isabsvalue, issignmode, isfltpmode>>,
 	std::array<test64<isabsvalue, issignmode, isfltpmode>, 3>> convertinput(U cura, U curb, U curc)noexcept{
 	std::size_t LO{}, HI{1};// little-endian case
 	if constexpr(1 < sizeof(double)){
