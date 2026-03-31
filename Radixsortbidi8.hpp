@@ -42056,19 +42056,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	pcall(reportedcores, count, input, output, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
 #else// single-threaded only
 	auto pcall{radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>};
-	if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+	if constexpr(ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 		pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 	}
-	if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+	if constexpr(ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 		pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 	}
-	if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+	if constexpr(UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 		pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 	}
-	if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+	if constexpr(USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 		pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 	}
-	if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+	if constexpr(UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 		pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 	}
 	pcall(count, input, output, varparameters...);// architecture: indirect calls only have a modest performance penalty on most platforms
