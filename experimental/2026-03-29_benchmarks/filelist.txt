@@ -1,0 +1,7 @@
+Benchmark collection file details
+filelist.txt: this description file
+crossing.txt: Crossing point for various types calculation where rsbd8::radixsort() should be just as fast as std::stable_sort().
+2-waylimit.txt: Exponential regression information used to create the 2-way multithreading limit function for the project.
+seqmt.txt: full 8 GiB test suite results with 2- to 16-way multithreading enabled
+*st.txt: smaller single-threaded benchmarks for a particular type from the test suites
+*mt.txt: smaller dual-threaded benchmarks for a particular type from the test suites

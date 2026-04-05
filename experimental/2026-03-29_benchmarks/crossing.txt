@@ -1,0 +1,121 @@
+﻿Crossing point for various types calculation where rsbd8::radixsort() should be just as fast as std::stable_sort().
+Results for the entire collection (the radix sort will be all single-threaded for these low counts):
+uint8:  19
+uint16: 349
+uint32: 523
+float:  354
+uint64: 557
+double: 426
+
+crossing data extracts from the benchmarks:
+uint8:
+00000042	45.15188980	[19896] rsbd8::radixsort() test of 16 B instead of 1 GiB
+00000043	45.15201187	[19896]                 5178
+00000044	45.34556580	[19896] std::stable_sort() test of 16 B instead of 1 GiB
+00000045	45.34567261	[19896]                 3604
+00000038	44.75531006	[19896] rsbd8::radixsort() test of 128 B instead of 1 GiB
+00000039	44.75543213	[19896]                 8594
+00000040	44.95377731	[19896] std::stable_sort() test of 128 B instead of 1 GiB
+00000041	44.95389938	[19896]                58016
+
+uint16:
+00000104	46.01848602	[21984] rsbd8::radixsort() test of .625 KiB instead of 1 GiB
+00000105	46.01860809	[21984]               126358
+00000106	46.21446228	[21984] std::stable_sort() test of .625 KiB instead of 1 GiB
+00000107	46.21457672	[21984]               106814
+00000108	46.40932465	[21984] rsbd8::radixsort() test of .75 KiB instead of 1 GiB
+00000109	46.40944672	[21984]               147216
+00000110	46.60585785	[21984] std::stable_sort() test of .75 KiB instead of 1 GiB
+00000111	46.60589218	[21984]               170334
+
+uint32:
+00000052	32.98525238	[20916] rsbd8::radixsort() test of 2 KiB instead of 1 GiB
+00000053	32.98535538	[20916]               107588
+00000054	33.17964935	[20916] std::stable_sort() test of 2 KiB instead of 1 GiB
+00000055	33.17976379	[20916]               101094
+00000056	33.38171768	[20916] rsbd8::radixsort() test of 2.5 KiB instead of 1 GiB
+00000057	33.38183212	[20916]               102404
+00000058	33.56798553	[20916] std::stable_sort() test of 2.5 KiB instead of 1 GiB
+00000059	33.56809616	[20916]               168572
+
+float:
+00000030	16.62407684	[10164] rsbd8::radixsort() test of 1 KiB instead of 1 GiB
+00000031	16.62419128	[10164]               144328
+00000032	16.82528114	[10164] std::stable_sort() test of 1 KiB instead of 1 GiB
+00000033	16.82540512	[10164]                85018
+00000042	17.79582214	[10164] rsbd8::radixsort() test of 1.5 KiB instead of 1 GiB
+00000043	17.79592705	[10164]               114010
+00000044	17.98207474	[10164] std::stable_sort() test of 1.5 KiB instead of 1 GiB
+00000045	17.98219872	[10164]               132522
+
+uint64:
+00000080	80.85449219	[16068] rsbd8::radixsort() test of 4 KiB instead of 1 GiB
+00000081	80.85460663	[16068]               155538
+00000082	81.04079437	[16068] std::stable_sort() test of 4 KiB instead of 1 GiB
+00000083	81.04090881	[16068]               104966
+00000084	81.23263550	[16068] rsbd8::radixsort() test of 4.5 KiB instead of 1 GiB
+00000085	81.23274994	[16068]               131380
+00000086	81.41900635	[16068] std::stable_sort() test of 4.5 KiB instead of 1 GiB
+00000087	81.41911316	[16068]               152650
+
+double:
+00000054	13.69145298	[20228] rsbd8::radixsort() test of 3 KiB instead of 1 GiB
+00000055	13.69156456	[20228]               139824
+00000056	13.88753796	[20228] std::stable_sort() test of 3 KiB instead of 1 GiB
+00000057	13.88765717	[20228]               133146
+00000058	14.07888126	[20228] rsbd8::radixsort() test of 3.5 KiB instead of 1 GiB
+00000059	14.07899666	[20228]               137904
+00000060	14.27831078	[20228] std::stable_sort() test of 3.5 KiB instead of 1 GiB
+00000061	14.27841759	[20228]               141306
+
+
+
+Example, calculations used for 16-bit unsigned without indirection:
+00000104	46.01848602	[21984] rsbd8::radixsort() test of .625 KiB instead of 1 GiB
+00000105	46.01860809	[21984]               126358
+00000106	46.21446228	[21984] std::stable_sort() test of .625 KiB instead of 1 GiB
+00000107	46.21457672	[21984]               106814
+00000108	46.40932465	[21984] rsbd8::radixsort() test of .75 KiB instead of 1 GiB
+00000109	46.40944672	[21984]               147216
+00000110	46.60585785	[21984] std::stable_sort() test of .75 KiB instead of 1 GiB
+00000111	46.60589218	[21984]               170334
+
+Intersection calculated by Precise calculator (set to 50 digits) at:
+(698.63841357648492803900426609160376916225212132577, 135913.31273733064553935586704795837044676761520791)
+This is an array count of 349, as the x result has to be divided by 2 bytes.
+
+general linear equation used to convert the line segment into functions for generating the intersection:
+x expressed in bytes
+y expressed in 100 ns units
+a * x + b = y
+
+Notes on the next few outputs:
+ry and sy should result in the same value (it's the crossing point after all)
+ra, sa, rb and sb are printed just to see if they are within a reasonable range
+x is the only output used for the result table (when it's divided by the size in bytes of the type as the final step)
+
+Input to Precise calculator:
+
+x1 = .625 * 1024;
+x2 = .75 * 1024;
+ry1 = 126358;
+sy1 = 106814;
+ry2 = 147216;
+sy2 = 170334;
+
+run = x2 - x1;
+rrise = ry2 - ry1;
+srise = sy2 - sy1;
+ra = rrise / run;
+sa = srise / run;
+print ra; print sa;
+
+rb = ry1 - ra * x1;
+sb = sy1 - sa * x1;
+print rb; print sb;
+
+x = (rb - sb) / (sa - ra);
+print x;
+ry = ra * x + rb;
+sy = sa * x + sb;
+print ry; print sy;

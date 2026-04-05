@@ -1,0 +1,164 @@
+﻿Exponential regression information used to create the 2-way multithreading limit function for the project.
+Exponential regression was used on 3 points each for every test of 64, 512 and 4096 KiB batch.
+(Omni calculator tool set to 17 digits, followed up by Wolfram Alpha's solver)
+
+outputs at crossing [bytes/unitsize] (see the low part of this file for details):
+8:  x ≈ 287771.8194257094/1
+16: x ≈ 201981.8479993494/2
+32: x ≈ 236773.0488253047/4
+64: x ≈ 221699.3654484825/8
+
+array counts:
+8:  x ≈ 287771.8194257094
+16: x ≈ 100990.9239996747
+32: x ≈  59193.2622063261750
+64: x ≈  27712.4206810603125
+
+simple 1st degree regression, anchor point near 64-bit:
+base: 0x1B0000/n
+8:  221184
+16: 110592
+32:  55296
+64:  27648
+
+separate value for 8 is used here, as it's a different function (note: 4- to 16-way multithreading limits exclude 8-bit sources):
+287771.8194257094
+
+Power regression calculated at: https://www.ndcurvemaster.com/regression-calculator/
+-The logarithmic version has a better score, but doesn't scale well at all to 128-bit.
+-8-bit data input was skipped.
+y = 2489307.2144848 * x^-1.0899682810689
+R^2: 0.9681
+MSE: 324470251.5386
+MAE: 13285.7277
+RMSE: 18013.0578
+
+8:  200147.84140801545289845549638625996008761056530767 (unused)
+16: 104844.81779302606040349743588004204093181161317942
+32: 54921.580671179862369392689009958266511219103475670
+64: 28769.948643294388418827543149660734333644669750811
+
+
+fp transition (all rough estimates, this isn't exactly a fair comparison of a/b):
+fl/32: 203649.8642298221 / 236773.0488253047 = 0.8601057647404732056437149179165677369805301437924
+db/64: 221699.3654484825 / 224095.4281158423 = 0.9893078467173315273001324507836003981151767522960
+attempt at a simple, usable formula to establish a scaling factor:
+y = 1-4/x
+1-4/32=0.875
+1-4/64=0.9375
+
+extracts per testing group:
+
+8 (memsize/1)
+st: y = 140566.12174978587 * 1.0000005988321223^x
+mt: y = 13208.04086666562 * 1.0000025753447401^x
+crossing at:
+y ≈ 287771.8194257094 [byte]
+x = 1196479.0544450705 [100 ns]
+00000018 42.78654861 [19896] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000019 42.78667831 [19896]              5826530 st
+00000018 42.38444138 [10992] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000019 42.38456345 [10992]              2291660 mt
+00000022 43.21765900 [19896] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000023 43.21777725 [19896]               678054 st
+00000022 42.82455826 [10992] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000023 42.82466507 [10992]              1127316 mt
+00000026 43.60820007 [19896] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000027 43.60831451 [19896]                90070 st
+00000026 43.22198105 [10992] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000027 43.22209549 [10992]               869250 mt
+
+16 (memsize/2)
+st: y = 132137.97376452864 * 1.000000148004119^x
+mt: y = 71522.33111418551 * 1.0000003621067053^x
+crossing at:
+y ≈ 201981.8479993494 [byte]
+x = 2867023.119170731 [100 ns]
+00000020 37.89483643 [21984] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000021 37.89494324 [21984]            24100882 st
+00000020 36.72121429 [1648] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000021 36.72134018 [1648]             11542694 mt
+00000024 38.30887604 [21984] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000025 38.30899048 [21984]             3395312 st
+00000024 37.13325119 [1648] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000025 37.13336182 [1648]              3075308 mt
+00000028 38.71249008 [21984] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000029 38.71261215 [21984]              439406 st
+00000028 37.53844070 [1648] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000029 37.53854752 [1648]              1885684 mt
+
+32 (memsize/4)
+st: y = 137419.09296757763 * 1.0000001404673662^x
+mt: y = 81584.95910363035 * 1.0000002750801635^x
+crossing at:
+y ≈ 236773.0488253047 [byte]
+x = 3873261.143997399 [100 ns]
+00000020 29.86091614 [20916] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000021 29.86102676 [20916]             25043236 st
+00000020 28.87784576 [9768] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000021 28.87795830 [9768]             14798030 mt
+00000024 30.26968384 [20916] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000025 30.26980400 [20916]             3138758 st
+00000024 29.29019928 [9768] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000025 29.29030991 [9768]              3795282 mt
+00000028 30.66921616 [20916] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000029 30.66933060 [20916]              415522 st
+00000028 29.68733215 [9768] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000029 29.68745613 [9768]              1696008 mt
+
+fl (memsize/4)
+st: y = 135554.1318021319 * 1.0000001414154716^x
+mt: y = 90043.95309551069 * 1.0000002835404285^x
+crossing at:
+y ≈ 203649.8642298221 [byte]
+x = 2878264.551426335 [100 ns]
+00000014 15.03877449 [10164] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000015 15.03888607 [10164]             24997232 st
+00000014 14.07354355 [15936] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000015 14.07365322 [15936]             13952302 mt
+00000018 14.47377110 [15936] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000019 14.47387695 [15936]              3268464 st
+00000018 15.44251823 [10164] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000019 15.44263363 [10164]              3172178 mt
+00000022 15.85077286 [10164] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000023 15.85087967 [10164]               429966 st
+00000022 14.87827206 [15936] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000023 14.87839031 [15936]              1515650 mt
+
+64 (memsize/8)
+st: y = 138120.1597578067 * 1.0000001210221072^x
+mt: y = 99509.56618536566 * 1.0000002030134705^x
+crossing at:
+y ≈ 224095.4281158423 [byte]
+x = 3998839.474994082 [100 ns]
+00000032 76.21432495 [16068] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000033 76.21443176 [16068]             29016292 st
+00000032 74.96248627 [18572] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000033 74.96260834 [18572]             18922232 mt
+00000036 76.60467529 [16068] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000037 76.60479736 [16068]              3582816 st
+00000036 75.36483002 [18572] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000037 75.36494446 [18572]              3771351 mt
+00000040 77.00061035 [16068] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000041 77.00070953 [16068]               467178 st
+00000040 75.76199341 [18572] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000041 75.76210022 [18572]              1863224 mt
+
+db (memsize/8)
+st: y = 137930.5233608529 * 1.0000001251976751^x
+mt: y = 93945.72500938238 * 1.0000002265100456^x
+crossing at:
+y ≈ 221699.3654484825 [byte]
+x = 3790583.006425834 [100 ns]
+00000014 9.80499268 [20228] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000015 9.80510521 [20228]            28059656 st
+00000014 8.77380276 [8000] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000015 8.77391815 [8000]             17227800 mt
+00000018 10.20646477 [20228] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000019 10.20659542 [20228]            3474578 st
+00000018 9.17262936 [8000] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000019 9.17274666 [8000]              3665293 mt
+00000022 10.60200691 [20228] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000023 10.60211182 [20228]             462154 st
+00000022 9.56451035 [8000] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000023 9.56461906 [8000]              1878402 mt

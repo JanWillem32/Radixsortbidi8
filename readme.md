@@ -411,45 +411,48 @@ Sort as unsigned, just with the least significant bit flipped to complete the fi
 ```
 
 ## Performance tests
-### This library has a performance test suite used for development.
-These performance test results are for sorting a block of 1 GiB, with fully random bits in integer and floating-point arrays (with no indirection or extra filtering).
+### This library has a performance test suite.
+These performance test results are for multithreaded sorting on an input array of 8 GiB with random bits (with no indirection, and NaN/infinity values filtered out before the tests).
 #### std::stable_sort() vs rsbd8::radixsort(), measured in 100 ns units:
-- float :_ 79341528806 vs 5068443726, a factor of 15.65 in speedup
-- double:_ 51521014035 vs 5284085860, a factor of 9.750 in speedup
-- uint64:_ 50518618540 vs 4882182872, a factor of 10.35 in speedup
-- int64 :_ 50963293135 vs 5159867120, a factor of 9.877 in speedup
-- uint32: 101573004007 vs 3701128500, a factor of 27.44 in speedup
-- int32 : 103658239227 vs 3801618261, a factor of 27.27 in speedup
-- uint16: 155841701982 vs 3233975799, a factor of 48.19 in speedup
-- int16 : 149563180451 vs 3191150398, a factor of 46.87 in speedup
-- uint8 : 213574532756 vs 3039381578, a factor of 70.27 in speedup
-- int8 _: 211616058503 vs 2946007896, a factor of 71.83 in speedup
-A radix sort with indirection, with its relatively fewer memory accesses compared to a comparison-based sort, will definitely often be one of the most optimal choices.
-However, sorting with indirection is slower than sorting without indirection, as expected.
-#### Simple tests of the first-level indirection rsbd8::radixsort() vs the direct variant above, measured in 100 ns units:
-- uint64: 20172428670 vs 4882182872, a factor of 4.132 in slowdown, purely because of indirection
-- double: 20779336651 vs 5284085860, a factor of 3.932 in slowdown, purely because of indirection
+- float : 231758364499 vs 38433468002, a factor of 6.030 in speedup
+- double: 121298695754 vs 36844696866, a factor of 3.292 in speedup
+- uint8 : 403469022010 vs_ 2012878944, a factor of 200.4 in speedup
+- int8 _: 400091813529 vs_ 2175455608, a factor of 183.9 in speedup
+- uint16: 356746704856 vs 20806669192, a factor of 17.15 in speedup
+- int16 : 355380580812 vs 20774401030, a factor of 17.11 in speedup
+- uint32: 219358920288 vs 32921990902, a factor of 6.663 in speedup
+- int32 : 220877952186 vs 33145154208, a factor of 6.664 in speedup
+- uint64: 117545475016 vs 30891091762, a factor of 3.805 in speedup
+- int64 : 117403336514 vs 32361553856, a factor of 3.628 in speedup
+Sorting with indirection on these radix sort functions is between 1.3 to 4.2 times slower than sorting without indirection.
+#### First-level indirection std::stable_sort() vs rsbd8::radixsort(), measured in 100 ns units:
+- float : 204356608772 vs_ 73121796076, a factor of 2.795 in speedup
+- double: 238697774074 vs 140078237752, a factor of 1.704 in speedup
+- uint8 : 120924180233 vs__ 6391512192, a factor of 18.92 in speedup
+- uint16: 160850055268 vs_ 26123381825, a factor of 6.157 in speedup
+- uint32: 202944783478 vs_ 73381336022, a factor of 2.766 in speedup
+- uint64: 233261759814 vs 137025602824, a factor of 1.702 in speedup
 
 ### The next tests were done on smaller blocks.
 There will be a minimum amount of array entries where rsbd8::radixsort() starts to get the upper hand in speed over std::stable_sort().
-#### These test results were obtained by performance testing on multiple sizes of blocks between .5 to 8 KB, with again fully random bits in unsigned integer and floating-point arrays (with no indirection):
-- float : 875 array entries
-- double: 600 array entries
-- uint64: 700 array entries
-- uint32: 400 array entries
-- uint16: 375 array entries
-- uint8 : 300 array entries
+#### These test results were obtained by single-threaded performance testing on multiple sizes of blocks between .5 to 512 KiB, with fully random bits in unsigned integer and floating-point arrays (with no indirection):
+- float : 354 array entries
+- double: 426 array entries
+- uint8 :  19 array entries
+- uint16: 349 array entries
+- uint32: 523 array entries
+- uint64: 557 array entries
 Interpreting this means that radix sort variants will be faster for somewhat larger arrays when sorting data under the given conditions.
-In this case that's a sequence of just plain numbers in an array.
-When dealing with sorting while using indirection or filtering, test results will vary.
+In this case that's a sequence of just plain values in an array.
+When dealing with sorting while using indirection or more filtering, test results will vary.
 
 ### System configuration data ofthe last performance tests:
-#### Performance testing was done on 2025-11-17 on development PC 1:
+#### Performance testing was done on 2026-03-29 on development PC 1:
 - Intel Core i9 11900K, specification string: 11th Gen Intel Core i9-11900K @ 3.50GHz
 - Corsair CMK16GX4M2B3200C16 * 2, 32 GiB, 1600 MHz (XMP-3200 scheme), DDR4
-- ASRock Z590 PG Velocita, UEFI version L1.92
-- Windows 11 Home, 10.0.26100.6584
-- Microsoft Visual Studio 2026 (Community edition), using the default Visual C++ 2026 compiler
+- ASRock Z590 PG Velocita, UEFI version 2.01 beta
+- Windows 11 Home Single Language, (25H2) build 26200.7462
+- Microsoft Visual Studio 2026 (Community edition) build 11626.173, using the default Visual C++ 2026 compiler
 - The CPU was locked to run at 3.5 GHz on all cores in the UEFI, without boosts or throttling during testing.
 - Some background programs were disabled, and the main testing was done by just running the test executable and letting DebugView x64 do the readout
 - DebugView is also useful at keeping a record on any outputs generated by other simultaneous processes to analyse some possible disturbances. If any such disturbances were detected, the test run was discarded and re-done.
