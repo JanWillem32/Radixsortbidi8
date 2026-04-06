@@ -11501,7 +11501,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // function to establish the initial treshold for 2-way multithreading
 // this is the only version that allows 8-bit inputs
-template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
+template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool isindirect>
 constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
@@ -11520,9 +11520,13 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// for unfiltered 80-bit it's 228.16 KiB, and for 80-bit floating-point it's 216.752 KiB
 	// for unfiltered 128-bit it's 235.481 KiB, and for quadruple-precision floating-point it's 228.122 KiB
 	static double constexpr lookup[]{
-		// for 8-bit items the single-pass radix sort functions are used, and tests show that the measured threshold is much higher than the extrapolated one
-		287771.8194257094,// 8
-		// multi-pass items are interpolated using: 2489307.2144848 * pow(typebitsize, -1.0899682810689)
+		// for 8-bit items some special-use single-pass radix sort functions work a bit differently
+		!isindirect &&// indirection
+		!(isabsvalue && issignmode) &&// both regular absolute modes
+		!(!isabsvalue && issignmode && isfltpmode)?// regular floating-point mode
+		287771.8194257094 :// 8, but only when using the fill function repeatedly as a final pass for sorting the array
+		// these items are interpolated using: 2489307.2144848 * pow(typebitsize, -1.0899682810689)
+		258070.91225655556523868017430538485977229980457628,// 8, for all other cases
 		104844.81779302606040349743588004204093181161317942,// 16
 		71826.911671658030434570369310450136241539432633321,// 24
 		54921.580671179862369392689009958266511219103475670,// 32
@@ -13052,7 +13056,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -13683,7 +13687,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -15547,7 +15551,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -16193,7 +16197,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -17699,7 +17703,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -18336,7 +18340,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -19997,7 +20001,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -20665,7 +20669,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test128<isabsvalue, issignmode, isfltpmode>, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -22229,7 +22233,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -22771,7 +22775,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -24421,7 +24425,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test64<isabsvalue, issignmode, isfltpmode>>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test64<isabsvalue, issignmode, isfltpmode>, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -24983,7 +24987,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test64<isabsvalue, issignmode, isfltpmode>>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, test64<isabsvalue, issignmode, isfltpmode>, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -28043,7 +28047,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -29874,7 +29878,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -34631,7 +34635,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -36519,7 +36523,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -39412,7 +39416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -39706,7 +39710,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -40074,7 +40078,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -40367,7 +40371,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
-				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 				assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
@@ -41035,7 +41039,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -41474,7 +41478,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
-					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1) / ((limit2way + 1) / 2)));// simple safety limit on the maximum thread count
 					assert(1 < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
@@ -41753,7 +41757,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -41835,7 +41839,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -41925,7 +41929,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42006,7 +42010,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42087,7 +42091,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42173,7 +42177,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42256,7 +42260,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42342,7 +42346,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -42424,7 +42428,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -45214,7 +45218,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -45383,7 +45387,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -46542,7 +46546,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -46696,7 +46700,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -46873,7 +46877,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -47074,7 +47078,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -47266,7 +47270,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -47468,7 +47472,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -48042,7 +48046,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -48203,7 +48207,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	static std::size_t constexpr limit4way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -48976,7 +48980,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -49129,7 +49133,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -49300,7 +49304,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -49493,7 +49497,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -49688,7 +49692,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(output);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
@@ -49895,7 +49899,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(buffer);
 
-	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()};
+	static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
 	unsigned reportedcores{};
 	auto pcall{radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V,
 		std::conditional_t<limit2way <= UCHAR_MAX, unsigned char,
