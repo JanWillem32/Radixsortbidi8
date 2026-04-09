@@ -425,7 +425,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // #### These test results were obtained by single-threaded performance testing on multiple sizes of blocks between .5 to 512 KiB, with fully random bits in unsigned integer and floating-point arrays (with no indirection):
 // - float : 354 array entries
 // - double: 426 array entries
-// - uint8 :  19 array entries
+// - uint8 :_ 19 array entries
 // - uint16: 349 array entries
 // - uint32: 523 array entries
 // - uint64: 557 array entries
@@ -504,7 +504,9 @@ RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the
 #include <atomic>
 #include <array>
 #include <new>
-#if !defined(_WIN32) && defined(_POSIX_C_SOURCE)// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+#ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+#include <Windows.h>
+#elif defined(_POSIX_C_SOURCE)
 #include <sys/types.h>
 #include <sys/mman.h>
 #endif
@@ -594,6 +596,36 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
 // GCC/Clang-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
+// solve the case of the missing compiler intrinsics, _subborrow_u16() is a bit more tricky (and resides in critical paths) for this library so these have asm/other statements per item
+
+namespace rsbd8::helper{
+template<typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	std::is_same_v<T, unsigned char>,
+	unsigned char> _addcarry_u16(T carry, std::uint_least16_t first, std::uint_least16_t second, std::uint_least16_t *output){
+	// TODO: temporary fix until _addcarry_u16() is implemented like _addcarry_u32() and _addcarry_u64()
+	// inline asm sadly failed to handle the carry correctly here
+	std::uint_least16_t ori{first};
+	first += second;
+	first += carry;
+	*output = first;
+	return first < ori;
+}
+
+template<typename T>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	!std::is_same_v<T, unsigned char>,
+	unsigned char> _addcarry_u16(T nocarry, std::uint_least16_t first, std::uint_least16_t second, std::uint_least16_t *output){
+	// it's safe to assume in this library that only unsigned char will be used as carry-in, for the rest it's simply a plain 0
+	assert(!nocarry);
+	// TODO: temporary fix until _addcarry_u16() is implemented like _addcarry_u32() and _addcarry_u64()
+	// inline asm sadly failed to handle the carry correctly here
+	std::uint_least16_t ori{first};
+	first += second;
+	*output = first;
+	return first < ori;
+}
+}// namespace rsbd8::helper
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
 // GCC/Clang-compatible compiler, targeting ARM with NEON
@@ -782,13 +814,32 @@ struct longdoubletest128{
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return short{} > static_cast<short>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t res{static_cast<std::uint_least16_t>(signexponent)};
+		unsigned char carry;
+		asm(
+			"cmpq %3, %2\n"
+			"sbbw %4, %1\n"
+			:// outputs:
+			"=@ccc"(carry),// 0
+			"+r"(res)// 1
+			:// inputs:
+			"r"(mantissa),// 2
+			"rm"(other.mantissa),// 3
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 4; little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+#endif
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #else
@@ -826,19 +877,38 @@ struct longdoubletest128{
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
 		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+		static_cast<void>(carry);
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		asm(
+			"cmpq %2, %1\n"
+			"sbbw %3, %0\n"
+			:// outputs:
+			"+r"(rsign)// 0
+			:// inputs:
+			"r"(mantissa),// 1
+			"rm"(other.mantissa),// 2
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 3; little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
+#endif
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
 #else
 		std::uint_least64_t rlo{mantissa - other.mantissa};
 		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
 		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
 		rsign -= mantissa < rlo;
 #endif
-		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
@@ -989,13 +1059,32 @@ struct longdoubletest96{
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return short{} > static_cast<short>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t res{static_cast<std::uint_least16_t>(signexponent)};
+		unsigned char carry;
+		asm(
+			"cmpq %3, %2\n"
+			"sbbw %4, %1\n"
+			:// outputs:
+			"=@ccc"(carry),// 0
+			"+r"(res)// 1
+			:// inputs:
+			"r"(mantissa),// 2
+			"rm"(other.mantissa),// 3
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 4; little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+#endif
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #else
@@ -1033,19 +1122,38 @@ struct longdoubletest96{
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
 		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+		static_cast<void>(carry);
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		asm(
+			"cmpq %2, %1\n"
+			"sbbw %3, %0\n"
+			:// outputs:
+			"+r"(rsign)// 0
+			:// inputs:
+			"r"(mantissa),// 1
+			"rm"(other.mantissa),// 2
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 3; little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
+#endif
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
 #else
 		std::uint_least64_t rlo{mantissa - other.mantissa};
 		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
 		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
 		rsign -= mantissa < rlo;
 #endif
-		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
@@ -1184,13 +1292,32 @@ struct longdoubletest80{
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return short{} > static_cast<short>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t res{static_cast<std::uint_least16_t>(signexponent)};
+		unsigned char carry;
+		asm(
+			"cmpq %3, %2\n"
+			"sbbw %4, %1\n"
+			:// outputs:
+			"=@ccc"(carry),// 0
+			"+r"(res)// 1
+			:// inputs:
+			"r"(mantissa),// 2
+			"rm"(other.mantissa),// 3
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 4, little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+#endif
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t res;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &res)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least16_t{} > static_cast<std::int_least16_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #else
@@ -1228,19 +1355,38 @@ struct longdoubletest80{
 		static_assert(16 == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carry;
 		std::uint_least16_t rsign{__builtin_subcs(static_cast<unsigned short>(signexponent), static_cast<unsigned short>(other.signexponent), static_cast<unsigned short>(carrymid), &carry)};
+		static_cast<void>(carry);
 #elif defined(_M_X64)
+#if defined(__GNUC__) || defined(__clang__)// 16-bit integer issues require a workaround
+		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
+		asm(
+			"cmpq %2, %1\n"
+			"sbbw %3, %0\n"
+			:// outputs:
+			"+r"(rsign)// 0
+			:// inputs:
+			"r"(mantissa),// 1
+			"rm"(other.mantissa),// 2
+			"rm"(static_cast<std::uint_least16_t>(other.signexponent))// 3; little-endian, so when in m mode shortening the type this will still work
+			:// clobbers:
+			"cc");
+#else
+		std::uint_least64_t discardedmantissa;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u64(0, mantissa, other.mantissa, &discardedmantissa), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
+#endif
 #elif defined(_M_IX86)
+		std::uint_least32_t discardedmantissalo, discardedmantissahi;
 		std::uint_least16_t rsign;
-		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), nullptr), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		unsigned char carry{_subborrow_u16(_subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(mantissa & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(other.mantissa & 0xFFFFFFFFu), &discardedmantissalo), static_cast<std::uint_least32_t>(mantissa >> 32), static_cast<std::uint_least32_t>(other.mantissa >> 32), &discardedmantissahi), static_cast<std::uint_least16_t>(signexponent), static_cast<std::uint_least16_t>(other.signexponent), &rsign)};
+		static_cast<void>(carry);
 #else
 		std::uint_least64_t rlo{mantissa - other.mantissa};
 		std::uint_least16_t rsign{static_cast<std::uint_least16_t>(signexponent)};
 		rsign -= static_cast<std::uint_least16_t>(other.signexponent);
 		rsign -= mantissa < rlo;
 #endif
-		static_cast<void>(carry);
 		return{static_cast<std::intptr_t>(static_cast<std::int_least16_t>(rsign))};// force sign-extension
 	}
 
@@ -1349,7 +1495,7 @@ using stripenum = typename std::conditional_t<std::is_enum_v<T>, std::underlying
 // A dirty method that heavily relies on proper inlining and compiler optimisation of that, but it at least can detect the floating-point mixed endianness cases if used properly
 
 template<typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	std::is_integral_v<stripenum<T>>,
 	T> generatehighbit()noexcept{
@@ -1359,7 +1505,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	std::is_floating_point_v<stripenum<T>>,
 	T> generatehighbit()noexcept{
@@ -1369,7 +1515,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 }
 
 template<typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	std::is_same_v<T, longdoubletest128<false, false, false>> ||
 	std::is_same_v<T, longdoubletest128<false, false, true>> ||
 	std::is_same_v<T, longdoubletest128<false, true, false>> ||
@@ -1451,8 +1597,8 @@ struct test64{
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return long{} > static_cast<long>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #elif defined(_M_IX86)
-		std::uint_least32_t res;
-		unsigned char carry{_subborrow_u32(_subborrow_u32(0, data[LO], other.data[LO], nullptr), data[HI], other.data[HI], &res)};
+		std::uint_least32_t discarded, res;
+		unsigned char carry{_subborrow_u32(_subborrow_u32(0, data[LO], other.data[LO], &discarded), data[HI], other.data[HI], &res)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least32_t{} > static_cast<std::int_least32_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #else
@@ -1480,8 +1626,8 @@ struct test64{
 				std::uint_least32_t rhi{__builtin_subcl(data[0], other.data[0], carrymid, &carry)};
 				static_cast<void>(carry);
 #elif defined(_M_IX86)
-				std::uint_least32_t rhi;
-				_subborrow_u32(_subborrow_u32(0, data[1], other.data[1], nullptr), data[0], other.data[0], &rhi);
+				std::uint_least32_t rlo, rhi;
+				_subborrow_u32(_subborrow_u32(0, data[1], other.data[1], &rlo), data[0], other.data[0], &rhi);
 #else
 				std::uint_least32_t rlo{data[1] - other.data[1]}, rhi{data[0] - other.data[0]};
 				rhi -= data[1] < rlo;
@@ -1498,8 +1644,8 @@ struct test64{
 		std::uint_least32_t rhi{__builtin_subcl(data[1], other.data[1], carrymid, &carry)};
 		static_cast<void>(carry);
 #elif defined(_M_IX86)
-		std::uint_least32_t rhi;
-		_subborrow_u32(_subborrow_u32(0, data[0], other.data[0], nullptr), data[1], other.data[1], &rhi);
+		std::uint_least32_t rlo, rhi;
+		_subborrow_u32(_subborrow_u32(0, data[0], other.data[0], &rlo), data[1], other.data[1], &rhi);
 #else
 		std::uint_least32_t rlo{data[0] - other.data[0]}, rhi{data[1] - other.data[1]};
 		rhi -= data[0] < rlo;
@@ -1666,8 +1812,8 @@ struct test128{
 		else return carry;// unsigned integer mode
 #endif
 #elif defined(_M_X64)
-		std::uint_least64_t res;
-		unsigned char carry{_subborrow_u64(_subborrow_u64(0, data[LO], other.data[LO], nullptr), data[HI], other.data[HI], &res)};
+		std::uint_least64_t discarded, res;
+		unsigned char carry{_subborrow_u64(_subborrow_u64(0, data[LO], other.data[LO], &discarded), data[HI], other.data[HI], &res)};
 		if constexpr(!isabsvalue && issignmode && !isfltpmode) return std::int_least64_t{} > static_cast<std::int_least64_t>(res);// signed integer mode
 		else return carry;// unsigned integer mode
 #else
@@ -1702,8 +1848,8 @@ struct test128{
 				static_cast<void>(rlo);
 				static_cast<void>(carry);
 #elif defined(_M_X64)
-				std::uint_least64_t rhi;
-				_subborrow_u64(_subborrow_u64(0, data[1], other.data[1], nullptr), data[0], other.data[0], &rhi);
+				std::uint_least64_t rlo, rhi;
+				_subborrow_u64(_subborrow_u64(0, data[1], other.data[1], &rlo), data[0], other.data[0], &rhi);
 #else
 				std::uint_least64_t rlo{data[1] - other.data[1]}, rhi{data[0] - other.data[0]};
 				rhi -= data[1] < rlo;
@@ -1727,8 +1873,8 @@ struct test128{
 		static_cast<void>(rlo);
 		static_cast<void>(carry);
 #elif defined(_M_IX86)
-		std::uint_least64_t rhi;
-		_subborrow_u64(_subborrow_u64(0, data[0], other.data[0], nullptr), data[1], other.data[1], &rhi);
+		std::uint_least64_t rlo, rhi;
+		_subborrow_u64(_subborrow_u64(0, data[0], other.data[0], &rlo), data[1], other.data[1], &rhi);
 #else
 		std::uint_least64_t rlo{data[0] - other.data[0]}, rhi{data[1] - other.data[1]};
 		rhi -= data[0] < rlo;
@@ -2332,7 +2478,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
 	void> addcarryofless(unsigned &accumulator, U minuend, U subtrahend)noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc) && __has_builtin(__builtin_addc)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1 == sizeof(U), unsigned char,
 		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
 		std::conditional_t<sizeof(signed) == sizeof(U), unsigned,
@@ -2349,19 +2495,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, nullptr);
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend < subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, &minuend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, &minuend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, &minuend);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, &minuend);
 	unsigned char checkcarry{_addcarry_u32(carry, accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_IX86)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), nullptr);// decompose; cmp r, r followed by sbb r, r
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend < subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, &minuend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, &minuend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, &minuend);
+	else if constexpr(8 == sizeof(U)){
+		std::uint_least32_t discardedlo, discardedhi;
+		carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), &discardedlo), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), &discardedhi);// decompose; cmp r, r followed by sbb r, r
+	}
 	unsigned char checkcarry{_addcarry_u32(carry, accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
@@ -2393,19 +2556,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, subtrahend, minuend, nullptr);
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend <= subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, &subtrahend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, subtrahend, minuend, &subtrahend);
 	unsigned char checkcarry{_subborrow_u32(carry, accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_IX86)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), nullptr), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), nullptr);// decompose; cmp r, r followed by sbb r, r
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend <= subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, &subtrahend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(8 == sizeof(U)){
+		std::uint_least32_t discardedlo, discardedhi;
+		carry = _subborrow_u32(_subborrow_u32(0, static_cast<std::uint_least32_t>(minuend & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(subtrahend & 0xFFFFFFFFu), &discardedlo), static_cast<std::uint_least32_t>(minuend >> 32), static_cast<std::uint_least32_t>(subtrahend >> 32), &discardedhi);// decompose; cmp r, r followed by sbb r, r
+	}
 	unsigned char checkcarry{_subborrow_u32(carry, accumulator, 0xFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
@@ -2420,7 +2600,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64 >= CHAR_BIT * sizeof(U) &&
 	std::is_unsigned_v<U>,
 	void> addcarryofless(std::size_t &accumulator, U minuend, U subtrahend)noexcept{
-#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc) && __has_builtin(__builtin_addc)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_subc)
 	std::conditional_t<1 == sizeof(U), unsigned char,
 		std::conditional_t<sizeof(short) == sizeof(U), unsigned short,
 		std::conditional_t<sizeof(signed) == sizeof(U), unsigned,
@@ -2444,10 +2624,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, nullptr);
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend < subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, minuend, subtrahend, &minuend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, minuend, subtrahend, &minuend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, minuend, subtrahend, &minuend);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, minuend, subtrahend, &minuend);
 	unsigned char checkcarry{_addcarry_u64(carry, accumulator, 0, &accumulator)};// cmp r, r followed by adc r, 0
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
@@ -2487,10 +2674,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
 #elif defined(_M_X64)
 	unsigned char carry;
-	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, nullptr);
-	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, nullptr);
-	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, nullptr);
-	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, subtrahend, minuend, nullptr);
+#if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
+	if constexpr(2 >= sizeof(U)){
+		accumulator += minuend <= subtrahend;
+		return;
+	}
+#else
+	if constexpr(1 == sizeof(U)) carry = _subborrow_u8(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(2 == sizeof(U)) carry = _subborrow_u16(0, subtrahend, minuend, &subtrahend);
+#endif
+	else if constexpr(4 == sizeof(U)) carry = _subborrow_u32(0, subtrahend, minuend, &subtrahend);
+	else if constexpr(8 == sizeof(U)) carry = _subborrow_u64(0, subtrahend, minuend, &subtrahend);
 	unsigned char checkcarry{_subborrow_u64(carry, accumulator, 0xFFFFFFFFFFFFFFFFu, &accumulator)};// cmp r, r followed by sbb r, -1
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
@@ -2514,7 +2708,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	> bitscanforwardportable(T input)noexcept{
 	assert(input);// design decision: do not allow 0 as input as neither x86/x64 bsf nor using the de Bruijn sequence supports it
-#ifdef _M_X64
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_ctz)
+	if constexpr(sizeof(unsigned) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctz(input))};
+	else if constexpr(sizeof(unsigned long) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctzl(input))};
+	else return{static_cast<unsigned>(__builtin_ctzll(input))};
+#elif defined(_M_X64)
 	// will run bsf (bit scan forward) on older architectures, which is fine
 	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{_tzcnt_u32(input)};
 	else return{_tzcnt_u64(input)};
@@ -2531,10 +2729,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_M_ARM) || defined(_M_ARM64) || defined(_M_HYBRID_X86_ARM64) || defined(_M_ARM64EC)
 	if constexpr(32 >= CHAR_BIT * sizeof(T)) return{_CountTrailingZeros(input)};
 	else return{_CountTrailingZeros64(input)};
-#elif defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))
-	if constexpr(sizeof(unsigned) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctz(input))};
-	else if constexpr(sizeof(unsigned long) >= sizeof(T)) return{static_cast<unsigned>(__builtin_ctzl(input))};
-	else return{static_cast<unsigned>(__builtin_ctzll(input))};
 #elif defined(__cpp_lib_bitops)
 	return{static_cast<unsigned>(std::countr_zero(input))};
 #else// Count the consecutive zero bits (trailing) on the right with multiply and lookup.
@@ -3025,11 +3219,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
 			static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
 #else
 			std::uint_least64_t curmtmp{curm};
@@ -3070,11 +3264,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
 			static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, nullptr), curo, static_cast<std::uint_least16_t>(curq), &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, &curm), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curq, nullptr), curo, static_cast<std::uint_least16_t>(curq), &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
 #else
 			curm += curq;
@@ -3109,11 +3303,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
 		static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-		unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
 		static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-		unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, &curmhi), curo, curo, &curo)};
 		static_cast<void>(checkcarry);
 #else
 		std::uint_least64_t curmtmp{curm};
@@ -3181,11 +3375,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #else
 			std::uint_least64_t curmtmpa{curma};
@@ -3222,11 +3416,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #else
 			std::uint_least64_t curmtmpb{curmb};
@@ -3287,16 +3481,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, &curma), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, &curmb), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
@@ -3370,16 +3564,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
 		static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
 		std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #else
 		std::uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
@@ -3454,11 +3648,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #else
 			std::uint_least64_t curmtmpa{curma};
@@ -3495,11 +3689,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #else
 			std::uint_least64_t curmtmpb{curmb};
@@ -3536,11 +3730,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoc = __builtin_addcs(curoc, curoc, static_cast<unsigned short>(carryc), &checkcarryc);
 			static_cast<void>(checkcarryc);
 #elif defined(_M_X64)
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, nullptr), curoc, curoc, &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, &curmc), curoc, curoc, &curoc)};
 			static_cast<void>(checkcarryc);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, nullptr), curoc, curoc, &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 			static_cast<void>(checkcarryc);
 #else
 			std::uint_least64_t curmtmpc{curmc};
@@ -3577,11 +3771,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curod = __builtin_addcs(curod, curod, static_cast<unsigned short>(carryd), &checkcarryd);
 			static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, nullptr), curod, curod, &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, &curmd), curod, curod, &curod)};
 			static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, nullptr), curod, curod, &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, &curmhid), curod, curod, &curod)};
 			static_cast<void>(checkcarryd);
 #else
 			std::uint_least64_t curmtmpd{curmd};
@@ -3678,26 +3872,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curod = __builtin_addcs(curod, static_cast<unsigned short>(curqd), static_cast<unsigned short>(carryd), &checkcarryd);
 			static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, &curma), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, &curmb), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curqc, nullptr), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curqc, &curmc), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
 			static_cast<void>(checkcarryc);
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curqd, nullptr), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curqd, &curmd), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
 			static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 			std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curqc, nullptr), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curqc, &curmhic), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
 			static_cast<void>(checkcarryc);
 			std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curqd, nullptr), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curqd, &curmhid), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
 			static_cast<void>(checkcarryd);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
@@ -3827,26 +4021,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curod = __builtin_addcs(curod, curod, static_cast<unsigned short>(carryd), &checkcarryd);
 		static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
-		unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, nullptr), curoc, curoc, &curoc)};
+		unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, &curmc), curoc, curoc, &curoc)};
 		static_cast<void>(checkcarryc);
-		unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, nullptr), curod, curod, &curod)};
+		unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, &curmd), curod, curod, &curod)};
 		static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
 		std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 		std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-		unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, nullptr), curoc, curoc, &curoc)};
+		unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 		static_cast<void>(checkcarryc);
 		std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-		unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, nullptr), curod, curod, &curod)};
+		unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, &curmhid), curod, curod, &curod)};
 		static_cast<void>(checkcarryd);
 #else
 		std::uint_least64_t curmtmpa{curma}, curmtmpb{curmb}, curmtmpc{curmc}, curmtmpd{curmd};
@@ -3933,11 +4127,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
 			static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, &curmhi), curo, curo, &curo)};
 			static_cast<void>(checkcarry);
 #else
 			std::uint_least64_t curmtmp{curm};
@@ -3977,11 +4171,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curo = __builtin_addcs(curo, static_cast<unsigned short>(curq), static_cast<unsigned short>(carry), &checkcarry);
 			static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, nullptr), curo, static_cast<std::uint_least16_t>(curq), &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curq, &curm), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curq, nullptr), curo, static_cast<std::uint_least16_t>(curq), &curo)};
+			unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curq, &curmhi), curo, static_cast<std::uint_least16_t>(curq), &curo)};
 			static_cast<void>(checkcarry);
 #else
 			curm += curq;
@@ -4015,11 +4209,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curo = __builtin_addcs(curo, curo, static_cast<unsigned short>(carry), &checkcarry);
 		static_cast<void>(checkcarry);
 #elif defined(_M_X64)
-		unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, nullptr), curo, curo, &curo)};
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u64(0, curm, curm, &curm), curo, curo, &curo)};
 		static_cast<void>(checkcarry);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-		unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, nullptr), curo, curo, &curo)};
+		unsigned char checkcarry{_addcarry_u16(_addcarry_u32(0, curmhi, curmhi, &curmhi), curo, curo, &curo)};
 		static_cast<void>(checkcarry);
 #else
 		std::uint_least64_t curmtmp{curm};
@@ -4081,11 +4275,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #else
 			std::uint_least64_t curmtmpa{curma};
@@ -4122,11 +4316,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #else
 			std::uint_least64_t curmtmpb{curmb};
@@ -4183,16 +4377,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curob = __builtin_addcs(curob, static_cast<unsigned short>(curqb), static_cast<unsigned short>(carryb), &checkcarryb);
 			static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, &curma), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, &curmb), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
@@ -4263,16 +4457,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curob = __builtin_addcs(curob, curob, static_cast<unsigned short>(carryb), &checkcarryb);
 		static_cast<void>(checkcarryb);
 #elif defined(_M_X64)
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
 		std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 #else
 		std::uint_least64_t curmtmpa{curma}, curmtmpb{curmb};
@@ -4340,11 +4534,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoa = __builtin_addcs(curoa, curoa, static_cast<unsigned short>(carrya), &checkcarrya);
 			static_cast<void>(checkcarrya);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 			static_cast<void>(checkcarrya);
 #else
 			std::uint_least64_t curmtmpa{curma};
@@ -4382,7 +4576,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			static_cast<void>(checkcarryb);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 			static_cast<void>(checkcarryb);
 #else
 			std::uint_least64_t curmtmpb{curmb};
@@ -4419,11 +4613,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curoc = __builtin_addcs(curoc, curoc, static_cast<unsigned short>(carryc), &checkcarryc);
 			static_cast<void>(checkcarryc);
 #elif defined(_M_X64)
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, nullptr), curoc, curoc, &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, &curmc), curoc, curoc, &curoc)};
 			static_cast<void>(checkcarryc);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, nullptr), curoc, curoc, &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 			static_cast<void>(checkcarryc);
 #else
 			std::uint_least64_t curmtmpc{curmc};
@@ -4460,11 +4654,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curod = __builtin_addcs(curod, curod, static_cast<unsigned short>(carryd), &checkcarryd);
 			static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, nullptr), curod, curod, &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, &curmd), curod, curod, &curod)};
 			static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, nullptr), curod, curod, &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, &curmhid), curod, curod, &curod)};
 			static_cast<void>(checkcarryd);
 #else
 			std::uint_least64_t curmtmpd{curmd};
@@ -4555,26 +4749,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curod = __builtin_addcs(curod, static_cast<unsigned short>(curqd), static_cast<unsigned short>(carryd), &checkcarryd);
 			static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curqa, &curma), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curqb, &curmb), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curqc, nullptr), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curqc, &curmc), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
 			static_cast<void>(checkcarryc);
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curqd, nullptr), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curqd, &curmd), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
 			static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 			std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, nullptr), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
+			unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curqa, &curmhia), curoa, static_cast<std::uint_least16_t>(curqa), &curoa)};
 			static_cast<void>(checkcarrya);
 			std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, nullptr), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
+			unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curqb, &curmhib), curob, static_cast<std::uint_least16_t>(curqb), &curob)};
 			static_cast<void>(checkcarryb);
 			std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curqc, nullptr), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
+			unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curqc, &curmhic), curoc, static_cast<std::uint_least16_t>(curqc), &curoc)};
 			static_cast<void>(checkcarryc);
 			std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curqd, nullptr), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
+			unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curqd, &curmhid), curod, static_cast<std::uint_least16_t>(curqd), &curod)};
 			static_cast<void>(checkcarryd);
 #elif 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
@@ -4703,26 +4897,26 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curod = __builtin_addcs(curod, curod, static_cast<unsigned short>(carryd), &checkcarryd);
 		static_cast<void>(checkcarryd);
 #elif defined(_M_X64)
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u64(0, curma, curma, &curma), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u64(0, curmb, curmb, &curmb), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
-		unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, nullptr), curoc, curoc, &curoc)};
+		unsigned char checkcarryc{_addcarry_u16(_addcarry_u64(0, curmc, curmc, &curmc), curoc, curoc, &curoc)};
 		static_cast<void>(checkcarryc);
-		unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, nullptr), curod, curod, &curod)};
+		unsigned char checkcarryd{_addcarry_u16(_addcarry_u64(0, curmd, curmd, &curmd), curod, curod, &curod)};
 		static_cast<void>(checkcarryd);
 #elif defined(_M_IX86)
 		std::uint_least32_t curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, nullptr), curoa, curoa, &curoa)};
+		unsigned char checkcarrya{_addcarry_u16(_addcarry_u32(0, curmhia, curmhia, &curmhia), curoa, curoa, &curoa)};
 		static_cast<void>(checkcarrya);
 		std::uint_least32_t curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, nullptr), curob, curob, &curob)};
+		unsigned char checkcarryb{_addcarry_u16(_addcarry_u32(0, curmhib, curmhib, &curmhib), curob, curob, &curob)};
 		static_cast<void>(checkcarryb);
 		std::uint_least32_t curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-		unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, nullptr), curoc, curoc, &curoc)};
+		unsigned char checkcarryc{_addcarry_u16(_addcarry_u32(0, curmhic, curmhic, &curmhic), curoc, curoc, &curoc)};
 		static_cast<void>(checkcarryc);
 		std::uint_least32_t curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-		unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, nullptr), curod, curod, &curod)};
+		unsigned char checkcarryd{_addcarry_u16(_addcarry_u32(0, curmhid, curmhid, &curmhid), curod, curod, &curod)};
 		static_cast<void>(checkcarryd);
 #else
 		std::uint_least64_t curmtmpa{curma}, curmtmpb{curmb}, curmtmpc{curmc}, curmtmpd{curmd};
@@ -11502,7 +11696,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // function to establish the initial treshold for 2-way multithreading
 // this is the only version that allows 8-bit inputs
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, bool isindirect>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -11563,7 +11757,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 
 // function to establish the initial treshold for 4-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -11582,7 +11776,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// for unfiltered 80-bit it's 131.072 MiB, and for 80-bit floating-point it's 124.518 MiB
 	// for unfiltered 128-bit it's 20 MiB, and for quadruple-precision floating-point it's 19.375 MiB
 	static double constexpr base{// inverse quintic exponential scaling
-		0x5p53 / static_cast<double>(typebitsize * typebitsizesqr * typebitsizesqr)
+		0x5p53 / (static_cast<double>(typebitsize * typebitsizesqr) * static_cast<double>(typebitsizesqr))// pow(128, 5) already exceeds the 32-bit limit, so split calculations here
 		// the first item is measured and tuned using the the test suite for this project
 		* ((isabsvalue != isfltpmode)? 1. - 4. / static_cast<double>(typebitsize) : 1.)// 4 modes with around three extra filtering steps per input value
 		// the second item is extrapolated from the first item, and is a decent estimate
@@ -11601,7 +11795,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 
 // function to establish the initial treshold for 6-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -11622,7 +11816,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 	// for unfiltered 80-bit it's 879.609 KiB, and for 80-bit floating-point it's 835.629 KiB
 	// for unfiltered 128-bit it's 8 KiB, and for quadruple-precision floating-point it's 7.75 KiB
 	static double constexpr base{// inverse unodecic exponential scaling
-		0x1p86 / static_cast<double>(typebitsizecub * typebitsizequt * typebitsizequt)
+		0x1p86 / (static_cast<double>(typebitsizecub) * static_cast<double>(typebitsizequt) * static_cast<double>(typebitsizequt))// pow(128, 5) already exceeds the 32-bit limit, so split calculations here
 		// the first item is measured and tuned using the the test suite for this project
 		* ((isabsvalue != isfltpmode)? 1. - 4. / static_cast<double>(typebitsize) : 1.)// 4 modes with around three extra filtering steps per input value
 		// the second item is extrapolated from the first item, and is a decent estimate
@@ -11641,7 +11835,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 
 // function to establish the initial treshold for 8-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -11678,7 +11872,7 @@ constexpr RSBD8_FUNC_INLINE std::enable_if_t<
 
 // function to establish the initial treshold for 16-way multithreading
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-constexpr RSBD8_FUNC_INLINE std::enable_if_t<
+RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	!std::is_same_v<bool, T> &&
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
@@ -12473,7 +12667,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -13509,7 +13703,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -14195,7 +14389,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -14943,7 +15137,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -15973,7 +16167,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -16665,7 +16859,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -17266,7 +17460,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -18160,7 +18354,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -18804,7 +18998,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -19442,7 +19636,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -20447,7 +20641,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -21125,7 +21319,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -21760,7 +21954,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -22595,7 +22789,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -23192,7 +23386,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -23834,7 +24028,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -24781,7 +24975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -25383,7 +25577,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 #endif
@@ -27666,7 +27860,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -29698,7 +29892,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -31927,7 +32121,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -34174,7 +34368,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -36321,7 +36515,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *output = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -38549,7 +38743,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}else if(0 == static_cast<std::ptrdiff_t>(count)) *buffer = *input;// copy the single element if the count is 1
 #if !defined(RSBD8_THREAD_MAXIMUM) || 2 < (RSBD8_THREAD_MAXIMUM)
-	return{asynchandle};// let a possible parent thread wait on all of its childen
+	return asynchandle;// let a possible parent thread wait on all of its childen
 #endif
 }
 
@@ -38915,7 +39109,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglesortmain(std::size_t count, T const psrclo[], T pdst[], X offsets[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -40730,7 +40924,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocsinglesortmain(std::size_t count, V *const psrclo[], V *pdst[], X offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
-	assert(count && count != MAXSIZE_T);
+	assert(count && count != SIZE_MAX);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -45328,7 +45522,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 			}
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
-			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+			return asyncreturnhandle;// let a possible parent thread wait on all of its childen
 #else
 			return;
 		}else{// single-threaded
@@ -45502,7 +45696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 			}
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
-			return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+			return asyncreturnhandle;// let a possible parent thread wait on all of its childen
 #else
 			return;
 		}else{// single-threaded
@@ -46999,7 +47193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, output, buffer);
 				}
 #if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
-				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+				return asyncreturnhandle;// let a possible parent thread wait on all of its childen
 #else
 				return;
 			}else{// dual-threaded
@@ -47205,7 +47399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					mergehalvesmain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>(count, input, buffer);
 				}
 #if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
-				return{asyncreturnhandle};// let a possible parent thread wait on all of its childen
+				return asyncreturnhandle;// let a possible parent thread wait on all of its childen
 #else
 				return;
 			}else{// dual-threaded

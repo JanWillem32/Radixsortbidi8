@@ -1,128 +1,128 @@
-00000001	0.00000000	[16068]          51016778570 w	
-00000002	2.52733469	[16068] std::sort() test	
-00000003	2.52735114	[16068]           6978483684	
-00000004	6.17138910	[16068] std::stable_sort() test	
-00000005	6.17150831	[16068]          12099541822	
-00000006	20.65223885	[16068] radixsort1() test	
-00000007	20.65235329	[16068]          50059809124	
-00000008	31.17997742	[16068] radixsort2() test	
-00000009	31.18000984	[16068]          36189793460	
-00000010	33.68259048	[16068] radixsortbidi8ori() test	
-00000011	33.68270493	[16068]           8069933895	
-00000012	36.07415390	[16068] radixsortbidi8() test	
-00000013	36.07427979	[16068]           7704565555	
-00000014	38.63315964	[16068] radixsortbidi8asm() test	
-00000015	38.63327026	[16068]           8260823479	
-00000016	41.08805847	[16068] radixsortbidi8unroll() test	
-00000017	41.08820343	[16068]           7925845866	
-00000018	44.39672470	[16068] radixsortbidi16() test	
-00000019	44.39683151	[16068]          10909736947	
-00000020	59.06619644	[16068] radixsortbidi() test	
-00000021	59.06631088	[16068]          50746562086	
-00000022	73.06692505	[16068] radixsortbidiasm() test	
-00000023	73.06703186	[16068]          48356909198	
-00000024	75.42173767	[16068] rsbd8::radixsort() test	
-00000025	75.42176056	[16068]           7566585652	
-00000026	75.42183685	[16068] Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.	
-00000027	75.42183685	[16068] Discard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.	
-00000028	75.68955994	[16068] rsbd8::radixsort() test of 32 MiB instead of 1 GiB	
-00000029	75.68966675	[16068]            259611506	
-00000030	76.00490570	[16068] std::stable_sort() test of 32 MiB instead of 1 GiB	
-00000031	76.00502014	[16068]            323754770	
-00000032	76.21432495	[16068] rsbd8::radixsort() test of 4 MiB instead of 1 GiB	
-00000033	76.21443176	[16068]             29016292	
-00000034	76.41708374	[16068] std::stable_sort() test of 4 MiB instead of 1 GiB	
-00000035	76.41720581	[16068]             34098612	
-00000036	76.60467529	[16068] rsbd8::radixsort() test of 512 KiB instead of 1 GiB	
-00000037	76.60479736	[16068]              3582816	
-00000038	76.80868530	[16068] std::stable_sort() test of 512 KiB instead of 1 GiB	
-00000039	76.80879974	[16068]             34394428	
-00000040	77.00061035	[16068] rsbd8::radixsort() test of 64 KiB instead of 1 GiB	
-00000041	77.00070953	[16068]               467178	
-00000042	77.20011139	[16068] std::stable_sort() test of 64 KiB instead of 1 GiB	
-00000043	77.20023346	[16068]              1266370	
-00000044	77.40040588	[16068] rsbd8::radixsort() test of 8 KiB instead of 1 GiB	
-00000045	77.40051270	[16068]               162868	
-00000046	77.59895325	[16068] std::stable_sort() test of 8 KiB instead of 1 GiB	
-00000047	77.59906769	[16068]               297006	
-00000048	77.78900146	[16068] rsbd8::radixsort() test of 1 KiB instead of 1 GiB	
-00000049	77.78912354	[16068]               116940	
-00000050	77.98528290	[16068] std::stable_sort() test of 1 KiB instead of 1 GiB	
-00000051	77.98540497	[16068]                60136	
-00000052	78.18072510	[16068] rsbd8::radixsort() test of 128 B instead of 1 GiB	
-00000053	78.18084717	[16068]               121908	
-00000054	78.36905670	[16068] std::stable_sort() test of 128 B instead of 1 GiB	
-00000055	78.36916351	[16068]                 4034	
-00000056	78.55526733	[16068] rsbd8::radixsort() test of 16 B instead of 1 GiB	
-00000057	78.55539703	[16068]               117416	
-00000058	78.74617767	[16068] std::stable_sort() test of 16 B instead of 1 GiB	
-00000059	78.74628448	[16068]                 3220	
-00000060	78.93972015	[16068] rsbd8::radixsort() test of 1.5 KiB instead of 1 GiB	
-00000061	78.93983459	[16068]               102222	
-00000062	79.14016724	[16068] std::stable_sort() test of 1.5 KiB instead of 1 GiB	
-00000063	79.14028168	[16068]                76672	
-00000064	79.33129120	[16068] rsbd8::radixsort() test of 2 KiB instead of 1 GiB	
-00000065	79.33139801	[16068]               128834	
-00000066	79.51756287	[16068] std::stable_sort() test of 2 KiB instead of 1 GiB	
-00000067	79.51768494	[16068]                93400	
-00000068	79.70883179	[16068] rsbd8::radixsort() test of 2.5 KiB instead of 1 GiB	
-00000069	79.70894623	[16068]               132756	
-00000070	79.89853668	[16068] std::stable_sort() test of 2.5 KiB instead of 1 GiB	
-00000071	79.89865112	[16068]               113224	
-00000072	80.08513641	[16068] rsbd8::radixsort() test of 3 KiB instead of 1 GiB	
-00000073	80.08523560	[16068]               141156	
-00000074	80.27668762	[16068] std::stable_sort() test of 3 KiB instead of 1 GiB	
-00000075	80.27680206	[16068]               121862	
-00000076	80.47224426	[16068] rsbd8::radixsort() test of 3.5 KiB instead of 1 GiB	
-00000077	80.47235107	[16068]               142108	
-00000078	80.66770935	[16068] std::stable_sort() test of 3.5 KiB instead of 1 GiB	
-00000079	80.66780853	[16068]               140060	
-00000080	80.85449219	[16068] rsbd8::radixsort() test of 4 KiB instead of 1 GiB	
-00000081	80.85460663	[16068]               155538	
-00000082	81.04079437	[16068] std::stable_sort() test of 4 KiB instead of 1 GiB	
-00000083	81.04090881	[16068]               104966	
-00000084	81.23263550	[16068] rsbd8::radixsort() test of 4.5 KiB instead of 1 GiB	
-00000085	81.23274994	[16068]               131380	
-00000086	81.41900635	[16068] std::stable_sort() test of 4.5 KiB instead of 1 GiB	
-00000087	81.41911316	[16068]               152650	
-00000088	81.61503601	[16068] rsbd8::radixsort() test of 5 KiB instead of 1 GiB	
-00000089	81.61513519	[16068]               141506	
-00000090	81.80564117	[16068] std::stable_sort() test of 5 KiB instead of 1 GiB	
-00000091	81.80574036	[16068]               160398	
-00000092	82.00132751	[16068] rsbd8::radixsort() test of 5.5 KiB instead of 1 GiB	
-00000093	82.00144958	[16068]               150096	
-00000094	82.19256592	[16068] std::stable_sort() test of 5.5 KiB instead of 1 GiB	
-00000095	82.19267273	[16068]               179446	
-00000096	82.39170074	[16068] rsbd8::radixsort() test of 6 KiB instead of 1 GiB	
-00000097	82.39182281	[16068]               153346	
-00000098	82.58790588	[16068] std::stable_sort() test of 6 KiB instead of 1 GiB	
-00000099	82.58801270	[16068]               179812	
-00000100	82.78169250	[16068] rsbd8::radixsort() test of 6.5 KiB instead of 1 GiB	
-00000101	82.78179932	[16068]               157580	
-00000102	82.96826172	[16068] std::stable_sort() test of 6.5 KiB instead of 1 GiB	
-00000103	82.96840668	[16068]               193426	
-00000104	83.16294861	[16068] rsbd8::radixsort() test of 7 KiB instead of 1 GiB	
-00000105	83.16305542	[16068]               149300	
-00000106	83.35340881	[16068] std::stable_sort() test of 7 KiB instead of 1 GiB	
-00000107	83.35352325	[16068]               212396	
-00000108	83.55074310	[16068] rsbd8::radixsort() test of 7.5 KiB instead of 1 GiB	
-00000109	83.55088043	[16068]               161960	
-00000110	83.74983978	[16068] std::stable_sort() test of 7.5 KiB instead of 1 GiB	
-00000111	83.74987793	[16068]               427451	
-00000112	83.95149994	[16068] rsbd8::radixsort() test of .5 KiB instead of 1 GiB	
-00000113	83.95160675	[16068]                94012	
-00000114	84.13796997	[16068] std::stable_sort() test of .5 KiB instead of 1 GiB	
-00000115	84.13809204	[16068]                 9310	
-00000116	84.32848358	[16068] rsbd8::radixsort() test of .625 KiB instead of 1 GiB	
-00000117	84.32858276	[16068]               119358	
-00000118	84.51924896	[16068] std::stable_sort() test of .625 KiB instead of 1 GiB	
-00000119	84.51937103	[16068]                11870	
-00000120	84.71402740	[16068] rsbd8::radixsort() test of .75 KiB instead of 1 GiB	
-00000121	84.71413422	[16068]               112976	
-00000122	84.90467834	[16068] std::stable_sort() test of .75 KiB instead of 1 GiB	
-00000123	84.90479279	[16068]                14138	
-00000124	85.09963226	[16068] rsbd8::radixsort() test of .875 KiB instead of 1 GiB	
-00000125	85.09974670	[16068]               121540	
-00000126	85.29055023	[16068] std::stable_sort() test of .875 KiB instead of 1 GiB	
-00000127	85.29067230	[16068]                14706	
-00000128	85.29078674	[16068]          51869686100 b	
+00000001	0.00000000	[16068]          51016778570 w
+00000002	2.52733469	[16068] std::sort() test
+00000003	2.52735114	[16068]           6978483684
+00000004	6.17138910	[16068] std::stable_sort() test
+00000005	6.17150831	[16068]          12099541822
+00000006	20.65223885	[16068] radixsort1() test
+00000007	20.65235329	[16068]          50059809124
+00000008	31.17997742	[16068] radixsort2() test
+00000009	31.18000984	[16068]          36189793460
+00000010	33.68259048	[16068] radixsortbidi8ori() test
+00000011	33.68270493	[16068]           8069933895
+00000012	36.07415390	[16068] radixsortbidi8() test
+00000013	36.07427979	[16068]           7704565555
+00000014	38.63315964	[16068] radixsortbidi8asm() test
+00000015	38.63327026	[16068]           8260823479
+00000016	41.08805847	[16068] radixsortbidi8unroll() test
+00000017	41.08820343	[16068]           7925845866
+00000018	44.39672470	[16068] radixsortbidi16() test
+00000019	44.39683151	[16068]          10909736947
+00000020	59.06619644	[16068] radixsortbidi() test
+00000021	59.06631088	[16068]          50746562086
+00000022	73.06692505	[16068] radixsortbidiasm() test
+00000023	73.06703186	[16068]          48356909198
+00000024	75.42173767	[16068] rsbd8::radixsort() test
+00000025	75.42176056	[16068]           7566585652
+00000026	75.42183685	[16068] Warning: these absolutely tiny tests can be ruined by minor scheduling and system-wide interruptions.
+00000027	75.42183685	[16068] Discard benchmarks that deviate from expected readings, and re-do the benchmarking session as needed.
+00000028	75.68955994	[16068] rsbd8::radixsort() test of 32 MiB instead of 1 GiB
+00000029	75.68966675	[16068]            259611506
+00000030	76.00490570	[16068] std::stable_sort() test of 32 MiB instead of 1 GiB
+00000031	76.00502014	[16068]            323754770
+00000032	76.21432495	[16068] rsbd8::radixsort() test of 4 MiB instead of 1 GiB
+00000033	76.21443176	[16068]             29016292
+00000034	76.41708374	[16068] std::stable_sort() test of 4 MiB instead of 1 GiB
+00000035	76.41720581	[16068]             34098612
+00000036	76.60467529	[16068] rsbd8::radixsort() test of 512 KiB instead of 1 GiB
+00000037	76.60479736	[16068]              3582816
+00000038	76.80868530	[16068] std::stable_sort() test of 512 KiB instead of 1 GiB
+00000039	76.80879974	[16068]             34394428
+00000040	77.00061035	[16068] rsbd8::radixsort() test of 64 KiB instead of 1 GiB
+00000041	77.00070953	[16068]               467178
+00000042	77.20011139	[16068] std::stable_sort() test of 64 KiB instead of 1 GiB
+00000043	77.20023346	[16068]              1266370
+00000044	77.40040588	[16068] rsbd8::radixsort() test of 8 KiB instead of 1 GiB
+00000045	77.40051270	[16068]               162868
+00000046	77.59895325	[16068] std::stable_sort() test of 8 KiB instead of 1 GiB
+00000047	77.59906769	[16068]               297006
+00000048	77.78900146	[16068] rsbd8::radixsort() test of 1 KiB instead of 1 GiB
+00000049	77.78912354	[16068]               116940
+00000050	77.98528290	[16068] std::stable_sort() test of 1 KiB instead of 1 GiB
+00000051	77.98540497	[16068]                60136
+00000052	78.18072510	[16068] rsbd8::radixsort() test of 128 B instead of 1 GiB
+00000053	78.18084717	[16068]               121908
+00000054	78.36905670	[16068] std::stable_sort() test of 128 B instead of 1 GiB
+00000055	78.36916351	[16068]                 4034
+00000056	78.55526733	[16068] rsbd8::radixsort() test of 16 B instead of 1 GiB
+00000057	78.55539703	[16068]               117416
+00000058	78.74617767	[16068] std::stable_sort() test of 16 B instead of 1 GiB
+00000059	78.74628448	[16068]                 3220
+00000060	78.93972015	[16068] rsbd8::radixsort() test of 1.5 KiB instead of 1 GiB
+00000061	78.93983459	[16068]               102222
+00000062	79.14016724	[16068] std::stable_sort() test of 1.5 KiB instead of 1 GiB
+00000063	79.14028168	[16068]                76672
+00000064	79.33129120	[16068] rsbd8::radixsort() test of 2 KiB instead of 1 GiB
+00000065	79.33139801	[16068]               128834
+00000066	79.51756287	[16068] std::stable_sort() test of 2 KiB instead of 1 GiB
+00000067	79.51768494	[16068]                93400
+00000068	79.70883179	[16068] rsbd8::radixsort() test of 2.5 KiB instead of 1 GiB
+00000069	79.70894623	[16068]               132756
+00000070	79.89853668	[16068] std::stable_sort() test of 2.5 KiB instead of 1 GiB
+00000071	79.89865112	[16068]               113224
+00000072	80.08513641	[16068] rsbd8::radixsort() test of 3 KiB instead of 1 GiB
+00000073	80.08523560	[16068]               141156
+00000074	80.27668762	[16068] std::stable_sort() test of 3 KiB instead of 1 GiB
+00000075	80.27680206	[16068]               121862
+00000076	80.47224426	[16068] rsbd8::radixsort() test of 3.5 KiB instead of 1 GiB
+00000077	80.47235107	[16068]               142108
+00000078	80.66770935	[16068] std::stable_sort() test of 3.5 KiB instead of 1 GiB
+00000079	80.66780853	[16068]               140060
+00000080	80.85449219	[16068] rsbd8::radixsort() test of 4 KiB instead of 1 GiB
+00000081	80.85460663	[16068]               155538
+00000082	81.04079437	[16068] std::stable_sort() test of 4 KiB instead of 1 GiB
+00000083	81.04090881	[16068]               104966
+00000084	81.23263550	[16068] rsbd8::radixsort() test of 4.5 KiB instead of 1 GiB
+00000085	81.23274994	[16068]               131380
+00000086	81.41900635	[16068] std::stable_sort() test of 4.5 KiB instead of 1 GiB
+00000087	81.41911316	[16068]               152650
+00000088	81.61503601	[16068] rsbd8::radixsort() test of 5 KiB instead of 1 GiB
+00000089	81.61513519	[16068]               141506
+00000090	81.80564117	[16068] std::stable_sort() test of 5 KiB instead of 1 GiB
+00000091	81.80574036	[16068]               160398
+00000092	82.00132751	[16068] rsbd8::radixsort() test of 5.5 KiB instead of 1 GiB
+00000093	82.00144958	[16068]               150096
+00000094	82.19256592	[16068] std::stable_sort() test of 5.5 KiB instead of 1 GiB
+00000095	82.19267273	[16068]               179446
+00000096	82.39170074	[16068] rsbd8::radixsort() test of 6 KiB instead of 1 GiB
+00000097	82.39182281	[16068]               153346
+00000098	82.58790588	[16068] std::stable_sort() test of 6 KiB instead of 1 GiB
+00000099	82.58801270	[16068]               179812
+00000100	82.78169250	[16068] rsbd8::radixsort() test of 6.5 KiB instead of 1 GiB
+00000101	82.78179932	[16068]               157580
+00000102	82.96826172	[16068] std::stable_sort() test of 6.5 KiB instead of 1 GiB
+00000103	82.96840668	[16068]               193426
+00000104	83.16294861	[16068] rsbd8::radixsort() test of 7 KiB instead of 1 GiB
+00000105	83.16305542	[16068]               149300
+00000106	83.35340881	[16068] std::stable_sort() test of 7 KiB instead of 1 GiB
+00000107	83.35352325	[16068]               212396
+00000108	83.55074310	[16068] rsbd8::radixsort() test of 7.5 KiB instead of 1 GiB
+00000109	83.55088043	[16068]               161960
+00000110	83.74983978	[16068] std::stable_sort() test of 7.5 KiB instead of 1 GiB
+00000111	83.74987793	[16068]               427451
+00000112	83.95149994	[16068] rsbd8::radixsort() test of .5 KiB instead of 1 GiB
+00000113	83.95160675	[16068]                94012
+00000114	84.13796997	[16068] std::stable_sort() test of .5 KiB instead of 1 GiB
+00000115	84.13809204	[16068]                 9310
+00000116	84.32848358	[16068] rsbd8::radixsort() test of .625 KiB instead of 1 GiB
+00000117	84.32858276	[16068]               119358
+00000118	84.51924896	[16068] std::stable_sort() test of .625 KiB instead of 1 GiB
+00000119	84.51937103	[16068]                11870
+00000120	84.71402740	[16068] rsbd8::radixsort() test of .75 KiB instead of 1 GiB
+00000121	84.71413422	[16068]               112976
+00000122	84.90467834	[16068] std::stable_sort() test of .75 KiB instead of 1 GiB
+00000123	84.90479279	[16068]                14138
+00000124	85.09963226	[16068] rsbd8::radixsort() test of .875 KiB instead of 1 GiB
+00000125	85.09974670	[16068]               121540
+00000126	85.29055023	[16068] std::stable_sort() test of .875 KiB instead of 1 GiB
+00000127	85.29067230	[16068]                14706
+00000128	85.29078674	[16068]          51869686100 b
