@@ -630,9 +630,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
 // GCC/Clang-compatible compiler, targeting ARM with NEON
 #include <arm_neon.h>
-#if defined (MISSING_ARM_VLD1)
+#if defined(MISSING_ARM_VLD1)
 #include <ATen/cpu/vec256/missing_vld1_neon.h>
-#elif defined (MISSING_ARM_VST1)
+#elif defined(MISSING_ARM_VST1)
 #include <ATen/cpu/vec256/missing_vst1_neon.h>
 #endif
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
