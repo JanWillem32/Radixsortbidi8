@@ -596,6 +596,8 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
 // GCC/Clang-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
+
+#if defined(__has_builtin) && __has_builtin(__builtin_add_overflow)
 // solve the case of the missing compiler intrinsics, _subborrow_u16() is a bit more tricky (and resides in critical paths) for this library so these have asm/other statements per item
 
 namespace rsbd8::helper{
@@ -605,11 +607,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned char> _addcarry_u16(T carry, std::uint_least16_t first, std::uint_least16_t second, std::uint_least16_t *output){
 	// TODO: temporary fix until _addcarry_u16() is implemented like _addcarry_u32() and _addcarry_u64()
 	// inline asm sadly failed to handle the carry correctly here
-	std::uint_least16_t ori{first};
-	first += second;
-	first += carry;
-	*output = first;
-	return first < ori;
+	// copied from the compiler suite guide's website
+	auto c1{__builtin_add_overflow(first, second, output)};
+	auto c2{__builtin_add_overflow(*output, carry, output)};
+	c1 |= c2;
+	return c1;
 }
 
 template<typename T>
@@ -620,12 +622,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(!nocarry);
 	// TODO: temporary fix until _addcarry_u16() is implemented like _addcarry_u32() and _addcarry_u64()
 	// inline asm sadly failed to handle the carry correctly here
-	std::uint_least16_t ori{first};
-	first += second;
-	*output = first;
-	return first < ori;
+	// copied from the compiler suite guide's website
+	auto c1{__builtin_add_overflow(first, second, output)};
+	return c1;
 }
 }// namespace rsbd8::helper
+#endif
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
 // GCC/Clang-compatible compiler, targeting ARM with NEON
@@ -2493,6 +2495,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	accumulator = __builtin_addc(accumulator, 0, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
+	accumulator += __builtin_sub_overflow_p(minuend, subtrahend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2554,6 +2558,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	accumulator = __builtin_subc(accumulator, ~0u, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
+	accumulator += !__builtin_sub_overflow_p(subtrahend, minuend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2622,6 +2628,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
+	accumulator += __builtin_sub_overflow_p(minuend, subtrahend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2672,6 +2680,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
+	accumulator += !__builtin_sub_overflow_p(subtrahend, minuend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
