@@ -7421,6 +7421,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curm, U &cure, T *out, T *dst)noexcept{
+	assert(out != dst);
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
@@ -7929,6 +7930,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, std::uint_least64_t &curmb, U &cureb, T *outb)noexcept{
+	assert(outa != outb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -8263,6 +8265,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, T *dsta, std::uint_least64_t &curmb, U &cureb, T *outb, T *dstb)noexcept{
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -8854,6 +8859,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
+	assert(out != dst);
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
@@ -9155,6 +9161,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
+	assert(outa != outb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -9352,6 +9359,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			HI = 0;
 		}
 	}
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -9635,6 +9645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cur, T *out, T *dst)noexcept{
+	assert(out != dst);
 	// do not pass a nullptr here
 	assert(out);
 	assert(dst);
@@ -9724,6 +9735,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, U &curb, T *outb)noexcept{
+	assert(outa != outb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -9781,6 +9793,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb)noexcept{
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -9910,6 +9925,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc)noexcept{
+	assert(outa != outb);
+	assert(outb != outc);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -9986,6 +10003,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc)noexcept{
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
+	assert(dstb != outc);
+	assert(outc != dstc);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -10153,6 +10175,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc, U &curd, T *outd)noexcept{
+	assert(outa != outb);
+	assert(outb != outc);
+	assert(outc != outd);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -10248,6 +10273,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc, U &curd, T *outd, T *dstd)noexcept{
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
+	assert(dstb != outc);
+	assert(outc != dstc);
+	assert(dstc != outd);
+	assert(outd != dstd);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -10498,6 +10530,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc, U &curd, T *outd, U &cure, T *oute, U &curf, T *outf, U &curg, T *outg, U &curh, T *outh)noexcept{
+	assert(outa != outb);
+	assert(outb != outc);
+	assert(outc != outd);
+	assert(outd != oute);
+	assert(oute != outf);
+	assert(outf != outg);
+	assert(outg != outh);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(outb);
@@ -10669,6 +10708,21 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64 >= CHAR_BIT * sizeof(U),
 	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc, U &curd, T *outd, T *dstd, U &cure, T *oute, T *dste, U &curf, T *outf, T *dstf, U &curg, T *outg, T *dstg, U &curh, T *outh, T *dsth)noexcept{
+	assert(outa != dsta);
+	assert(dsta != outb);
+	assert(outb != dstb);
+	assert(dstb != outc);
+	assert(outc != dstc);
+	assert(dstc != outd);
+	assert(outd != dstd);
+	assert(dstd != oute);
+	assert(oute != dste);
+	assert(dste != outf);
+	assert(outf != dstf);
+	assert(dstf != outg);
+	assert(outg != dstg);
+	assert(dstg != outh);
+	assert(outh != dsth);
 	// do not pass a nullptr here
 	assert(outa);
 	assert(dsta);
@@ -10873,8 +10927,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetshelpershared(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
+	assert(offsetscompanion);
 
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	static_assert(!isabsvalue || !issignmode, "this function variant is not entirely intended for usage on the top part in absolute signed modes");
@@ -10977,6 +11033,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
 	static std::size_t constexpr offsetsstride{8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -11069,6 +11126,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -11119,6 +11177,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglehelpermain(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
 	assert(offsetscompanion);
@@ -11545,6 +11604,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
 	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread)noexcept{
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
 	if(usemultithread) assert(offsetscompanion);
@@ -11619,6 +11679,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>)? 80 : CHAR_BIT * sizeof(T)};
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
 
@@ -11925,6 +11986,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -12425,6 +12491,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -12670,6 +12738,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<128 == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -13081,6 +13151,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -13214,6 +13288,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -13718,6 +13795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -13846,6 +13924,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -14425,6 +14504,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -14883,6 +14967,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 		;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -15140,6 +15226,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{80 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -15537,6 +15625,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 < CHAR_BIT * sizeof(long double)),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -15700,6 +15792,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -16189,6 +16284,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -16347,6 +16443,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -16886,6 +16983,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -17300,6 +17402,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -17463,6 +17567,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -17724,6 +17830,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -17861,6 +17971,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -18367,6 +18480,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -18499,6 +18613,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -19033,6 +19148,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -19427,6 +19547,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -19639,6 +19761,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	static std::size_t constexpr offsetsstride{128 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -19989,6 +20113,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
 	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -20150,6 +20278,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -20663,6 +20794,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -20819,6 +20951,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -21346,6 +21479,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -21760,6 +21898,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -21957,6 +22097,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -22254,6 +22396,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -22391,6 +22537,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -22802,6 +22951,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -22934,6 +23084,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -23413,6 +23564,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -23781,6 +23937,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -24031,6 +24189,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 	static std::size_t constexpr offsetsstride{64 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -24421,6 +24581,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -24574,6 +24736,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -24989,6 +25152,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -25137,6 +25301,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -25599,6 +25764,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -27724,6 +27894,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -27863,6 +28035,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -28072,6 +28246,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -28205,6 +28383,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -29909,6 +30090,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -30037,6 +30219,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -32141,6 +32324,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
+	assert(input != pout);
+	if constexpr(isrevorder && isinputconst){
+		assert(input != splitparameter<false>(varparameters...));
+		assert(pout != splitparameter<false>(varparameters...));
+	}
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -34201,6 +34389,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(7 <= count);// this function is not for small arrays, 8 is the minimum original array count for 16-bit inputs
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -34371,6 +34561,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	static std::size_t constexpr offsetsstride{CHAR_BIT * sizeof(T) * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)};// shrink the offsets size if possible
 	assert(count && count != SIZE_MAX);
+	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
+	assert(pdst != pdstnext);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pdst);
@@ -34637,6 +34829,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
+	assert(1 < allowedthreads);
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -34784,6 +34980,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -36531,6 +36730,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -36673,6 +36873,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -38764,6 +38965,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::array<X, 8 * 256 / 8 - (isabsvalue && issignmode) * (256 / 2 - !isfltpmode)>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[], T pout[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(input != pout);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -38949,6 +39151,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocsinglesortmtc(std::size_t count, T const psrclo[], T pdst[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -39015,6 +39218,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocsinglesimplesortmtc(std::size_t count, T pdst[], X const offsets[], X const offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(3 <= count);// this function is not for small arrays, 4 is the minimum original array count
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(pdst);
 	assert(offsets);
@@ -39112,6 +39316,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoallocsinglesortmain(std::size_t count, T const psrclo[], T pdst[], X offsets[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
+	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -39234,11 +39439,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglesimplesortmain(T pdst[], X const offsets[], X const offsetscompanion[], unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
+	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(pdst);
 	assert(offsets);
-
 	if constexpr(ismultithreadcapable) if(usemultithread) assert(offsetscompanion);
+
 	// the code here is mainly copied from generateoffsetssinglemain()
 	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	// Determining the starting point depends on several factors here.
@@ -39405,6 +39611,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -39497,6 +39705,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -39579,6 +39789,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -39873,6 +40084,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -40068,6 +40280,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
 	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -40160,6 +40373,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	assert(1 < allowedthreads);
 	// do not pass a nullptr here
 	assert(input);
 
@@ -40241,6 +40455,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -40719,6 +40934,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
+	assert(input != pout);
 	// do not pass a nullptr here
 	assert(input);
 	assert(pout);
@@ -40852,6 +41068,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(15 <= count);// this function is not for small arrays, 16 is the minimum original array count
+	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -40927,6 +41144,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
+	assert(psrclo != pdst);
 	// do not pass a nullptr here
 	assert(psrclo);
 	assert(pdst);
@@ -41069,6 +41287,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(1 < allowedthreads);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -41193,6 +41413,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -41508,6 +41729,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1 < allowedthreads);
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -41632,6 +41854,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		assert(1 < std::thread::hardware_concurrency());// only use multithreading if there is more than one hardware thread
 		assert(15 <= count);// a 0 or 1 count array is only allowed here in single-threaded function mode
 	}
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -41950,6 +42173,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42032,6 +42260,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42122,6 +42355,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
 	void> radixsortnoallocsingle(std::size_t count, T input[])noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42202,6 +42438,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42283,6 +42524,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42370,6 +42616,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42453,6 +42707,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42538,6 +42797,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -42620,6 +42887,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	// select the smallest unsigned type for the indices
 	// architecture: this compiles into just a few conditional move instructions on most platforms
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
@@ -44829,6 +45101,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -45193,6 +45466,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -45409,6 +45683,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned reportedcores,
 #endif
 		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -45579,6 +45856,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned reportedcores,
 #endif
 		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -45745,6 +46023,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -46356,6 +46635,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
 	using M = std::conditional_t<std::is_integral_v<U>, U, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -46737,6 +47017,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortcopynoallocmulti6thread
 #endif
 	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -46892,6 +47175,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	radixsortnoallocmulti6thread
 #endif
 	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -47068,6 +47352,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned reportedcores,
 #endif
 		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -47270,6 +47557,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		unsigned reportedcores,
 #endif
 		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -47461,6 +47749,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -47664,6 +47955,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -47879,6 +48171,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -48099,6 +48392,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -48237,6 +48531,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -48399,6 +48696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -48560,6 +48858,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -48932,6 +49231,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
 	assert(2 < count);
+	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -49171,6 +49471,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -49325,6 +49628,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -49495,6 +49799,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -49689,6 +49996,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -49883,6 +50191,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
@@ -50091,6 +50402,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
+	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
@@ -50528,6 +50840,12 @@ RSBD8_FUNC_INLINE void deallocatearray(T *buffer
 	, std::size_t allocsize
 #endif
 	)noexcept{
+#if !defined(_WIN32) && defined(_POSIX_C_SOURCE)// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
+	assert(allocsize);
+#endif
+	// do not pass a nullptr here
+	assert(buffer);
+
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 	BOOL boVirtualFree{VirtualFree(buffer, 0, MEM_RELEASE)};
 	static_cast<void>(boVirtualFree);
@@ -50579,6 +50897,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50597,6 +50923,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50614,6 +50945,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[])noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50631,6 +50967,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, T>(count, input, output);
 }
@@ -50643,6 +50987,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[])noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50663,6 +51012,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[])noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50684,6 +51036,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50707,6 +51064,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T input[], bool movetobuffer)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50738,6 +51098,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50791,6 +51154,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -50836,6 +51204,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		)noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original.
 	assert(!(largepagesize - 1 & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
@@ -50856,6 +51229,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50878,6 +51259,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	128 >= CHAR_BIT * sizeof(T) &&
 	8 < CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50899,6 +51285,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], vararguments... varparameters)noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50920,6 +51311,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, varparameters...);
 }
@@ -50932,6 +51331,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], vararguments... varparameters)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50954,6 +51358,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8 >= CHAR_BIT * sizeof(T),
 	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -50986,6 +51395,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51032,6 +51444,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51083,6 +51500,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<direction, mode, indirection2, isindexed2, T>(count, input, output, varparameters...);
 	return{true};
@@ -51097,6 +51519,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -51114,6 +51544,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -51135,6 +51570,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -51149,6 +51589,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	helper::radixsortcopynoallocsingle<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
@@ -51166,6 +51614,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -51183,6 +51636,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, T>};
 	static bool constexpr issignmode{helper::issignmode<mode, T>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, T>};
@@ -51211,6 +51669,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	// do not pass a nullptr here
+	assert(input);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51255,6 +51716,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51304,6 +51770,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 	return{true};
@@ -51316,6 +51787,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
@@ -51336,6 +51815,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
@@ -51360,6 +51844,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
@@ -51378,6 +51867,14 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
+	assert(input != output);
+	assert(input != buffer);
+	assert(output != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+	assert(buffer);
+
 	static_cast<void>(buffer);// the single-part version never needs an extra buffer
 	helper::radixsortcopynoallocsingle<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 }
@@ -51393,6 +51890,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
@@ -51413,6 +51915,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8 >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
 	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
+	assert(input != buffer);
+	// do not pass a nullptr here
+	assert(input);
+	assert(buffer);
+
 	static bool constexpr isabsvalue{helper::isabsvalue<mode, std::remove_pointer_t<T>>};
 	static bool constexpr issignmode{helper::issignmode<mode, std::remove_pointer_t<T>>};
 	static bool constexpr isfltpmode{helper::isfltpmode<mode, std::remove_pointer_t<T>>};
@@ -51445,6 +51952,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
+	// do not pass a nullptr here
+	assert(input);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51488,6 +51998,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
 		, vararguments... varparameters)noexcept{
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	if(1 < count){// do not attempt to allocate memory if the array is already considered sorted
 		auto
 #if defined(_POSIX_C_SOURCE)
@@ -51536,6 +52051,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 	static_cast<void>(mmapflags);
 #endif
+	assert(input != output);
+	// do not pass a nullptr here
+	assert(input);
+	assert(output);
+
 	// the single-part version never needs an extra buffer
 	radixsortcopynoalloc<T, indirection1, direction, mode, indirection2, isindexed2, V>(count, input, output, varparameters...);
 	return{true};
