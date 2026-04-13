@@ -11813,7 +11813,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	};
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
@@ -11851,7 +11851,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	};
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
@@ -11891,7 +11891,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	};
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
@@ -11928,7 +11928,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	};
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
@@ -11966,7 +11966,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	};
 	// apply clamping and rounding typecast
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
-	static double constexpr intermediate{base - (-static_cast<double>(PTRDIFF_MIN) + ((base < -static_cast<double>(PTRDIFF_MIN))? .5 : -.5))};
+	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
 	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 }
