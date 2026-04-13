@@ -2495,8 +2495,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	accumulator = __builtin_addc(accumulator, 0, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
-	accumulator += __builtin_sub_overflow_p(minuend, subtrahend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2558,8 +2556,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	accumulator = __builtin_subc(accumulator, ~0u, static_cast<unsigned>(carry), &checkcarry);
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
-	accumulator += !__builtin_sub_overflow_p(subtrahend, minuend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2628,8 +2624,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	static_cast<void>(checkcarry);
 	assert(!checkcarry);// the chosen accumulator should be big enough to never wrap-around
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
-	accumulator += __builtin_sub_overflow_p(minuend, subtrahend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
@@ -2680,8 +2674,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 	static_cast<void>(checkcarry);
 	assert(checkcarry);// the chosen accumulator should be big enough to never wrap-around
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_sub_overflow_p)
-	accumulator += !__builtin_sub_overflow_p(subtrahend, minuend, U{});
 #elif defined(_M_X64)
 	unsigned char carry;
 #if defined(__GNUC__) || defined(__clang__)// 8- and 16-bit integer issues require a workaround
