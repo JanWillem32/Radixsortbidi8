@@ -1,5 +1,5 @@
 # Radixsortbidi8
-This library implements an efficient stable sort on arrays using an 8-bit indexed, bidirectional, least significant bit first radix sort method.
+This library implements an efficient stable sort on arrays using an extensible 8-bit indexed, bidirectional, least significant bit first radix sort method.
 This is currently a single-file library, with some additional folders and files only used for its test suite.
 Sorting functionality is available for unsigned integer, signed integer, floating-point and enumeration types.
 All these sorting functions can sort ascending or descending, order forwards or reverse, and optionally filter by absolute value.
@@ -33,6 +33,7 @@ See "Performance tests" for more details about array sizes, types and achievable
 - Utilities for general purpose register count compile-time detection
 - Utilities to provide piecewise support and tests for the often padded 80-bit long double types
 - Utilities to either pass through a type or allow std::underlying_type to do its work for enum types
+- Utilities to calculate sorting loop counts and offsets lengths
 - Utilities for endianess compile-time detection
 - Utilities to provide piecewise support and tests for 64- or 128-bit types
 - Utilities to create an immediate member object pointer for the type and offset indirection wrapper functions
@@ -438,7 +439,7 @@ There will be a minimum amount of array entries where rsbd8::radixsort() starts 
 #### These test results were obtained by single-threaded performance testing on multiple sizes of blocks between .5 to 512 KiB, with fully random bits in unsigned integer and floating-point arrays (with no indirection):
 - float : 354 array entries
 - double: 426 array entries
-- uint8 :  19 array entries
+- uint8 : 19 array entries
 - uint16: 349 array entries
 - uint32: 523 array entries
 - uint64: 557 array entries
