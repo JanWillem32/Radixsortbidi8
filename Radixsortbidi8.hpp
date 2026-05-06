@@ -1534,42 +1534,50 @@ std::size_t constexpr typebitsize{// all templated variants need to be included 
 
 // the radix of the body sorting stages of a type
 template<typename T>
-unsigned constexpr typeradix{((32u == typebitsize<T> || 64u == typebitsize<T> || 128u == typebitsize<T>) && defaultgprfilesize >= gprfilesize::medium)? 11u : 8u};
+unsigned constexpr typeradix{((32u == typebitsize<T> || 64u == typebitsize<T>) && defaultgprfilesize >= gprfilesize::medium || 80u == typebitsize<T> || 128u == typebitsize<T>)? 11u : 8u};
 
 // determines if of a type the body will be split up in two during processing
 // keep split up types in sync with the basic types in each half, otherwise the processing will break at the filtertop() stage during sorting
 // the 80-bit types are not evenly split up, so these simply get special sections and functions in the code for the 64-bit low part and the 16-bit high part
 template<typename T>
-bool constexpr isoffsetsbodysplitup{64u == typebitsize<T> && 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX || 128u == typebitsize<T>};
+bool constexpr isoffsetsbodysplitup{(64u == typebitsize<T> || 80u == typebitsize<T>) && 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX || 128u == typebitsize<T>};
 
 // the number of loop iterations of a type to process, halved if the body will be split up in two during processing
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
-unsigned constexpr offsetsloopcountsplitup{((typebitsize<T> >> static_cast<unsigned>(isoffsetsbodysplitup<T>)) + typeradix<T> - 1u) / typeradix<T>};
+unsigned constexpr offsetsloopcountsplitup{((((80u == typebitsize<T>)? 64u : typebitsize<T>) >> static_cast<unsigned>(isoffsetsbodysplitup<T>)) + typeradix<T> - 1u) / typeradix<T>};
 
 // the number of loop iterations of a type to process
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
-unsigned constexpr offsetsloopcount{offsetsloopcountsplitup<T> << static_cast<unsigned>(isoffsetsbodysplitup<T>)};
+unsigned constexpr offsetsloopcount{(offsetsloopcountsplitup<T> << static_cast<unsigned>(isoffsetsbodysplitup<T>)) + 2u * (80u == typebitsize<T>)};
 
 // the remainder radix of a type, at the top end after the body stages of a type are processed
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
-unsigned constexpr typeradixremainder{(typebitsize<T> >> static_cast<unsigned>(isoffsetsbodysplitup<T>)) - (offsetsloopcountsplitup<T> - 1u) * typeradix<T>};
+unsigned constexpr typeradixremainder{(((80u == typebitsize<T>)? 64u : typebitsize<T>) >> static_cast<unsigned>(isoffsetsbodysplitup<T>)) - (offsetsloopcountsplitup<T> - 1u) * typeradix<T>};
 
 // the length of the offsets array of a type for the body stages, shortened if the body will be split up in two during processing
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
 std::size_t constexpr offsetsbodylengthsplitup{static_cast<std::size_t>(offsetsloopcountsplitup<T> - 1u) << typeradix<T>};
 
 // the length of the offsets array of a type for the remainder stage at the top end
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
 std::size_t constexpr offsetsremainderlengthsplitup{static_cast<std::size_t>(1u) << typeradixremainder<T>};
 
 // the length of the offsets array of a type for the body stages
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<typename T>
-std::size_t constexpr offsetsbodylength{offsetsbodylengthsplitup<T> + isoffsetsbodysplitup<T> * (offsetsbodylengthsplitup<T> + offsetsremainderlengthsplitup<T>)};
+std::size_t constexpr offsetsbodylength{offsetsbodylengthsplitup<T> + isoffsetsbodysplitup<T> * (offsetsbodylengthsplitup<T> + offsetsremainderlengthsplitup<T>) + (80u == typebitsize<T>) * ((static_cast<std::size_t>(1u) << 8) + offsetsremainderlengthsplitup<T>)};
 
 // the full length of the offsets array of a type and configuration
 // this will be doubled in size for the bidirectional single-threaded mode of the implemented sorting functions
+// for the 80-bit types this will calculate it with the top two sets being fixed to 8-bit
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
-std::size_t constexpr offsetslength{offsetsbodylength<T> + offsetsremainderlengthsplitup<T> - (isabsvalue && issignmode) * ((offsetsremainderlengthsplitup<T> >> 1) - !isfltpmode)};// shrink the end of the offsets length if possible
+std::size_t constexpr offsetslength{(80u == typebitsize<T>)? offsetsbodylength<T> + (static_cast<std::size_t>(1u) << 8) - (isabsvalue && issignmode) * (((static_cast<std::size_t>(1u) << 8) >> 1) - !isfltpmode) :
+	offsetsbodylength<T> + offsetsremainderlengthsplitup<T> - (isabsvalue && issignmode) * ((offsetsremainderlengthsplitup<T> >> 1) - !isfltpmode)};// shrink the end of the offsets length if possible
 
 // Utilities for endianess compile-time detection
 //
@@ -1590,7 +1598,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	std::is_floating_point_v<stripenum<T>>,
 	T> generatehighbit()noexcept{
-	// this will definately not work on some floating-point types from machines from the digial stone age
+	// this will definately not work on some floating-point types from machines from the digital stone age
 	// however, this is a C++17 and onwards compatible library, and those devices have none of that
 	return{static_cast<T>(-0.)};
 }
@@ -1622,6 +1630,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<true, true, false>> ||
 	std::is_same_v<T, longdoubletest80<true, true, true>>,
 	T> generatehighbit()noexcept{
+	// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 	return{{0u, 0x8000u}};
 }
 
@@ -3083,7 +3092,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else if constexpr(isabsvalue && isfltpmode){// one-register filtering
 		if constexpr(typeradixremainder<T> < typebitsize<T>){
 			cur >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
-			return{static_cast<std::size_t>(cur & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode))};
+			return{static_cast<std::size_t>(cur & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode))};
 		}else if constexpr(issignmode){
 			return{static_cast<std::size_t>(cur & 1u << (typeradixremainder<T> - 1))};
 		}else{
@@ -3146,7 +3155,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		if constexpr(typeradixremainder<T> < typebitsize<T>){
 			cura >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
 			curb >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
-			return{{static_cast<std::size_t>(cura & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode)), static_cast<std::size_t>(curb & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode))}};
+			return{{static_cast<std::size_t>(cura & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode)), static_cast<std::size_t>(curb & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode))}};
 		}else if constexpr(issignmode){
 			return{{static_cast<std::size_t>(cura & 1u << (typeradixremainder<T> - 1)), static_cast<std::size_t>(curb & 1u << (typeradixremainder<T> - 1))}};
 		}else{
@@ -3244,7 +3253,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curb >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
 			curc >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
 			curd >>= typebitsize<T> - typeradixremainder<T> - !issignmode;
-			return{{static_cast<std::size_t>(cura & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode)), static_cast<std::size_t>(curb & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode)), static_cast<std::size_t>(curc & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode)), static_cast<std::size_t>(curd & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned char>(issignmode))}};
+			return{{static_cast<std::size_t>(cura & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode)), static_cast<std::size_t>(curb & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode)), static_cast<std::size_t>(curc & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode)), static_cast<std::size_t>(curd & ((1u << typeradixremainder<T>) - 1u) >> static_cast<unsigned>(issignmode))}};
 		}else if constexpr(issignmode){
 			return{{static_cast<std::size_t>(cura & 1u << (typeradixremainder<T> - 1)), static_cast<std::size_t>(curb & 1u << (typeradixremainder<T> - 1)), static_cast<std::size_t>(curc & 1u << (typeradixremainder<T> - 1)), static_cast<std::size_t>(curd & 1u << (typeradixremainder<T> - 1))}};
 		}else{
@@ -5342,6 +5351,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{static_cast<std::size_t>(cur & (1u << typeradix<T>) - 1u)};
 }
 
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
@@ -5350,22 +5360,83 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U) &&
 	8u < CHAR_BIT * sizeof(U),
-	std::size_t> filtershift(std::uint_least64_t curm, U cure, unsigned shift)noexcept{
+	std::size_t> filtershiftlo(std::uint_least64_t curm, U cure, unsigned shift)noexcept{
 	// filtering is simplified if possible
-	// this should never filter the top 16 bits
+	// this should never filter the top 48 bits
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isabsvalue && !issignmode) curm += curm;
 		curp >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};// sign-extend
-#else
 		std::uint_least32_t curq{static_cast<std::uint_least32_t>(curp)};// sign-extend
-#endif
 		if constexpr(issignmode){
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curm += curq;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
+			curmlo += curq;
+			curm = recompose64<isfltpmode>(curmlo, curmhi);
+		}
+		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
+		curmlo ^= curq;
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
+		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+		static_assert(16u == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carrysign;
+		curo = __builtin_addcs(curo, curo, 0u, &carrysign);
+		static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymid;
+		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
+		curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
+		static_cast<void>(carrymid);
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
+#elif defined(_M_IX86)
+		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
+		unsigned char carrymid{_addcarry_u32(_addcarry_u16(0u, curo, curo, &curo), curmlo, curmlo, &curmlo)};
+		static_cast<void>(carrymid);
+		curm = recompose64<isfltpmode>(curmlo, curmhi);
+#else
+		std::uint_least16_t curotmp{curo};
+		curo += curo;
+		curm += curm;
+		curm += curo < curotmp;
+#endif
+	}
+	std::uint_least32_t ret{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu) >> shift};// decompose
+	return{static_cast<std::size_t>(ret & (1u << typeradix<T>) - 1u)};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::size_t> filtershiftlo(T cur, unsigned shift)noexcept{
+	// use the function above
+	return filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(
+		cur.mantissa, static_cast<U>(cur.signexponent),
+		shift);
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::size_t> filtershifthi(std::uint_least64_t curm, U cure, unsigned shift)noexcept{
+	// filtering is simplified if possible
+	// this should never filter the top 16 bits or the bottom 32 bits
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
+		if constexpr(isabsvalue && !issignmode) curm += curm;
+		curp >>= 16 - 1;
+		std::uint_least32_t curq{static_cast<std::uint_least32_t>(curp)};// sign-extend
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymid, checkcarry;
 			std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
@@ -5386,21 +5457,58 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curm = recompose64<isfltpmode>(curmlo, curmhi);
 #endif
 		}
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		curm ^= curq;
-#else
 		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-		curmlo ^= curq;
 		curmhi ^= curq;
 		curm = recompose64<isfltpmode>(curmlo, curmhi);
-#endif
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
+		curm += curm;
+	}
+	std::uint_least32_t ret{static_cast<std::uint_least32_t>(curm >> 32) >> shift};// decompose
+	return{static_cast<std::size_t>(ret & (1u << typeradix<T>) - 1u)};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::size_t> filtershifthi(T cur, unsigned shift)noexcept{
+	// use the function above
+	return filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(
+		cur.mantissa, static_cast<U>(cur.signexponent),
+		shift);
+}
+
+#else// 64-bit and larger systems
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::size_t> filtershift(std::uint_least64_t curm, U cure, unsigned shift)noexcept{
+	// filtering is simplified if possible
+	// this should never filter the top 16 bits
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
+		if constexpr(isabsvalue && !issignmode) curm += curm;
+		curp >>= 16 - 1;
+		std::uint_least64_t curq{static_cast<std::uint_least64_t>(curp)};// sign-extend
+		if constexpr(issignmode){
+			curm += curq;
+		}
+		curm ^= curq;
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curo{static_cast<std::uint_least16_t>(cure)};
 #if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 		static_assert(16u == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysign;
 		curo = __builtin_addcs(curo, curo, 0u, &carrysign);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		static_assert(64u == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
 		unsigned long long checkcarry;
@@ -5411,23 +5519,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curm = __builtin_addcl(curm, curm, static_cast<unsigned long>(carrysign), &checkcarry);
 #endif
 		static_cast<void>(checkcarry);
-#else
-		static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long carrymid, checkcarry;
-		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-		curmlo = __builtin_addcl(curmlo, curmlo, static_cast<unsigned long>(carrysign), &carrymid);
-		curmhi = __builtin_addcl(curmhi, curmhi, carrymid, &checkcarry);
-		static_cast<void>(checkcarry);
-		curm = recompose64<isfltpmode>(curmlo, curmhi);
-#endif
 #elif defined(_M_X64)
 		unsigned char checkcarry{_addcarry_u64(_addcarry_u16(0u, curo, curo, &curo), curm, curm, &curm)};
 		static_cast<void>(checkcarry);
-#elif defined(_M_IX86)
-		std::uint_least32_t curmlo{static_cast<std::uint_least32_t>(curm & 0xFFFFFFFFu)}, curmhi{static_cast<std::uint_least32_t>(curm >> 32)};// decompose
-		unsigned char checkcarry{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curo, curo, &curo), curmlo, curmlo, &curmlo), curmhi, curmhi, &curmhi)};
-		static_cast<void>(checkcarry);
-		curm = recompose64<isfltpmode>(curmlo, curmhi);
 #else
 		std::uint_least16_t curotmp{curo};
 		curo += curo;
@@ -5453,6 +5547,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		cur.mantissa, static_cast<U>(cur.signexponent),
 		shift);
 }
+#endif
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
@@ -5915,6 +6010,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{{static_cast<std::size_t>(cura & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curb & (1u << typeradix<T>) - 1u)}};
 }
 
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
@@ -5923,31 +6019,113 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U) &&
 	8u < CHAR_BIT * sizeof(U),
-	std::array<std::size_t, 2>> filtershift(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, unsigned shift)noexcept{
+	std::array<std::size_t, 2>> filtershiftlo(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, unsigned shift)noexcept{
 	// filtering is simplified if possible
-	// this should never filter the top 16 bits
+	// this should never filter the top 48 bits
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		if constexpr(isabsvalue && !issignmode) curma += curma;
 		curpa >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};// sign-extend
-#else
 		std::uint_least32_t curqa{static_cast<std::uint_least32_t>(curpa)};// sign-extend
-#endif
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isabsvalue && !issignmode) curmb += curmb;
 		curpb >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};// sign-extend
-#else
 		std::uint_least32_t curqb{static_cast<std::uint_least32_t>(curpb)};// sign-extend
-#endif
 		if constexpr(issignmode){
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-			curma += curqa;
-			curmb += curqb;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
+			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
+			curmloa += curqa;
+			curmlob += curqb;
+			curma = recompose64<isfltpmode>(curmloa, curmhia);
+			curmb = recompose64<isfltpmode>(curmlob, curmhib);
+		}
+		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
+		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
+		curmloa ^= curqa;
+		curmlob ^= curqb;
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
+		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
+		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
+		static_assert(16u == CHAR_BIT * sizeof(short), "unexpected size of type short");
+		unsigned short carrysigna;
+		curoa = __builtin_addcs(curoa, curoa, 0u, &carrysigna);
+		static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
+		unsigned long carrymida;
+		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
+		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
+		static_cast<void>(carrymida);
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
+		unsigned short carrysignb;
+		curob = __builtin_addcs(curob, curob, 0u, &carrysignb);
+		unsigned long carrymidb;
+		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
+		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
+		static_cast<void>(carrymidb);
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
+#elif defined(_M_IX86)
+		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
+		unsigned char carrymida{_addcarry_u32(_addcarry_u16(0u, curoa, curoa, &curoa), curmloa, curmloa, &curmloa)};
+		static_cast<void>(carrymida);
+		curma = recompose64<isfltpmode>(curmloa, curmhia);
+		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
+		unsigned char carrymidb{_addcarry_u32(_addcarry_u16(0u, curob, curob, &curob), curmlob, curmlob, &curmlob)};
+		static_cast<void>(carrymidb);
+		curmb = recompose64<isfltpmode>(curmlob, curmhib);
+#else
+		std::uint_least16_t curotmpa{curoa}, curotmpb{curob};
+		curoa += curoa;
+		curma += curma;
+		curma += curoa < curotmpa;
+		curob += curob;
+		curmb += curmb;
+		curmb += curob < curotmpb;
+#endif
+	}
+	std::uint_least32_t retlo{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu) >> shift}, rethi{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu) >> shift};// decompose
+	return{{static_cast<std::size_t>(retlo & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(rethi & (1u << typeradix<T>) - 1u)}};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::array<std::size_t, 2>> filtershiftlo(T cura, T curb, unsigned shift)noexcept{
+	// use the function above
+	return filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(
+		cura.mantissa, static_cast<U>(cura.signexponent),
+		curb.mantissa, static_cast<U>(curb.signexponent),
+		shift);
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::array<std::size_t, 2>> filtershifthi(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, unsigned shift)noexcept{
+	// filtering is simplified if possible
+	// this should never filter the top 16 bits or the bottom 32 bits
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
+		if constexpr(isabsvalue && !issignmode) curma += curma;
+		curpa >>= 16 - 1;
+		std::uint_least32_t curqa{static_cast<std::uint_least32_t>(curpa)};// sign-extend
+		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
+		if constexpr(isabsvalue && !issignmode) curmb += curmb;
+		curpb >>= 16 - 1;
+		std::uint_least32_t curqb{static_cast<std::uint_least32_t>(curpb)};// sign-extend
+		if constexpr(issignmode){
+#if (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
 			static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
 			unsigned long carrymida, checkcarrya;
 			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
@@ -5983,19 +6161,63 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #endif
 		}
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
-		curma ^= curqa;
-		curmb ^= curqb;
-#else
 		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
 		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		curmloa ^= curqa;
 		curmhia ^= curqa;
-		curmlob ^= curqb;
 		curmhib ^= curqb;
 		curma = recompose64<isfltpmode>(curmloa, curmhia);
 		curmb = recompose64<isfltpmode>(curmlob, curmhib);
-#endif
+	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
+		curma += curma;
+		curmb += curmb;
+	}
+	std::uint_least32_t retlo{static_cast<std::uint_least32_t>(curma >> 32) >> shift}, rethi{static_cast<std::uint_least32_t>(curmb >> 32) >> shift};// decompose
+	return{{static_cast<std::size_t>(retlo & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(rethi & (1u << typeradix<T>) - 1u)}};
+}
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::array<std::size_t, 2>> filtershifthi(T cura, T curb, unsigned shift)noexcept{
+	// use the function above
+	return filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(
+		cura.mantissa, static_cast<U>(cura.signexponent),
+		curb.mantissa, static_cast<U>(curb.signexponent),
+		shift);
+}
+
+#else// 64-bit and larger systems
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
+RSBD8_FUNC_INLINE std::enable_if_t<
+	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
+		std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
+	std::is_unsigned_v<U> &&
+	64u >= CHAR_BIT * sizeof(U) &&
+	8u < CHAR_BIT * sizeof(U),
+	std::array<std::size_t, 2>> filtershift(std::uint_least64_t curma, U curea, std::uint_least64_t curmb, U cureb, unsigned shift)noexcept{
+	// filtering is simplified if possible
+	// this should never filter the top 16 bits
+	if constexpr(isabsvalue != isfltpmode){// two-register filtering
+		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
+		if constexpr(isabsvalue && !issignmode) curma += curma;
+		curpa >>= 16 - 1;
+		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};// sign-extend
+		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
+		if constexpr(isabsvalue && !issignmode) curmb += curmb;
+		curpb >>= 16 - 1;
+		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};// sign-extend
+		if constexpr(issignmode){
+			curma += curqa;
+			curmb += curqb;
+		}
+		curma ^= curqa;
+		curmb ^= curqb;
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
@@ -6003,7 +6225,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static_assert(16u == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysigna;
 		curoa = __builtin_addcs(curoa, curoa, 0u, &carrysigna);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		static_assert(64u == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
 		unsigned long long checkcarrya;
@@ -6014,18 +6235,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &checkcarrya);
 #endif
 		static_cast<void>(checkcarrya);
-#else
-		static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long carrymida, checkcarrya;
-		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
-		curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
-		static_cast<void>(checkcarrya);
-		curma = recompose64<isfltpmode>(curmloa, curmhia);
-#endif
 		unsigned short carrysignb;
 		curob = __builtin_addcs(curob, curob, 0u, &carrysignb);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		unsigned long long checkcarryb;
 		curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &checkcarryb);
@@ -6034,28 +6245,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &checkcarryb);
 #endif
 		static_cast<void>(checkcarryb);
-#else
-		unsigned long carrymidb, checkcarryb;
-		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
-		curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
-		static_cast<void>(checkcarryb);
-		curmb = recompose64<isfltpmode>(curmlob, curmhib);
-#endif
 #elif defined(_M_X64)
 		unsigned char checkcarrya{_addcarry_u64(_addcarry_u16(0u, curoa, curoa, &curoa), curma, curma, &curma)};
 		static_cast<void>(checkcarrya);
 		unsigned char checkcarryb{_addcarry_u64(_addcarry_u16(0u, curob, curob, &curob), curmb, curmb, &curmb)};
 		static_cast<void>(checkcarryb);
-#elif defined(_M_IX86)
-		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curoa, curoa, &curoa), curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
-		static_cast<void>(checkcarrya);
-		curma = recompose64<isfltpmode>(curmloa, curmhia);
-		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curob, curob, &curob), curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
-		static_cast<void>(checkcarryb);
-		curmb = recompose64<isfltpmode>(curmlob, curmhib);
 #else
 		std::uint_least16_t curotmpa{curoa}, curotmpb{curob};
 		curoa += curoa;
@@ -6086,6 +6280,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curb.mantissa, static_cast<U>(curb.signexponent),
 		shift);
 }
+#endif
 
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 template<bool isabsvalue, bool issignmode, bool isfltpmode>
@@ -6842,6 +7037,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{{static_cast<std::size_t>(cura & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curb & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curc & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curd & (1u << typeradix<T>) - 1u)}};
 }
 
+#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
+// the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
@@ -6857,130 +7054,29 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
 		if constexpr(isabsvalue && !issignmode) curma += curma;
 		curpa >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		std::uint_least64_t curqa{static_cast<std::uint_least64_t>(curpa)};// sign-extend
-#else
-		std::uint_least32_t curqa{static_cast<std::uint_least32_t>(curpa)};// sign-extend
-#endif
 		std::int_least16_t curpb{static_cast<std::int_least16_t>(cureb)};
 		if constexpr(isabsvalue && !issignmode) curmb += curmb;
 		curpb >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		std::uint_least64_t curqb{static_cast<std::uint_least64_t>(curpb)};// sign-extend
-#else
-		std::uint_least32_t curqb{static_cast<std::uint_least32_t>(curpb)};// sign-extend
-#endif
 		std::int_least16_t curpc{static_cast<std::int_least16_t>(curec)};
 		if constexpr(isabsvalue && !issignmode) curmc += curmc;
 		curpc >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		std::uint_least64_t curqc{static_cast<std::uint_least64_t>(curpc)};// sign-extend
-#else
-		std::uint_least32_t curqc{static_cast<std::uint_least32_t>(curpc)};// sign-extend
-#endif
 		std::int_least16_t curpd{static_cast<std::int_least16_t>(cured)};
 		if constexpr(isabsvalue && !issignmode) curmd += curmd;
 		curpd >>= 16 - 1;
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		std::uint_least64_t curqd{static_cast<std::uint_least64_t>(curpd)};// sign-extend
-#else
-		std::uint_least32_t curqd{static_cast<std::uint_least32_t>(curpd)};// sign-extend
-#endif
 		if constexpr(issignmode){
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 			curma += curqa;
 			curmb += curqb;
 			curmc += curqc;
 			curmd += curqd;
-#elif (defined(__GNUC__) || defined(__clang__) || defined(__xlC__) && (defined(__VEC__) || defined(__ALTIVEC__))) && defined(__has_builtin) && __has_builtin(__builtin_addc)
-			static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
-			unsigned long carrymida, checkcarrya;
-			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			curmloa = __builtin_addcl(curmloa, curqa, 0u, &carrymida);
-			curmhia = __builtin_addcl(curmhia, curqa, carrymida, &checkcarrya);
-			static_cast<void>(checkcarrya);
-			curma = recompose64<isfltpmode>(curmloa, curmhia);
-			unsigned long carrymidb, checkcarryb;
-			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			curmlob = __builtin_addcl(curmlob, curqb, 0u, &carrymidb);
-			curmhib = __builtin_addcl(curmhib, curqb, carrymidb, &checkcarryb);
-			static_cast<void>(checkcarryb);
-			curmb = recompose64<isfltpmode>(curmlob, curmhib);
-			unsigned long carrymidc, checkcarryc;
-			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			curmloc = __builtin_addcl(curmloc, curqc, 0u, &carrymidc);
-			curmhic = __builtin_addcl(curmhic, curqc, carrymidc, &checkcarryc);
-			static_cast<void>(checkcarryc);
-			curmc = recompose64<isfltpmode>(curmloc, curmhic);
-			unsigned long carrymidd, checkcarryd;
-			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			curmlod = __builtin_addcl(curmlod, curqd, 0u, &carrymidd);
-			curmhid = __builtin_addcl(curmhid, curqd, carrymidd, &checkcarryd);
-			static_cast<void>(checkcarryd);
-			curmd = recompose64<isfltpmode>(curmlod, curmhid);
-#elif defined(_M_IX86)
-			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(0u, curmloa, curqa, &curmloa), curmhia, curqa, &curmhia)};
-			static_cast<void>(checkcarrya);
-			curma = recompose64<isfltpmode>(curmloa, curmhia);
-			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(0u, curmlob, curqb, &curmlob), curmhib, curqb, &curmhib)};
-			static_cast<void>(checkcarryb);
-			curmb = recompose64<isfltpmode>(curmlob, curmhib);
-			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(0u, curmloc, curqc, &curmloc), curmhic, curqc, &curmhic)};
-			static_cast<void>(checkcarryc);
-			curmc = recompose64<isfltpmode>(curmloc, curmhic);
-			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(0u, curmlod, curqd, &curmlod), curmhid, curqd, &curmhid)};
-			static_cast<void>(checkcarryd);
-			curmd = recompose64<isfltpmode>(curmlod, curmhid);
-#else
-			std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-			std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-			std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-			std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-			curmloa += curqa;
-			curmhia += curqa;
-			curmhia += curmloa < curqa;
-			curmlob += curqb;
-			curmhib += curqb;
-			curmhib += curmlob < curqb;
-			curmloc += curqc;
-			curmhic += curqc;
-			curmhic += curmloc < curqc;
-			curmlod += curqd;
-			curmhid += curqd;
-			curmhid += curmlod < curqd;
-			curma = recompose64<isfltpmode>(curmloa, curmhia);
-			curmb = recompose64<isfltpmode>(curmlob, curmhib);
-			curmc = recompose64<isfltpmode>(curmloc, curmhic);
-			curmd = recompose64<isfltpmode>(curmlod, curmhid);
-#endif
 		}
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 		curma ^= curqa;
 		curmb ^= curqb;
 		curmc ^= curqc;
 		curmd ^= curqd;
-#else
-		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-		std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-		curmloa ^= curqa;
-		curmhia ^= curqa;
-		curmlob ^= curqb;
-		curmhib ^= curqb;
-		curmloc ^= curqc;
-		curmhic ^= curqc;
-		curmlod ^= curqd;
-		curmhid ^= curqd;
-		curma = recompose64<isfltpmode>(curmloa, curmhia);
-		curmb = recompose64<isfltpmode>(curmlob, curmhib);
-		curmc = recompose64<isfltpmode>(curmloc, curmhic);
-		curmd = recompose64<isfltpmode>(curmlod, curmhid);
-#endif
 	}else if constexpr(isabsvalue && !issignmode && isfltpmode){// one-register filtering
 		std::uint_least16_t curoa{static_cast<std::uint_least16_t>(curea)};
 		std::uint_least16_t curob{static_cast<std::uint_least16_t>(cureb)};
@@ -6990,7 +7086,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static_assert(16u == CHAR_BIT * sizeof(short), "unexpected size of type short");
 		unsigned short carrysigna;
 		curoa = __builtin_addcs(curoa, curoa, 0u, &carrysigna);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		static_assert(64u == CHAR_BIT * sizeof(long long), "unexpected size of type long long");
 		unsigned long long checkcarrya;
@@ -7001,18 +7096,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curma = __builtin_addcl(curma, curma, static_cast<unsigned long>(carrysigna), &checkcarrya);
 #endif
 		static_cast<void>(checkcarrya);
-#else
-		static_assert(32u == CHAR_BIT * sizeof(long), "unexpected size of type long");
-		unsigned long carrymida, checkcarrya;
-		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		curmloa = __builtin_addcl(curmloa, curmloa, static_cast<unsigned long>(carrysigna), &carrymida);
-		curmhia = __builtin_addcl(curmhia, curmhia, carrymida, &checkcarrya);
-		static_cast<void>(checkcarrya);
-		curma = recompose64<isfltpmode>(curmloa, curmhia);
-#endif
 		unsigned short carrysignb;
 		curob = __builtin_addcs(curob, curob, 0u, &carrysignb);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		unsigned long long checkcarryb;
 		curmb = __builtin_addcll(curmb, curmb, static_cast<unsigned long long>(carrysignb), &checkcarryb);
@@ -7021,17 +7106,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmb = __builtin_addcl(curmb, curmb, static_cast<unsigned long>(carrysignb), &checkcarryb);
 #endif
 		static_cast<void>(checkcarryb);
-#else
-		unsigned long carrymidb, checkcarryb;
-		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		curmlob = __builtin_addcl(curmlob, curmlob, static_cast<unsigned long>(carrysignb), &carrymidb);
-		curmhib = __builtin_addcl(curmhib, curmhib, carrymidb, &checkcarryb);
-		static_cast<void>(checkcarryb);
-		curmb = recompose64<isfltpmode>(curmlob, curmhib);
-#endif
 		unsigned short carrysignc;
 		curoc = __builtin_addcs(curoc, curoc, 0u, &carrysignc);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		unsigned long long checkcarryc;
 		curmc = __builtin_addcll(curmc, curmc, static_cast<unsigned long long>(carrysignc), &checkcarryc);
@@ -7040,17 +7116,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmc = __builtin_addcl(curmc, curmc, static_cast<unsigned long>(carrysignc), &checkcarryc);
 #endif
 		static_cast<void>(checkcarryc);
-#else
-		unsigned long carrymidc, checkcarryc;
-		std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-		curmloc = __builtin_addcl(curmloc, curmloc, static_cast<unsigned long>(carrysignc), &carrymidc);
-		curmhic = __builtin_addcl(curmhic, curmhic, carrymidc, &checkcarryc);
-		static_cast<void>(checkcarryc);
-		curmc = recompose64<isfltpmode>(curmloc, curmhic);
-#endif
 		unsigned short carrysignd;
 		curod = __builtin_addcs(curod, curod, 0u, &carrysignd);
-#if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		unsigned long long checkcarryd;
 		curmd = __builtin_addcll(curmd, curmd, static_cast<unsigned long long>(carrysignd), &checkcarryd);
@@ -7059,14 +7126,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curmd = __builtin_addcl(curmd, curmd, static_cast<unsigned long>(carrysignd), &checkcarryd);
 #endif
 		static_cast<void>(checkcarryd);
-#else
-		unsigned long carrymidd, checkcarryd;
-		std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-		curmlod = __builtin_addcl(curmlod, curmlod, static_cast<unsigned long>(carrysignd), &carrymidd);
-		curmhid = __builtin_addcl(curmhid, curmhid, carrymidd, &checkcarryd);
-		static_cast<void>(checkcarryd);
-		curmd = recompose64<isfltpmode>(curmlod, curmhid);
-#endif
 #elif defined(_M_X64)
 		unsigned char checkcarrya{_addcarry_u64(_addcarry_u16(0u, curoa, curoa, &curoa), curma, curma, &curma)};
 		static_cast<void>(checkcarrya);
@@ -7076,23 +7135,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		static_cast<void>(checkcarryc);
 		unsigned char checkcarryd{_addcarry_u64(_addcarry_u16(0u, curod, curod, &curod), curmd, curmd, &curmd)};
 		static_cast<void>(checkcarryd);
-#elif defined(_M_IX86)
-		std::uint_least32_t curmloa{static_cast<std::uint_least32_t>(curma & 0xFFFFFFFFu)}, curmhia{static_cast<std::uint_least32_t>(curma >> 32)};// decompose
-		unsigned char checkcarrya{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curoa, curoa, &curoa), curmloa, curmloa, &curmloa), curmhia, curmhia, &curmhia)};
-		static_cast<void>(checkcarrya);
-		curma = recompose64<isfltpmode>(curmloa, curmhia);
-		std::uint_least32_t curmlob{static_cast<std::uint_least32_t>(curmb & 0xFFFFFFFFu)}, curmhib{static_cast<std::uint_least32_t>(curmb >> 32)};// decompose
-		unsigned char checkcarryb{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curob, curob, &curob), curmlob, curmlob, &curmlob), curmhib, curmhib, &curmhib)};
-		static_cast<void>(checkcarryb);
-		curmb = recompose64<isfltpmode>(curmlob, curmhib);
-		std::uint_least32_t curmloc{static_cast<std::uint_least32_t>(curmc & 0xFFFFFFFFu)}, curmhic{static_cast<std::uint_least32_t>(curmc >> 32)};// decompose
-		unsigned char checkcarryc{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curoc, curoc, &curoc), curmloc, curmloc, &curmloc), curmhic, curmhic, &curmhic)};
-		static_cast<void>(checkcarryc);
-		curmc = recompose64<isfltpmode>(curmloc, curmhic);
-		std::uint_least32_t curmlod{static_cast<std::uint_least32_t>(curmd & 0xFFFFFFFFu)}, curmhid{static_cast<std::uint_least32_t>(curmd >> 32)};// decompose
-		unsigned char checkcarryd{_addcarry_u32(_addcarry_u32(_addcarry_u16(0u, curod, curod, &curod), curmlod, curmlod, &curmlod), curmhid, curmhid, &curmhid)};
-		static_cast<void>(checkcarryd);
-		curmd = recompose64<isfltpmode>(curmlod, curmhid);
 #else
 		std::uint_least16_t curotmpa{curoa}, curotmpb{curob}, curotmpc{curoc}, curotmpd{curod};
 		curoa += curoa;
@@ -7116,6 +7158,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	return{{static_cast<std::size_t>(curma & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curmb & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curmc & (1u << typeradix<T>) - 1u), static_cast<std::size_t>(curmd & (1u << typeradix<T>) - 1u)}};
 }
 
+// the variant with 4 items is only used on 64-bit and larger systems
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
@@ -7133,6 +7176,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		curd.mantissa, static_cast<U>(curd.signexponent),
 		shift);
 }
+#endif
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename U>
 RSBD8_FUNC_INLINE std::enable_if_t<
@@ -11007,7 +11051,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetshelpershared(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetshelpernotshared(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -11210,37 +11254,77 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 	// transform counts into base offsets
 	// transform the top set of offsets first and work downwards to keep the cache hot for the first few stages
+	// distribution pattern tables when multithreading
+	// symbols: [M] main thread, [C] companion thread, [S] shared in half between threads, [$] 32-bit and smaller systems only
+	// entry on the left: for all modes except for the regular absolute signed and absolute floating-point modes
+	// entry on the right: for the regular absolute signed and absolute floating-point modes
+	// table for when in extensible mode, sets ordered in low to high bits
+	// set| _ 0| _ 1| _ 2| _ 3| _ 4| _ 5| _ 6| _ 7| _ 8| _ 9| _10| _11
+	// 128: M S, M M, M M, M M, M M, M M, C C, C C, C C, C C, C C, C S
+	// _80: S S, M M, M M, C C, C C, S S, M S, C S
+	// $80: M M, M M, M M, C C, C C, C C, M S, C S
+	// _64: M S, M M, M M, C C, C C, C S
+	// $64: M M, M M, M S, C C, C C, C S
+	// _32: M M, C C, S S
+	// table for when in 8-bit mode, sets ordered in low to high bits
+	// set| _ 0| _ 1| _ 2| _ 3| _ 4| _ 5| _ 6| _ 7
+	// _64: M S, M M, M M, M M, C C, C C, C C, C S
+	// _56: S M, M M, M M, M C, C C, C C, C S
+	// _48: M S, M M, M M, C C, C C, C S
+	// _40: S M, M M, M C, C C, C S
+	// _32: M S, M M, C C, C S
+	// _24: S M, M C, C S
+	// _16: M S, C S
+	// __8: S S
 	// the companion thread mostly handles the top sets
 	X *tbase{offsets + offsetsbodylength<T>};
 	X *ubase{offsetscompanion + offsetsbodylength<T>};
 	unsigned skipsteps, paritybool;// only the main thread may initialise at 0 or 1 for the parity
 	if constexpr(!isoffsetsbodysplitup<T> || typeradixremainder<T> == typeradix<T>){// no split in the radix bit pattern for this type
 		// the topmost and bottommost sets can be shared between the main and companion thread here
-		if constexpr(typeradixremainder<T> != typeradix<T> || issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
-			if constexpr(typeradixremainder<T> != typeradix<T> || isabsvalue) paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradixremainder<T>>(count, tbase, ubase);
-			else paritybool = generateoffsetshelpershared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradixremainder<T>>(count, tbase, ubase);
+		// handle the topmost 3 for 80-bit, or the topmost 1 for other types first
+		if constexpr(80u == typebitsize<T> || typeradixremainder<T> != typeradix<T> || issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
+			if constexpr(80u != typebitsize<T> && typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode) paritybool = generateoffsetssinglemtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase);
+			else paritybool = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase);
+			skipsteps = paritybool << (offsetsloopcount<T> - 1u);
+			if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+				if constexpr(isabsvalue && issignmode){
+					tbase -= 1u << 8u;
+					ubase -= 1u << 8u;
+					unsigned bhi{generateoffsetssinglemtc<isdescsort, false, false, false, false, X, 8u>(count, tbase, ubase)};
+					tbase -= 1u << typeradixremainder<T>;
+					ubase -= 1u << typeradixremainder<T>;
+					paritybool ^= bhi;
+					skipsteps |= bhi << (offsetsloopcount<T> - 2u);
+				}else{
+					tbase -= (1u << 8u) + (1u << typeradixremainder<T>);
+					ubase -= (1u << 8u) + (1u << typeradixremainder<T>);
+				}
+				unsigned blo{generateoffsetssinglemtc<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase)};
+				paritybool ^= blo;
+				skipsteps |= blo << (offsetsloopcount<T> - 3u);
+			}
 			tbase -= 1u << typeradix<T>;
 			ubase -= 1u << typeradix<T>;
-			skipsteps = paritybool << (offsetsloopcount<T> - 1u);
 		}else{
 			paritybool = 0u;
 			skipsteps = 0u;
 		}
 		// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
-		static unsigned constexpr fullsets{offsetsloopcount<T> - (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)};
+		static unsigned constexpr fullsets{offsetsloopcount<T> - 2u * (80u == typebitsize<T>) - (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)};
 		static unsigned constexpr halfsets{fullsets >> 1};
 		static unsigned constexpr kbase{halfsets - (typeradixremainder<T> == typeradix<T> && !isabsvalue && issignmode)};
 		if constexpr(1u < kbase){
 			unsigned k{kbase};
 			do{// handle these sets like regular unsigned
-				unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 				tbase -= 1u << typeradix<T>;
 				ubase -= 1u << typeradix<T>;
 				paritybool ^= b;
 				skipsteps |= b << (k + offsetsloopcount<T> - 1u - halfsets);
 			}while(--k);
 		}else if constexpr(1u == kbase){// handle this set like regular unsigned
-			unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 			paritybool ^= b;
 			//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 			//ubase -= 1u << typeradix<T>; not necessary since this is the last set in the body
@@ -11254,16 +11338,34 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}else{// split in the radix bit pattern for this type
 		// both or none of the top sets of the halves (which are using typeradixremainder<T>) are shared between the main and companion thread here
-		if constexpr(isabsvalue && issignmode) paritybool = generateoffsetssinglehelpermtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradixremainder<T>>(count, tbase, ubase);
-		else paritybool = generateoffsetshelpershared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradixremainder<T>>(count, tbase, ubase);
+		// handle the topmost 2 + 1 for 80-bit, or the topmost 1 for other types first
+		if constexpr(isabsvalue && issignmode) paritybool = generateoffsetssinglehelpermtc<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase);
+		else paritybool = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase);
+		skipsteps = paritybool << (offsetsloopcountsplitup<T> - 1u);
+		if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+			if constexpr(isabsvalue && issignmode){
+				tbase -= 1u << 8u;
+				ubase -= 1u << 8u;
+				unsigned bhi{generateoffsetssinglemtc<isdescsort, false, false, false, false, X, 8u>(count, tbase, ubase)};
+				tbase -= 1u << typeradixremainder<T>;
+				ubase -= 1u << typeradixremainder<T>;
+				paritybool ^= bhi;
+				skipsteps |= bhi << (offsetsloopcountsplitup<T> - 2u);
+			}else{
+				tbase -= (1u << 8u) + (1u << typeradixremainder<T>);
+				ubase -= (1u << 8u) + (1u << typeradixremainder<T>);
+			}
+			unsigned blo{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase)};
+			paritybool ^= blo;
+			skipsteps |= blo << (offsetsloopcountsplitup<T> - 2u);
+		}
 		tbase -= 1u << typeradix<T>;
 		ubase -= 1u << typeradix<T>;
-		skipsteps = paritybool << (offsetsloopcountsplitup<T> - 1u);
 		// handle the body sets
 		if constexpr(2u < offsetsloopcountsplitup<T>){
 			signed k{static_cast<signed>(offsetsloopcountsplitup<T> - 2u)};
 			do{// handle these sets like regular unsigned
-				unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 				tbase -= 1u << typeradix<T>;
 				ubase -= 1u << typeradix<T>;
 				paritybool ^= b;
@@ -11271,7 +11373,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				--k;
 			}while(0 <= k);
 		}else if constexpr(2u == offsetsloopcountsplitup<T>){// handle this set like regular unsigned
-			unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+			unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 			tbase -= 1u << typeradix<T>;
 			ubase -= 1u << typeradix<T>;
 			paritybool ^= b;
@@ -11724,14 +11826,24 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(1u & offsetsloopcount<T>) paritybool ^= 1;// when the maximum amount of steps is odd, the parity starts off flipped
 	X *tbase{offsets + offsetsbodylength<T>};
 	unsigned skipsteps;
-	if constexpr(typeradixremainder<T> != typeradix<T> || issignmode){// start off with different radix or signed handling on the top
-		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradixremainder<T>>(count, tbase)};
-		tbase -= 1u << typeradix<T>;
+	if constexpr(80u == typebitsize<T> || typeradixremainder<T> != typeradix<T> || issignmode){// start off with different radix or signed handling on the top
+		unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
+		tbase -= 1u << ((80u == typebitsize<T>)? 8u : typeradix<T>);
 		paritybool ^= b;
 		skipsteps = b << (offsetsloopcount<T> - 1u);
 	}else skipsteps = 0u;
+	if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+		unsigned bhi{generateoffsetssinglemain<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+		tbase -= 1u << typeradixremainder<T>;
+		paritybool ^= bhi;
+		skipsteps = bhi << (offsetsloopcount<T> - 2u);
+		unsigned blo{generateoffsetssinglemain<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+		tbase -= 1u << typeradix<T>;
+		paritybool ^= blo;
+		skipsteps = blo << (offsetsloopcount<T> - 3u);
+	}
 	// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
-	static signed constexpr kbase{static_cast<signed>(((isoffsetsbodysplitup<T> && typeradixremainder<T> != typeradix<T>)? offsetsloopcountsplitup<T> : offsetsloopcount<T>) - 1u - (typeradixremainder<T> != typeradix<T> || issignmode))};
+	static signed constexpr kbase{static_cast<signed>(((80u == typebitsize<T> || isoffsetsbodysplitup<T> && typeradixremainder<T> != typeradix<T>)? offsetsloopcountsplitup<T> : offsetsloopcount<T>) - 1u - (typeradixremainder<T> != typeradix<T> || issignmode))};
 	if constexpr(((!isoffsetsbodysplitup<T> || typeradixremainder<T> == typeradix<T>) && isabsvalue && !issignmode && isfltpmode)? 0 < kbase : 0 <= kbase){
 		signed k{kbase};
 		do{// handle these sets like regular unsigned
@@ -11803,24 +11915,79 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	X *tbase{offsets + offsetsbodylength<T>};
 	unsigned skipsteps;
 	if(usemultithread){
+		// distribution pattern tables when multithreading
+		// symbols: [M] main thread, [C] companion thread, [S] shared in half between threads, [$] 32-bit and smaller systems only
+		// entry on the left: for all modes except for the regular absolute signed and absolute floating-point modes
+		// entry on the right: for the regular absolute signed and absolute floating-point modes
+		// table for when in extensible mode, sets ordered in low to high bits
+		// set| _ 0| _ 1| _ 2| _ 3| _ 4| _ 5| _ 6| _ 7| _ 8| _ 9| _10| _11
+		// 128: M S, M M, M M, M M, M M, M M, C C, C C, C C, C C, C C, C S
+		// _80: S S, M M, M M, C C, C C, S S, M S, C S
+		// $80: M M, M M, M M, C C, C C, C C, M S, C S
+		// _64: M S, M M, M M, C C, C C, C S
+		// $64: M M, M M, M S, C C, C C, C S
+		// _32: M M, C C, S S
+		// table for when in 8-bit mode, sets ordered in low to high bits
+		// set| _ 0| _ 1| _ 2| _ 3| _ 4| _ 5| _ 6| _ 7
+		// _64: M S, M M, M M, M M, C C, C C, C C, C S
+		// _56: S M, M M, M M, M C, C C, C C, C S
+		// _48: M S, M M, M M, C C, C C, C S
+		// _40: S M, M M, M C, C C, C S
+		// _32: M S, M M, C C, C S
+		// _24: S M, M C, C S
+		// _16: M S, C S
+		// __8: S S
 		// the main thread mostly handles the bottom sets
 		X *ubase{offsetscompanion + offsetsbodylength<T>};
 		if constexpr(!isoffsetsbodysplitup<T> || typeradixremainder<T> == typeradix<T>){// no split in the radix bit pattern for this type
 			// the topmost and bottommost sets can be shared between the main and companion thread here
-			if constexpr(typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
-				unsigned b{generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradixremainder<T>>(count, tbase, ubase)};
+			// handle the topmost 3 for 80-bit, or the topmost 1 for other types first
+			static unsigned constexpr fullsets{offsetsloopcount<T> - 2u * (80u == typebitsize<T>) - (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)};
+			static unsigned constexpr halfsets{fullsets >> 1};
+			if constexpr((80u != typebitsize<T> && typeradixremainder<T> != typeradix<T>) || isabsvalue && issignmode){// start off with remainder radix or signed absolute handling on the top, split it up if absolute mode is used
+				unsigned b{generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase)};
 				paritybool ^= b;
 				skipsteps = b << (offsetsloopcount<T> - 1u);
-			}else skipsteps = 0u;
+				if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+					tbase -= 1u << 8u;
+					ubase -= 1u << 8u;
+					unsigned bhi{generateoffsetssinglehelpermain<isdescsort, false, false, false, false, X, 8u>(count, tbase, ubase)};
+					tbase -= 1u << typeradixremainder<T>;
+					ubase -= 1u << typeradixremainder<T>;
+					paritybool ^= bhi;
+					skipsteps |= bhi << (offsetsloopcount<T> - 2u);
+					unsigned blo{generateoffsetssinglehelpermain<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase)};
+					tbase -= (halfsets + 1u) << typeradix<T>;
+					ubase -= (halfsets + 1u) << typeradix<T>;
+					paritybool ^= blo;
+					skipsteps |= blo << (offsetsloopcount<T> - 3u);
+				}else{
+					tbase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
+					ubase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
+				}
+			}else if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+				tbase -= 1u << 8u;
+				ubase -= 1u << 8u;
+				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, 8u>(count, tbase, ubase)};
+				tbase -= 1u << typeradixremainder<T>;
+				ubase -= 1u << typeradixremainder<T>;
+				paritybool ^= bhi;
+				skipsteps = bhi << (offsetsloopcount<T> - 2u);
+				unsigned blo{generateoffsetssinglehelpermain<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase)};
+				tbase -= (halfsets + 1u) << typeradix<T>;
+				ubase -= (halfsets + 1u) << typeradix<T>;
+				paritybool ^= blo;
+				skipsteps |= blo << (offsetsloopcount<T> - 3u);
+			}else{
+				tbase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
+				ubase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
+				skipsteps = 0u;
+			}
 			// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
-			static unsigned constexpr fullsets{offsetsloopcount<T> - (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)};
-			static unsigned constexpr halfsets{fullsets >> 1};
-			tbase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
-			ubase -= (halfsets + (typeradixremainder<T> != typeradix<T> || isabsvalue && issignmode)) << typeradix<T>;
 			if constexpr(1u < halfsets){
 				signed k{static_cast<signed>(halfsets - 1u + (1u & fullsets | (isabsvalue && !issignmode && isfltpmode)))};
 				do{// handle these sets like regular unsigned
-					unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 					tbase -= 1u << typeradix<T>;
 					ubase -= 1u << typeradix<T>;
 					paritybool ^= b;
@@ -11828,7 +11995,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					--k;
 				}while((1u & fullsets || isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 			}else if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) == halfsets){// handle this set like regular unsigned
-				unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 				//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				//ubase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				paritybool ^= b;
@@ -11838,35 +12005,56 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if constexpr((1u & fullsets) || isabsvalue && !issignmode && isfltpmode){
 				unsigned b;
 				if constexpr(1u & fullsets) b = generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradix<T>>(count, offsets, offsetscompanion);
-				else b = generateoffsetshelpershared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradix<T>>(count, offsets, offsetscompanion);
+				else b = generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradix<T>>(count, offsets, offsetscompanion);
 				paritybool ^= b;
 				skipsteps |= b;
 			}
 		}else{// split in the radix bit pattern for this type
 			// both or none of the top sets of the halves (which are using typeradixremainder<T>) are shared between the main and companion thread here
+			// handle the topmost 2 + 1 for 80-bit, or the topmost 1 for other types first
 			if constexpr(isabsvalue && issignmode){// start off with signed absolute handling on the top, split it up if absolute mode is used
-				unsigned b{generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradixremainder<T>>(count, tbase, ubase)};
+				unsigned b{generateoffsetssinglehelpermain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase, ubase)};
 				paritybool ^= b;
 				skipsteps = b << (offsetsloopcount<T> - 1u);
-			}else skipsteps = 0u;
+				if constexpr(80u == typebitsize<T>){// handle this set like regular unsigned
+					tbase -= 1u << 8u;
+					ubase -= 1u << 8u;
+					unsigned bhi{generateoffsetssinglehelpermain<isdescsort, false, false, false, false, T, X, 8u>(count, tbase, ubase)};
+					tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+					ubase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+					paritybool ^= bhi;
+					skipsteps = bhi << (offsetsloopcount<T> - 2u);
+				}else{
+					tbase -= (1u << 8u) + ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+					ubase -= (1u << 8u) + ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+				}
+			}else if(80u == typebitsize<T>){// handle this set like regular unsigned
+				tbase -= 1u << 8u;
+				ubase -= 1u << 8u;
+				unsigned bhi{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, 8u>(count, tbase, ubase)};
+				tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+				ubase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (2u << typeradixremainder<T>);
+				paritybool ^= bhi;
+				skipsteps = bhi << (offsetsloopcount<T> - 2u);
+			}else{
+				tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (1u << typeradixremainder<T>);
+				ubase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (1u << typeradixremainder<T>);
+				skipsteps = 0u;
+			}
 			// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
-			// the only case where 1u << typeradixremainder<T> is used in this entire of function group
-			// it's because typeradixremainder<T> is used directly afterwards (a bit counterintuitive indeed)
-			tbase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (1u << typeradixremainder<T>);
-			ubase -= ((offsetsloopcountsplitup<T> - 1u) << typeradix<T>) + (1u << typeradixremainder<T>);
 			{// handle this set like regular unsigned
 				unsigned b;
-				if constexpr(isabsvalue && issignmode) b = generateoffsetssinglehelpermain<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase, ubase);
-				else b = generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase);
+				if constexpr(80u != typebitsize<T> && isabsvalue && issignmode) b = generateoffsetssinglehelpermain<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase, ubase);
+				else b = generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradixremainder<T>>(count, tbase, ubase);
 				tbase -= 1u << typeradix<T>;
 				ubase -= 1u << typeradix<T>;
 				paritybool ^= b;
-				skipsteps = b << (offsetsloopcount<T> - 1u);
+				skipsteps = b << (offsetsloopcountsplitup<T> - 1u);
 			}
 			if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) < offsetsloopcountsplitup<T>){
 				signed k{static_cast<signed>(offsetsloopcountsplitup<T> - 2u)};
 				do{// handle these sets like regular unsigned
-					unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+					unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 					tbase -= 1u << typeradix<T>;
 					ubase -= 1u << typeradix<T>;
 					paritybool ^= b;
@@ -11874,7 +12062,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					--k;
 				}while((isabsvalue && !issignmode && isfltpmode)? 0 < k : 0 <= k);
 			}else if constexpr(1u + (isabsvalue && !issignmode && isfltpmode) == offsetsloopcountsplitup<T>){// handle this set like regular unsigned
-				unsigned b{generateoffsetshelpershared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, false, false, false, X, typeradix<T>>(count, tbase, ubase)};
 				//tbase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				//ubase -= 1u << typeradix<T>; not necessary since this is the last set in the body
 				paritybool ^= b;
@@ -11882,20 +12070,30 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 			// handle the final set if the absolute floating-point special mode is active
 			if constexpr(isabsvalue && !issignmode && isfltpmode){
-				unsigned b{generateoffsetshelpershared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradix<T>>(count, offsets, offsetscompanion)};
+				unsigned b{generateoffsetshelpernotshared<isdescsort, false, isabsvalue, issignmode, isfltpmode, X, typeradix<T>>(count, offsets, offsetscompanion)};
 				paritybool ^= b;
 				skipsteps |= b;
 			}
 		}
 	}else{// single-threaded case
-		if constexpr(typeradixremainder<T> != typeradix<T> || issignmode){// start off with different radix or signed handling on the top
-			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, typeradixremainder<T>>(count, tbase)};
-			tbase -= 1u << typeradix<T>;
+		if constexpr(80u == typebitsize<T> || typeradixremainder<T> != typeradix<T> || issignmode){// start off with different radix or signed handling on the top
+			unsigned b{generateoffsetssinglemain<isdescsort, false, isabsvalue, issignmode, isfltpmode, T, X, (80u == typebitsize<T>)? 8u : typeradixremainder<T>>(count, tbase)};
+			tbase -= 1u << ((80u == typebitsize<T>)? 8u : typeradix<T>);
 			paritybool ^= b;
 			skipsteps = b << (offsetsloopcount<T> - 1u);
 		}else skipsteps = 0u;
+		if constexpr(80u == typebitsize<T>){// handle these sets like regular unsigned
+			unsigned bhi{generateoffsetssinglemain<isdescsort, false, false, false, false, T, X, 8u>(count, tbase)};
+			tbase -= 1u << typeradixremainder<T>;
+			paritybool ^= bhi;
+			skipsteps = bhi << (offsetsloopcount<T> - 2u);
+			unsigned blo{generateoffsetssinglemain<isdescsort, false, false, false, false, T, X, typeradixremainder<T>>(count, tbase)};
+			tbase -= 1u << typeradix<T>;
+			paritybool ^= blo;
+			skipsteps = blo << (offsetsloopcount<T> - 3u);
+		}
 		// handle the body sets, but skip the lowest set if the absolute floating-point special mode is active, since that will be handled last
-		static signed constexpr kbase{static_cast<signed>(((isoffsetsbodysplitup<T> && typeradixremainder<T> != typeradix<T>)? offsetsloopcountsplitup<T> : offsetsloopcount<T>) - 1u - (typeradixremainder<T> != typeradix<T> || issignmode))};
+		static signed constexpr kbase{static_cast<signed>(((80u == typebitsize<T> || isoffsetsbodysplitup<T> && typeradixremainder<T> != typeradix<T>)? offsetsloopcountsplitup<T> : offsetsloopcount<T>) - 1u - (typeradixremainder<T> != typeradix<T> || issignmode))};
 		if constexpr(((!isoffsetsbodysplitup<T> || typeradixremainder<T> == typeradix<T>) && isabsvalue && !issignmode && isfltpmode)? 0 < kbase : 0 <= kbase){
 			signed k{kbase};
 			do{// handle these sets like regular unsigned
@@ -12169,480 +12367,417 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				// unsigned counter, not zero inclusive inside the loop
-				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
-				input += count - loc;
-				pout += loc;
-				pdst += loc;
-				do{
-					U cure{static_cast<U>(input[0].signexponent)};
-					std::uint_least64_t curm{input[0].mantissa};
-					--input;
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout, pdst);
-						++pout;
-						++pdst;
-					}
-					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[0].signexponent = static_cast<W>(cure);
-						pdst[0].signexponent = static_cast<W>(cure);
-					}
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[0].mantissa = curm;
-						pdst[0].mantissa = curm;
-					}
-					curm >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(cure0)];
-					cure &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curm0];
-					curm1 &= (1u << 8) - 1u;
-					curm2 &= (1u << 8) - 1u;
-					curm3 &= (1u << 8) - 1u;
-					curm4 &= (1u << 8) - 1u;
-					curm5 &= (1u << 8) - 1u;
-					curm6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curm)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(cure)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curm1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curm2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curm3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curm4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curm5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curm6)];
-				}while(--i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				// unsigned counter, not zero inclusive inside the loop
-				auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
-				input += count - loc;
-				pout += loc;
-				pdst += loc;
-				do{
-					U curelo{static_cast<U>(input[0].signexponent)};
-					std::uint_least64_t curmlo{input[0].mantissa};
-					U curehi{static_cast<U>(input[-1].signexponent)};
-					std::uint_least64_t curmhi{input[-1].mantissa};
-					input -= 2;
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curmlo, curelo, pout, pdst,
-							curmhi, curehi, pout + 1, pdst + 1u);
-						pout += 2;
-						pdst += 2;
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[0].signexponent = static_cast<W>(curelo);
-						pdst[0].signexponent = static_cast<W>(curelo);
-					}
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[0].mantissa = curmlo;
-						pdst[0].mantissa = curmlo;
-					}
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[1].signexponent = static_cast<W>(curehi);
-						pdst[1].signexponent = static_cast<W>(curehi);
-					}
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pout[1].mantissa = curmhi;
-						pout += 2;
-						pdst[1].mantissa = curmhi;
-						pdst += 2;
-					}
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(i -= 2);
-			}
-		}else{// !isinputconst
-			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-			T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				do{
-					U curelo{static_cast<U>(pinputlo[0].signexponent)};
-					std::uint_least64_t curmlo{pinputlo[0].mantissa};
-					U curehi{static_cast<U>(pinputhi[0].signexponent)};
-					std::uint_least64_t curmhi{pinputhi[0].mantissa};
-					// register pressure performance issue on several platforms: first do the low half here
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, poutputhi);
-						--pinputhi;
-						--poutputhi;
-					}
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputhi[0].signexponent = static_cast<W>(curelo);
-						poutputhi[0].signexponent = static_cast<W>(curelo);
-					}
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputhi[0].mantissa = curmlo;
-						--pinputhi;
-						poutputhi[0].mantissa = curmlo;
-						--poutputhi;
-					}
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the low half here second
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, poutputlo);
-						++pinputlo;
-						++poutputlo;
-					}
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].signexponent = static_cast<W>(curehi);
-						poutputlo[0].signexponent = static_cast<W>(curehi);
-					}
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].mantissa = curmhi;
-						++pinputlo;
-						poutputlo[0].mantissa = curmhi;
-						++poutputlo;
-					}
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				do{
-					U curelo{static_cast<U>(pinputlo[0].signexponent)};
-					std::uint_least64_t curmlo{pinputlo[0].mantissa};
-					U curehi{static_cast<U>(pinputhi[0].signexponent)};
-					std::uint_least64_t curmhi{pinputhi[0].mantissa};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(
-							curmlo, curelo, pinputhi, poutputhi,
-							curmhi, curehi, pinputlo, poutputlo);
-						--pinputhi;
-						--poutputhi;
-						++pinputlo;
-						++poutputlo;
-					}
-					// register pressure performance issue on several platforms: first do the low half here
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputhi[0].signexponent = static_cast<W>(curelo);
-						poutputhi[0].signexponent = static_cast<W>(curelo);
-					}
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputhi[0].mantissa = curmlo;
-						--pinputhi;
-						poutputhi[0].mantissa = curmlo;
-						--poutputhi;
-					}
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the low half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].signexponent = static_cast<W>(curehi);
-						poutputlo[0].signexponent = static_cast<W>(curehi);
-					}
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].mantissa = curmhi;
-						++pinputlo;
-						poutputlo[0].mantissa = curmhi;
-						++poutputlo;
-					}
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}
-		}
-	}else{// not in reverse order
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to one at a time when there's few registers
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
-			input += loc;
+			input += count - loc;
 			pout += loc;
+			pdst += loc;
 			do{
 				U cure{static_cast<U>(input[0].signexponent)};
 				std::uint_least64_t curm{input[0].mantissa};
-				++input;
+				--input;
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout);
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout, pdst);
 					++pout;
+					++pdst;
 				}
 				unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].signexponent = static_cast<W>(cure);
+					pdst[0].signexponent = static_cast<W>(cure);
 				}
 				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
+				unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+				unsigned curm1{static_cast<unsigned>(curm) >> 11};
+				unsigned curm2{static_cast<unsigned>(curm) >> 22};
+				unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curm4{static_cast<unsigned>(curm >> 43)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].mantissa = curm;
-					++pout;
+					pdst[0].mantissa = curm;
 				}
-				curm >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(cure0)];
-				cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				curm >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+				cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curm0];
-				curm1 &= (1u << 8) - 1u;
-				curm2 &= (1u << 8) - 1u;
-				curm3 &= (1u << 8) - 1u;
-				curm4 &= (1u << 8) - 1u;
-				curm5 &= (1u << 8) - 1u;
-				curm6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curm)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(cure)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curm1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curm2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curm3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curm4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curm5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curm6)];
+				curm1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curm2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+				curm4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curm1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
 			}while(--i);
-		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+#else// 64-bit and larger systems
+			// architecture: do not limit as much when there's a reasonable amount of registers
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
-			input += loc;
+			input += count - loc;
 			pout += loc;
+			pdst += loc;
 			do{
 				U curelo{static_cast<U>(input[0].signexponent)};
 				std::uint_least64_t curmlo{input[0].mantissa};
-				U curehi{static_cast<U>(input[1].signexponent)};
-				std::uint_least64_t curmhi{input[1].mantissa};
-				input += 2;
+				U curehi{static_cast<U>(input[-1].signexponent)};
+				std::uint_least64_t curmhi{input[-1].mantissa};
+				input -= 2;
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
-						curmlo, curelo, pout,
-						curmhi, curehi, pout + 1u);
+						curmlo, curelo, pout, pdst,
+						curmhi, curehi, pout + 1, pdst + 1u);
 					pout += 2;
+					pdst += 2;
 				}
-				// register pressure performance issue on several platforms: do the low half here first
+				// register pressure performance issue on several platforms: first do the low half here
 				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].signexponent = static_cast<W>(curelo);
+					pdst[0].signexponent = static_cast<W>(curelo);
 				}
 				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
+				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].mantissa = curmlo;
+					pdst[0].mantissa = curmlo;
 				}
-				curmlo >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-				curelo &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				curmlo >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curmlo0];
-				curmlo1 &= (1u << 8) - 1u;
-				curmlo2 &= (1u << 8) - 1u;
-				curmlo3 &= (1u << 8) - 1u;
-				curmlo4 &= (1u << 8) - 1u;
-				curmlo5 &= (1u << 8) - 1u;
-				curmlo6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
+				curmlo1 &= (1u << 11) - 1u;
+				curmlo2 &= (1u << 11) - 1u;
+				curmlo3 &= (1u << 11) - 1u;
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
 				// register pressure performance issue on several platforms: do the high half here second
 				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[1].signexponent = static_cast<W>(curehi);
+					pdst[1].signexponent = static_cast<W>(curehi);
 				}
 				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
+				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[1].mantissa = curmhi;
 					pout += 2;
+					pdst[1].mantissa = curmhi;
+					pdst += 2;
 				}
-				curmhi >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-				curehi &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				curmhi >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curmhi0];
-				curmhi1 &= (1u << 8) - 1u;
-				curmhi2 &= (1u << 8) - 1u;
-				curmhi3 &= (1u << 8) - 1u;
-				curmhi4 &= (1u << 8) - 1u;
-				curmhi5 &= (1u << 8) - 1u;
-				curmhi6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
+				curmhi1 &= (1u << 11) - 1u;
+				curmhi2 &= (1u << 11) - 1u;
+				curmhi3 &= (1u << 11) - 1u;
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
 			}while(i -= 2);
+#endif
+		}else{// !isinputconst
+			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
+			T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
+			T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to one at a time when there's few registers
+			do{
+				U curelo{static_cast<U>(pinputlo[0].signexponent)};
+				std::uint_least64_t curmlo{pinputlo[0].mantissa};
+				U curehi{static_cast<U>(pinputhi[0].signexponent)};
+				std::uint_least64_t curmhi{pinputhi[0].mantissa};
+				// register pressure performance issue on several platforms: first do the low half here
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, poutputhi);
+					--pinputhi;
+					--poutputhi;
+				}
+				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputhi[0].signexponent = static_cast<W>(curelo);
+					poutputhi[0].signexponent = static_cast<W>(curelo);
+				}
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo) & (1u << 11) - 1u};
+				unsigned curmlo1{static_cast<unsigned>(curmlo) >> 11};
+				unsigned curmlo2{static_cast<unsigned>(curmlo) >> 22};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputhi[0].mantissa = curmlo;
+					--pinputhi;
+					poutputhi[0].mantissa = curmlo;
+					--poutputhi;
+				}
+				curmlo >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo3)];
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
+				// register pressure performance issue on several platforms: do the high half here second
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, poutputlo);
+					++pinputlo;
+					++poutputlo;
+				}
+				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputlo[0].signexponent = static_cast<W>(curehi);
+					poutputlo[0].signexponent = static_cast<W>(curehi);
+				}
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi) & (1u << 11) - 1u};
+				unsigned curmhi1{static_cast<unsigned>(curmhi) >> 11};
+				unsigned curmhi2{static_cast<unsigned>(curmhi) >> 22};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputlo[0].mantissa = curmhi;
+					++pinputlo;
+					poutputlo[0].mantissa = curmhi;
+					++poutputlo;
+				}
+				curmhi >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi3)];
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi4)];
+			}while(--i);
+#else// 64-bit and larger systems
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			do{
+				U curelo{static_cast<U>(pinputlo[0].signexponent)};
+				std::uint_least64_t curmlo{pinputlo[0].mantissa};
+				U curehi{static_cast<U>(pinputhi[0].signexponent)};
+				std::uint_least64_t curmhi{pinputhi[0].mantissa};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(
+						curmlo, curelo, pinputhi, poutputhi,
+						curmhi, curehi, pinputlo, poutputlo);
+					--pinputhi;
+					--poutputhi;
+					++pinputlo;
+					++poutputlo;
+				}
+				// register pressure performance issue on several platforms: first do the low half here
+				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputhi[0].signexponent = static_cast<W>(curelo);
+					poutputhi[0].signexponent = static_cast<W>(curelo);
+				}
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputhi[0].mantissa = curmlo;
+					--pinputhi;
+					poutputhi[0].mantissa = curmlo;
+					--poutputhi;
+				}
+				curmlo >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= (1u << 11) - 1u;
+				curmlo2 &= (1u << 11) - 1u;
+				curmlo3 &= (1u << 11) - 1u;
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+				// register pressure performance issue on several platforms: do the high half here second
+				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputlo[0].signexponent = static_cast<W>(curehi);
+					poutputlo[0].signexponent = static_cast<W>(curehi);
+				}
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pinputlo[0].mantissa = curmhi;
+					++pinputlo;
+					poutputlo[0].mantissa = curmhi;
+					++poutputlo;
+				}
+				curmhi >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= (1u << 11) - 1u;
+				curmhi2 &= (1u << 11) - 1u;
+				curmhi3 &= (1u << 11) - 1u;
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+			}while(--i);
+#endif
 		}
+	}else{// not in reverse order
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+		// unsigned counter, not zero inclusive inside the loop
+		auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
+		input += loc;
+		pout += loc;
+		do{
+			U cure{static_cast<U>(input[0].signexponent)};
+			std::uint_least64_t curm{input[0].mantissa};
+			++input;
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout);
+				++pout;
+			}
+			unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[0].signexponent = static_cast<W>(cure);
+			}
+			cure >>= 8;
+			unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+			unsigned curm1{static_cast<unsigned>(curm) >> 11};
+			unsigned curm2{static_cast<unsigned>(curm) >> 22};
+			unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+			unsigned curm4{static_cast<unsigned>(curm >> 43)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[0].mantissa = curm;
+				++pout;
+			}
+			curm >>= 54;
+			++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+			cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curm0];
+			curm1 &= (1u << 11) - 1u;
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curm2)];
+			++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+			curm4 &= (1u << 11) - 1u;
+			++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+			++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curm1)];
+			++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+		}while(--i);
+#else// 64-bit and larger systems
+		// architecture: do not limit as much when there's a reasonable amount of registers
+		// unsigned counter, not zero inclusive inside the loop
+		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
+		input += loc;
+		pout += loc;
+		do{
+			U curelo{static_cast<U>(input[0].signexponent)};
+			std::uint_least64_t curmlo{input[0].mantissa};
+			U curehi{static_cast<U>(input[1].signexponent)};
+			std::uint_least64_t curmhi{input[1].mantissa};
+			input += 2;
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(
+					curmlo, curelo, pout,
+					curmhi, curehi, pout + 1u);
+				pout += 2;
+			}
+			// register pressure performance issue on several platforms: do the low half here first
+			unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[0].signexponent = static_cast<W>(curelo);
+			}
+			curelo >>= 8;
+			unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+			unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+			unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+			unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+			unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[0].mantissa = curmlo;
+			}
+			curmlo >>= 55;
+			++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+			curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curmlo0];
+			curmlo1 &= (1u << 11) - 1u;
+			curmlo2 &= (1u << 11) - 1u;
+			curmlo3 &= (1u << 11) - 1u;
+			curmlo4 &= (1u << 11) - 1u;
+			++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+			++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+			++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+			++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+			// register pressure performance issue on several platforms: do the high half here second
+			unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[1].signexponent = static_cast<W>(curehi);
+			}
+			curehi >>= 8;
+			unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+			unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+			unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+			unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+			unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+				pout[1].mantissa = curmhi;
+				pout += 2;
+			}
+			curmhi >>= 55;
+			++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+			curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curmhi0];
+			curmhi1 &= (1u << 11) - 1u;
+			curmhi2 &= (1u << 11) - 1u;
+			curmhi3 &= (1u << 11) - 1u;
+			curmhi4 &= (1u << 11) - 1u;
+			++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+			++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+			++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+			++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+		}while(i -= 2);
+#endif
 	}
 	return offsetscompanion;
 }
@@ -12676,19 +12811,78 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if((80u >> 3) - 2u == shifter)
+	if(offsetsloopcount<T> - 2u == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handlebelowtop;// rare, but possible
-	if((80u >> 3) - 2u < shifter)
+	if(offsetsloopcount<T> - 2u < shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+	while(32u > shifter){
+		// architecture: limit to two at a time when there's few registers
+		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+		do{// fill the array, two at a time
+			U outea{static_cast<U>(psrchi[0].signexponent)};
+			std::uint_least64_t outma{psrchi[0].mantissa};
+			U outeb{static_cast<U>(psrchi[-1].signexponent)};
+			std::uint_least64_t outmb{psrchi[-1].mantissa};
+			psrchi -= 2;
+			auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			T *pwa = pdst + offseta;
+			T *pwb = pdst + offsetb;
+			pwa[0].signexponent = static_cast<W>(outea);
+			pwa[0].mantissa = outma;
+			pwb[0].signexponent = static_cast<W>(outeb);
+			pwb[0].mantissa = outmb;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += typeradix<T>;
+		poffset += 1u << typeradix<T>;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrchi = pdst;
+		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		pdst = pdstnext;
+		pdstnext = psrchi;
+		psrchi += count;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * typeradix<T>;
+		poffset += static_cast<std::size_t>(index) << typeradix<T>;
+		if(!old) do{
+			spinpause();
+		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}
+	if((offsetsloopcount<T> - 2u) * typeradix<T> == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handlebelowtop;// rare, but possible
+	if((offsetsloopcount<T> - 2u) * typeradix<T> < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop;// rare, but possible
+	// also compensate for the remainder radix difference
+	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
+	poffset -= (1u << typeradix<T>) - (1u << typeradixremainder<T>);
+#endif
 	for(;;){
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 			do{// fill the array, two at a time
 				U outea{static_cast<U>(psrchi[0].signexponent)};
@@ -12696,7 +12890,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U outeb{static_cast<U>(psrchi[-1].signexponent)};
 				std::uint_least64_t outmb{psrchi[-1].mantissa};
 				psrchi -= 2;
-				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
 				T *pwa = pdst + offseta;
@@ -12706,7 +12900,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pwb[0].signexponent = static_cast<W>(outeb);
 				pwb[0].mantissa = outmb;
 			}while(--j);
-		}else{// architecture: limit to four at a time when there's a decent amount of registers
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				U outea{static_cast<U>(psrchi[0].signexponent)};
@@ -12736,13 +12931,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pwd[0].signexponent = static_cast<W>(outed);
 				pwd[0].mantissa = outmd;
 			}while(--j);
+#endif
 		}
 		runsteps >>= 1;
 		if(!runsteps)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -12762,71 +12958,73 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
 		}
 		// handle the top two parts differently
-		if(80u - 16u <= shifter)
+		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
 		{
-			if(80u - 16u == shifter)
+			if(offsetsloopcountsplitup<T> * typeradix<T> == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 			{
 handlebelowtop:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						U outea{static_cast<U>(psrchi[0].signexponent)};
-						std::uint_least64_t outma{psrchi[0].mantissa};
-						U outeb{static_cast<U>(psrchi[-1].signexponent)};
-						std::uint_least64_t outmb{psrchi[-1].mantissa};
-						psrchi -= 2;
-						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T> - (1u << 8)]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T> - (1u << 8)]--};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						U outea{static_cast<U>(psrchi[0].signexponent)};
-						std::uint_least64_t outma{psrchi[0].mantissa};
-						U outeb{static_cast<U>(psrchi[-1].signexponent)};
-						std::uint_least64_t outmb{psrchi[-1].mantissa};
-						U outec{static_cast<U>(psrchi[-2].signexponent)};
-						std::uint_least64_t outmc{psrchi[-2].mantissa};
-						U outed{static_cast<U>(psrchi[-3].signexponent)};
-						std::uint_least64_t outmd{psrchi[-3].mantissa};
-						psrchi -= 4;
-						auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T> - (1u << 8)]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T> - (1u << 8)]--};
-						std::size_t offsetc{offsetscompanion[curc + offsetsbodylength<T> - (1u << 8)]--};
-						std::size_t offsetd{offsetscompanion[curd + offsetsbodylength<T> - (1u << 8)]--};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						T *pwc = pdst + offsetc;
-						T *pwd = pdst + offsetd;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
-						pwc[0].signexponent = static_cast<W>(outec);
-						pwc[0].mantissa = outmc;
-						pwd[0].signexponent = static_cast<W>(outed);
-						pwd[0].mantissa = outmd;
-					}while(--j);
-				}
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to two at a time when there's few registers
+				std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+				do{// fill the array, two at a time
+					U outea{static_cast<U>(psrchi[0].signexponent)};
+					std::uint_least64_t outma{psrchi[0].mantissa};
+					U outeb{static_cast<U>(psrchi[-1].signexponent)};
+					std::uint_least64_t outmb{psrchi[-1].mantissa};
+					psrchi -= 2;
+					auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+					std::size_t offseta{offsetscompanion[cura + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (4u << 11) + (2u << 10)]--};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}while(--j);
+#else// 64-bit and larger systems
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
+				do{// fill the array, four at a time
+					U outea{static_cast<U>(psrchi[0].signexponent)};
+					std::uint_least64_t outma{psrchi[0].mantissa};
+					U outeb{static_cast<U>(psrchi[-1].signexponent)};
+					std::uint_least64_t outmb{psrchi[-1].mantissa};
+					U outec{static_cast<U>(psrchi[-2].signexponent)};
+					std::uint_least64_t outmc{psrchi[-2].mantissa};
+					U outed{static_cast<U>(psrchi[-3].signexponent)};
+					std::uint_least64_t outmd{psrchi[-3].mantissa};
+					psrchi -= 4;
+					auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+					std::size_t offseta{offsetscompanion[cura + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (5u << 11) + (1u << 9)]--};
+					std::size_t offsetc{offsetscompanion[curc + (5u << 11) + (1u << 9)]--};
+					std::size_t offsetd{offsetscompanion[curd + (5u << 11) + (1u << 9)]--};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					T *pwc = pdst + offsetc;
+					T *pwd = pdst + offsetd;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+					pwc[0].signexponent = static_cast<W>(outec);
+					pwc[0].mantissa = outmc;
+					pwd[0].signexponent = static_cast<W>(outed);
+					pwd[0].mantissa = outmd;
+				}while(--j);
+#endif
 				if(1u == runsteps)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
-					break;
+					return;
 				{
 					std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 					// swap the pointers for the next round, data is moved on each iteration
@@ -12838,58 +13036,60 @@ handlebelowtop:
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
 				}
-handletop:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						U outea{static_cast<U>(psrchi[0].signexponent)};
-						std::uint_least64_t outma{psrchi[0].mantissa};
-						U outeb{static_cast<U>(psrchi[-1].signexponent)};
-						std::uint_least64_t outmb{psrchi[-1].mantissa};
-						psrchi -= 2;
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T>]--};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						U outea{static_cast<U>(psrchi[0].signexponent)};
-						std::uint_least64_t outma{psrchi[0].mantissa};
-						U outeb{static_cast<U>(psrchi[-1].signexponent)};
-						std::uint_least64_t outmb{psrchi[-1].mantissa};
-						U outec{static_cast<U>(psrchi[-2].signexponent)};
-						std::uint_least64_t outmc{psrchi[-2].mantissa};
-						U outed{static_cast<U>(psrchi[-3].signexponent)};
-						std::uint_least64_t outmd{psrchi[-3].mantissa};
-						psrchi -= 4;
-						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T>]--};
-						std::size_t offsetc{offsetscompanion[curc + offsetsbodylength<T>]--};
-						std::size_t offsetd{offsetscompanion[curd + offsetsbodylength<T>]--};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						T *pwc = pdst + offsetc;
-						T *pwd = pdst + offsetd;
-						pwa[0].signexponent = static_cast<W>(outea);
-						pwa[0].mantissa = outma;
-						pwb[0].signexponent = static_cast<W>(outeb);
-						pwb[0].mantissa = outmb;
-						pwc[0].signexponent = static_cast<W>(outec);
-						pwc[0].mantissa = outmc;
-						pwd[0].signexponent = static_cast<W>(outed);
-						pwd[0].mantissa = outmd;
-					}while(--j);
-				}
-				break;// no further processing beyond the top part
 			}
+handletop:
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				U outea{static_cast<U>(psrchi[0].signexponent)};
+				std::uint_least64_t outma{psrchi[0].mantissa};
+				U outeb{static_cast<U>(psrchi[-1].signexponent)};
+				std::uint_least64_t outmb{psrchi[-1].mantissa};
+				psrchi -= 2;
+				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (4u << 11) + (2u << 10)]--};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+			}while(--j);
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
+			do{// fill the array, four at a time
+				U outea{static_cast<U>(psrchi[0].signexponent)};
+				std::uint_least64_t outma{psrchi[0].mantissa};
+				U outeb{static_cast<U>(psrchi[-1].signexponent)};
+				std::uint_least64_t outmb{psrchi[-1].mantissa};
+				U outec{static_cast<U>(psrchi[-2].signexponent)};
+				std::uint_least64_t outmc{psrchi[-2].mantissa};
+				U outed{static_cast<U>(psrchi[-3].signexponent)};
+				std::uint_least64_t outmd{psrchi[-3].mantissa};
+				psrchi -= 4;
+				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				std::size_t offsetc{offsetscompanion[curc + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				std::size_t offsetd{offsetscompanion[curd + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				T *pwc = pdst + offsetc;
+				T *pwd = pdst + offsetd;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+				pwc[0].signexponent = static_cast<W>(outec);
+				pwc[0].mantissa = outmc;
+				pwd[0].signexponent = static_cast<W>(outed);
+				pwd[0].mantissa = outmd;
+			}while(--j);
+#endif
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -12922,88 +13122,42 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if((80u >> 3) - 2u == shifter)
+	if(offsetsloopcount<T> - 2u == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handlebelowtop;// rare, but possible
-	if((80u >> 3) - 2u < shifter)
+	if(offsetsloopcount<T> - 2u < shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
-	for(;;){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+	while(32u > shifter){
 		if constexpr(ismultithreadcapable){
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, two at a time
-					U outea{static_cast<U>(psrclo[0].signexponent)};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{static_cast<U>(psrclo[1].signexponent)};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					psrclo += 2;
-					auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-				}
-			}else{// architecture: limit to four at a time when there's a decent amount of registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					U outea{static_cast<U>(psrclo[0].signexponent)};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{static_cast<U>(psrclo[1].signexponent)};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					U outec{static_cast<U>(psrclo[2].signexponent)};
-					std::uint_least64_t outmc{psrclo[2].mantissa};
-					U outed{static_cast<U>(psrclo[3].signexponent)};
-					std::uint_least64_t outmd{psrclo[3].mantissa};
-					psrclo += 4;
-					auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					std::size_t offsetc{poffset[curc]++};
-					std::size_t offsetd{poffset[curd]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					T *pwc = pdst + offsetc;
-					T *pwd = pdst + offsetd;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-					pwc[0].signexponent = static_cast<W>(outec);
-					pwc[0].mantissa = outmc;
-					pwd[0].signexponent = static_cast<W>(outed);
-					pwd[0].mantissa = outmd;
-				}
-				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					U outea{static_cast<U>(psrclo[0].signexponent)};
-					std::uint_least64_t outma{psrclo[0].mantissa};
-					U outeb{static_cast<U>(psrclo[1].signexponent)};
-					std::uint_least64_t outmb{psrclo[1].mantissa};
-					psrclo += 2;
-					auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					pwa[0].signexponent = static_cast<W>(outea);
-					pwa[0].mantissa = outma;
-					pwb[0].signexponent = static_cast<W>(outeb);
-					pwb[0].mantissa = outmb;
-				}
+			// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				U outea{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outma{psrclo[0].mantissa};
+				U outeb{static_cast<U>(psrclo[1].signexponent)};
+				std::uint_least64_t outmb{psrclo[1].mantissa};
+				psrclo += 2;
+				auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
 				U oute{static_cast<U>(psrclo[0].signexponent)};
 				std::uint_least64_t outm{psrclo[0].mantissa};
-				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
 				std::size_t offset{poffset[cur]};
 				T *pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
@@ -13018,7 +13172,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U outehi{static_cast<U>(psrchi[0].signexponent)};
 				std::uint_least64_t outmhi{psrchi[0].mantissa};
 				--psrchi;
-				auto[curlo, curhi]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi, shifter)};
+				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
 				T *pwlo = pdst + offsetlo;
@@ -13031,7 +13185,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(psrclo == psrchi){// fill in the final item for odd counts
 				U oute{static_cast<U>(psrclo[0].signexponent)};
 				std::uint_least64_t outm{psrclo[0].mantissa};
-				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
 				std::size_t offset{poffset[cur]};
 				T *pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
@@ -13043,7 +13197,162 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += typeradix<T>;
+		poffset += 1u << typeradix<T>;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::uintptr_t old;
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		pdst = pdstnext;
+		pdstnext = psrclo;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * typeradix<T>;
+		poffset += static_cast<std::size_t>(index) << typeradix<T>;
+		if constexpr(ismultithreadcapable) if(old < usemultithread) do{
+			spinpause();
+		}while(atomiclightbarrier.load(std::memory_order_relaxed));
+	}
+	// also compensate for the remainder radix difference
+	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
+	poffset -= (1u << typeradix<T>) - (1u << typeradixremainder<T>);
+#endif
+	for(;;){
+		if constexpr(ismultithreadcapable){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				U outea{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outma{psrclo[0].mantissa};
+				U outeb{static_cast<U>(psrclo[1].signexponent)};
+				std::uint_least64_t outmb{psrclo[1].mantissa};
+				psrclo += 2;
+				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+			}
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				U outea{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outma{psrclo[0].mantissa};
+				U outeb{static_cast<U>(psrclo[1].signexponent)};
+				std::uint_least64_t outmb{psrclo[1].mantissa};
+				U outec{static_cast<U>(psrclo[2].signexponent)};
+				std::uint_least64_t outmc{psrclo[2].mantissa};
+				U outed{static_cast<U>(psrclo[3].signexponent)};
+				std::uint_least64_t outmd{psrclo[3].mantissa};
+				psrclo += 4;
+				auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				T *pwc = pdst + offsetc;
+				T *pwd = pdst + offsetd;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+				pwc[0].signexponent = static_cast<W>(outec);
+				pwc[0].mantissa = outmc;
+				pwd[0].signexponent = static_cast<W>(outed);
+				pwd[0].mantissa = outmd;
+			}
+			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
+				U outea{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outma{psrclo[0].mantissa};
+				U outeb{static_cast<U>(psrclo[1].signexponent)};
+				std::uint_least64_t outmb{psrclo[1].mantissa};
+				psrclo += 2;
+				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				T *pwa = pdst + offseta;
+				T *pwb = pdst + offsetb;
+				pwa[0].signexponent = static_cast<W>(outea);
+				pwa[0].mantissa = outma;
+				pwb[0].signexponent = static_cast<W>(outeb);
+				pwb[0].mantissa = outmb;
+			}
+#endif
+			if(!(1u & count)){// fill in the final item for odd counts
+				U oute{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outm{psrclo[0].mantissa};
+				std::size_t cur{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t offset{poffset[cur]};
+				T *pw = pdst + offset;
+				pw[0].signexponent = static_cast<W>(oute);
+				pw[0].mantissa = outm;
+			}
+		}else{// !ismultithreadcapable
+			T const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				U outelo{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outmlo{psrclo[0].mantissa};
+				++psrclo;
+				U outehi{static_cast<U>(psrchi[0].signexponent)};
+				std::uint_least64_t outmhi{psrchi[0].mantissa};
+				--psrchi;
+				auto[curlo, curhi]{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+				T *pwlo = pdst + offsetlo;
+				T *pwhi = pdst + offsethi;
+				pwlo[0].signexponent = static_cast<W>(outelo);
+				pwlo[0].mantissa = outmlo;
+				pwhi[0].signexponent = static_cast<W>(outehi);
+				pwhi[0].mantissa = outmhi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				U oute{static_cast<U>(psrclo[0].signexponent)};
+				std::uint_least64_t outm{psrclo[0].mantissa};
+				std::size_t cur{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
+				std::size_t offset{poffset[cur]};
+				T *pw = pdst + offset;
+				pw[0].signexponent = static_cast<W>(oute);
+				pw[0].mantissa = outm;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -13066,143 +13375,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
 		}
 		// handle the top two parts differently
-		if(80u - 16u <= shifter)
+		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
 		{
-			if(80u - 16u == shifter)
+			if(offsetsloopcountsplitup<T> * typeradix<T> == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 			{
 handlebelowtop:
 				if constexpr(ismultithreadcapable){
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, two at a time
-							U outea{static_cast<U>(psrclo[0].signexponent)};
-							std::uint_least64_t outma{psrclo[0].mantissa};
-							U outeb{static_cast<U>(psrclo[1].signexponent)};
-							std::uint_least64_t outmb{psrclo[1].mantissa};
-							psrclo += 2;
-							auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							T *pwa = pdst + offseta;
-							T *pwb = pdst + offsetb;
-							pwa[0].signexponent = static_cast<W>(outea);
-							pwa[0].mantissa = outma;
-							pwb[0].signexponent = static_cast<W>(outeb);
-							pwb[0].mantissa = outmb;
-						}
-					}else{// architecture: limit to four at a time when there's a decent amount of registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, four at a time
-							U outea{static_cast<U>(psrclo[0].signexponent)};
-							std::uint_least64_t outma{psrclo[0].mantissa};
-							U outeb{static_cast<U>(psrclo[1].signexponent)};
-							std::uint_least64_t outmb{psrclo[1].mantissa};
-							U outec{static_cast<U>(psrclo[2].signexponent)};
-							std::uint_least64_t outmc{psrclo[2].mantissa};
-							U outed{static_cast<U>(psrclo[3].signexponent)};
-							std::uint_least64_t outmd{psrclo[3].mantissa};
-							psrclo += 4;
-							auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							std::size_t offsetc{offsets[curc + offsetsbodylength<T> - (1u << 8)]++};
-							std::size_t offsetd{offsets[curd + offsetsbodylength<T> - (1u << 8)]++};
-							T *pwa = pdst + offseta;
-							T *pwb = pdst + offsetb;
-							T *pwc = pdst + offsetc;
-							T *pwd = pdst + offsetd;
-							pwa[0].signexponent = static_cast<W>(outea);
-							pwa[0].mantissa = outma;
-							pwb[0].signexponent = static_cast<W>(outeb);
-							pwb[0].mantissa = outmb;
-							pwc[0].signexponent = static_cast<W>(outec);
-							pwc[0].mantissa = outmc;
-							pwd[0].signexponent = static_cast<W>(outed);
-							pwd[0].mantissa = outmd;
-						}
-						if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-							U outea{static_cast<U>(psrclo[0].signexponent)};
-							std::uint_least64_t outma{psrclo[0].mantissa};
-							U outeb{static_cast<U>(psrclo[1].signexponent)};
-							std::uint_least64_t outmb{psrclo[1].mantissa};
-							psrclo += 2;
-							auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							T *pwa = pdst + offseta;
-							T *pwb = pdst + offsetb;
-							pwa[0].signexponent = static_cast<W>(outea);
-							pwa[0].mantissa = outma;
-							pwb[0].signexponent = static_cast<W>(outeb);
-							pwb[0].mantissa = outmb;
-						}
-					}
-					if(!(1u & count)){// fill in the final item for odd counts
-						U oute{static_cast<U>(psrclo[0].signexponent)};
-						std::uint_least64_t outm{psrclo[0].mantissa};
-						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-						std::size_t offset{offsets[cur + offsetsbodylength<T> - (1u << 8)]};
-						T *pw = pdst + offset;
-						pw[0].signexponent = static_cast<W>(oute);
-						pw[0].mantissa = outm;
-					}
-				}else{// !ismultithreadcapable
-					T const *psrchi{psrclo + count};
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						U outelo{static_cast<U>(psrclo[0].signexponent)};
-						std::uint_least64_t outmlo{psrclo[0].mantissa};
-						++psrclo;
-						U outehi{static_cast<U>(psrchi[0].signexponent)};
-						std::uint_least64_t outmhi{psrchi[0].mantissa};
-						--psrchi;
-						auto[curlo, curhi]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi)};
-						std::size_t offsetlo{offsets[curlo + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-						std::size_t offsethi{offsets[curhi + offsetsbodylength<T> - (1u << 8) + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-						T *pwlo = pdst + offsetlo;
-						T *pwhi = pdst + offsethi;
-						pwlo[0].signexponent = static_cast<W>(outelo);
-						pwlo[0].mantissa = outmlo;
-						pwhi[0].signexponent = static_cast<W>(outehi);
-						pwhi[0].mantissa = outmhi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						U oute{static_cast<U>(psrclo[0].signexponent)};
-						std::uint_least64_t outm{psrclo[0].mantissa};
-						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-						std::size_t offset{offsets[cur + offsetsbodylength<T> - (1u << 8)]};
-						T *pw = pdst + offset;
-						pw[0].signexponent = static_cast<W>(oute);
-						pw[0].mantissa = outm;
-					}
-				}
-				runsteps >>= 1;
-				if(!runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-					[[unlikely]]
-#endif
-					break;
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
-#endif
-				std::uintptr_t old;
-				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				pdst = pdstnext;
-				// unused: pdstnext = psrclo;
-				if constexpr(ismultithreadcapable) if(old < usemultithread) do{
-					spinpause();
-				}while(atomiclightbarrier.load(std::memory_order_relaxed));
-			}
-handletop:
-			if constexpr(ismultithreadcapable){
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to two at a time when there's few registers
 					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, two at a time
 						U outea{static_cast<U>(psrclo[0].signexponent)};
@@ -13210,9 +13396,9 @@ handletop:
 						U outeb{static_cast<U>(psrclo[1].signexponent)};
 						std::uint_least64_t outmb{psrclo[1].mantissa};
 						psrclo += 2;
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
+						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsets[cura + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (4u << 11) + (2u << 10)]++};
 						T *pwa = pdst + offseta;
 						T *pwb = pdst + offsetb;
 						pwa[0].signexponent = static_cast<W>(outea);
@@ -13220,7 +13406,8 @@ handletop:
 						pwb[0].signexponent = static_cast<W>(outeb);
 						pwb[0].mantissa = outmb;
 					}
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
+#else// 64-bit and larger systems
+					// architecture: limit to four at a time when there's a decent amount of registers
 					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, four at a time
 						U outea{static_cast<U>(psrclo[0].signexponent)};
@@ -13232,11 +13419,11 @@ handletop:
 						U outed{static_cast<U>(psrclo[3].signexponent)};
 						std::uint_least64_t outmd{psrclo[3].mantissa};
 						psrclo += 4;
-						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
-						std::size_t offsetc{offsets[curc + offsetsbodylength<T>]++};
-						std::size_t offsetd{offsets[curd + offsetsbodylength<T>]++};
+						auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
+						std::size_t offsetc{offsets[curc + (5u << 11) + (1u << 9)]++};
+						std::size_t offsetd{offsets[curd + (5u << 11) + (1u << 9)]++};
 						T *pwa = pdst + offseta;
 						T *pwb = pdst + offsetb;
 						T *pwc = pdst + offsetc;
@@ -13256,9 +13443,9 @@ handletop:
 						U outeb{static_cast<U>(psrclo[1].signexponent)};
 						std::uint_least64_t outmb{psrclo[1].mantissa};
 						psrclo += 2;
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
+						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
 						T *pwa = pdst + offseta;
 						T *pwb = pdst + offsetb;
 						pwa[0].signexponent = static_cast<W>(outea);
@@ -13266,12 +13453,168 @@ handletop:
 						pwb[0].signexponent = static_cast<W>(outeb);
 						pwb[0].mantissa = outmb;
 					}
+#endif
+					if(!(1u & count)){// fill in the final item for odd counts
+						U oute{static_cast<U>(psrclo[0].signexponent)};
+						std::uint_least64_t outm{psrclo[0].mantissa};
+						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+						std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+						]};
+						T *pw = pdst + offset;
+						pw[0].signexponent = static_cast<W>(oute);
+						pw[0].mantissa = outm;
+					}
+				}else{// !ismultithreadcapable
+					T const *psrchi{psrclo + count};
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						U outelo{static_cast<U>(psrclo[0].signexponent)};
+						std::uint_least64_t outmlo{psrclo[0].mantissa};
+						++psrclo;
+						U outehi{static_cast<U>(psrchi[0].signexponent)};
+						std::uint_least64_t outmhi{psrchi[0].mantissa};
+						--psrchi;
+						auto[curlo, curhi]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi)};
+						std::size_t offsetlo{offsets[curlo +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							]++};// the next item will be placed one higher
+						std::size_t offsethi{offsets[curhi +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+						T *pwlo = pdst + offsetlo;
+						T *pwhi = pdst + offsethi;
+						pwlo[0].signexponent = static_cast<W>(outelo);
+						pwlo[0].mantissa = outmlo;
+						pwhi[0].signexponent = static_cast<W>(outehi);
+						pwhi[0].mantissa = outmhi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						U oute{static_cast<U>(psrclo[0].signexponent)};
+						std::uint_least64_t outm{psrclo[0].mantissa};
+						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
+						std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							]};
+						T *pw = pdst + offset;
+						pw[0].signexponent = static_cast<W>(oute);
+						pw[0].mantissa = outm;
+					}
 				}
+				runsteps >>= 1;
+				if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					return;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+				[[maybe_unused]]
+#endif
+				std::uintptr_t old;
+				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+				// swap the pointers for the next round, data is moved on each iteration
+				psrclo = pdst;
+				pdst = pdstnext;
+				// unused: pdstnext = psrclo;
+				if constexpr(ismultithreadcapable) if(old < usemultithread) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}
+handletop:
+			if constexpr(ismultithreadcapable){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					U outea{static_cast<U>(psrclo[0].signexponent)};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{static_cast<U>(psrclo[1].signexponent)};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					psrclo += 2;
+					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (4u << 11) + (2u << 10)]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}
+#else// 64-bit and larger systems
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					U outea{static_cast<U>(psrclo[0].signexponent)};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{static_cast<U>(psrclo[1].signexponent)};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					U outec{static_cast<U>(psrclo[2].signexponent)};
+					std::uint_least64_t outmc{psrclo[2].mantissa};
+					U outed{static_cast<U>(psrclo[3].signexponent)};
+					std::uint_least64_t outmd{psrclo[3].mantissa};
+					psrclo += 4;
+					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					std::size_t offsetc{offsets[curc + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					std::size_t offsetd{offsets[curd + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					T *pwc = pdst + offsetc;
+					T *pwd = pdst + offsetd;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+					pwc[0].signexponent = static_cast<W>(outec);
+					pwc[0].mantissa = outmc;
+					pwd[0].signexponent = static_cast<W>(outed);
+					pwd[0].mantissa = outmd;
+				}
+				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
+					U outea{static_cast<U>(psrclo[0].signexponent)};
+					std::uint_least64_t outma{psrclo[0].mantissa};
+					U outeb{static_cast<U>(psrclo[1].signexponent)};
+					std::uint_least64_t outmb{psrclo[1].mantissa};
+					psrclo += 2;
+					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					T *pwa = pdst + offseta;
+					T *pwb = pdst + offsetb;
+					pwa[0].signexponent = static_cast<W>(outea);
+					pwa[0].mantissa = outma;
+					pwb[0].signexponent = static_cast<W>(outeb);
+					pwb[0].mantissa = outmb;
+				}
+#endif
 				if(!(1u & count)){// fill in the final item for odd counts
 					U oute{static_cast<U>(psrclo[0].signexponent)};
 					std::uint_least64_t outm{psrclo[0].mantissa};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-					std::size_t offset{offsets[cur + offsetsbodylength<T>]};
+					std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]};
 					T *pw = pdst + offset;
 					pw[0].signexponent = static_cast<W>(oute);
 					pw[0].mantissa = outm;
@@ -13286,8 +13629,20 @@ handletop:
 					std::uint_least64_t outmhi{psrchi[0].mantissa};
 					--psrchi;
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outmlo, outelo, outmhi, outehi)};
-					std::size_t offsetlo{offsets[curlo + offsetsbodylength<T>]++};// the next item will be placed one higher
-					std::size_t offsethi{offsets[curhi + offsetsbodylength<T> + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+					std::size_t offsetlo{offsets[curlo +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
 					T *pwlo = pdst + offsetlo;
 					T *pwhi = pdst + offsethi;
 					pwlo[0].signexponent = static_cast<W>(outelo);
@@ -13299,13 +13654,19 @@ handletop:
 					U oute{static_cast<U>(psrclo[0].signexponent)};
 					std::uint_least64_t outm{psrclo[0].mantissa};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute)};
-					std::size_t offset{offsets[cur + offsetsbodylength<T>]};
+					std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]};
 					T *pw = pdst + offset;
 					pw[0].signexponent = static_cast<W>(oute);
 					pw[0].mantissa = outm;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -13518,362 +13879,314 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T const *pinput{input + count};
 				T *poutput{output};
 				T *pbuffer{buffer};
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					do{
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						--pinput;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
-							++poutput;
-							++pbuffer;
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(cure);
-							pbuffer[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curm;
-							++poutput;
-							pbuffer[0].mantissa = curm;
-							++pbuffer;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					do{
-						U curehi{static_cast<U>(pinput[0].signexponent)};
-						std::uint_least64_t curmhi{pinput[0].mantissa};
-						U curelo{static_cast<U>(pinput[-1].signexponent)};
-						std::uint_least64_t curmlo{pinput[-1].mantissa};
-						pinput -= 2;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(
-								curmhi, curehi, poutput, pbuffer,
-								curmlo, curelo, poutput + 1, pbuffer + 1u);
-							poutput += 2;
-							pbuffer += 2;
-						}
-						// register pressure performance issue on several platforms: first do the high half here
-						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(curehi);
-							pbuffer[0].signexponent = static_cast<W>(curehi);
-						}
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curmhi;
-							pbuffer[0].mantissa = curmhi;
-						}
-						curmhi >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= (1u << 8) - 1u;
-						curmhi2 &= (1u << 8) - 1u;
-						curmhi3 &= (1u << 8) - 1u;
-						curmhi4 &= (1u << 8) - 1u;
-						curmhi5 &= (1u << 8) - 1u;
-						curmhi6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-						// register pressure performance issue on several platforms: do the low half here second
-						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[1].signexponent = static_cast<W>(curelo);
-							pbuffer[1].signexponent = static_cast<W>(curelo);
-						}
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[1].mantissa = curmlo;
-							poutput += 2;
-							pbuffer[1].mantissa = curmlo;
-							pbuffer += 2;
-						}
-						curmlo >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= (1u << 8) - 1u;
-						curmlo2 &= (1u << 8) - 1u;
-						curmlo3 &= (1u << 8) - 1u;
-						curmlo4 &= (1u << 8) - 1u;
-						curmlo5 &= (1u << 8) - 1u;
-						curmlo6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(cure);
-							pbuffer[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curm;
-							pbuffer[0].mantissa = curm;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to one at a time when there's few registers
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					--pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
+						++poutput;
+						++pbuffer;
 					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+					unsigned curm1{static_cast<unsigned>(curm) >> 11};
+					unsigned curm2{static_cast<unsigned>(curm) >> 22};
+					unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curm4{static_cast<unsigned>(curm >> 43)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						++poutput;
+						pbuffer[0].mantissa = curm;
+						++pbuffer;
+					}
+					curm >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+				}while(0 <= --i);
+#else// 64-bit and larger systems
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				do{
+					U curehi{static_cast<U>(pinput[0].signexponent)};
+					std::uint_least64_t curmhi{pinput[0].mantissa};
+					U curelo{static_cast<U>(pinput[-1].signexponent)};
+					std::uint_least64_t curmlo{pinput[-1].mantissa};
+					pinput -= 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmhi, curehi, poutput, pbuffer,
+							curmlo, curelo, poutput + 1, pbuffer + 1u);
+						poutput += 2;
+						pbuffer += 2;
+					}
+					// register pressure performance issue on several platforms: first do the high half here
+					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(curehi);
+						pbuffer[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curmhi;
+						pbuffer[0].mantissa = curmhi;
+					}
+					curmhi >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= (1u << 11) - 1u;
+					curmhi2 &= (1u << 11) - 1u;
+					curmhi3 &= (1u << 11) - 1u;
+					curmhi4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+					// register pressure performance issue on several platforms: do the low half here second
+					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].signexponent = static_cast<W>(curelo);
+						pbuffer[1].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].mantissa = curmlo;
+						poutput += 2;
+						pbuffer[1].mantissa = curmlo;
+						pbuffer += 2;
+					}
+					curmlo >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= (1u << 11) - 1u;
+					curmlo2 &= (1u << 11) - 1u;
+					curmlo3 &= (1u << 11) - 1u;
+					curmlo4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+					unsigned curm1{static_cast<unsigned>(curm >> 11)};
+					unsigned curm2{static_cast<unsigned>(curm >> 22)};
+					unsigned curm3{static_cast<unsigned>(curm >> 33)};
+					unsigned curm4{static_cast<unsigned>(curm >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						pbuffer[0].mantissa = curm;
+					}
+					curm >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					curm2 &= (1u << 11) - 1u;
+					curm3 &= (1u << 11) - 1u;
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 				}
+#endif
 			}else{// not in reverse order
 				T const *pinput{input};
 				T *poutput{output};
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					do{
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						++pinput;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
-							++poutput;
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curm;
-							++poutput;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					do{
-						U curelo{static_cast<U>(pinput[0].signexponent)};
-						std::uint_least64_t curmlo{pinput[0].mantissa};
-						U curehi{static_cast<U>(pinput[1].signexponent)};
-						std::uint_least64_t curmhi{pinput[1].mantissa};
-						pinput += 2;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(
-								curmlo, curelo, poutput,
-								curmhi, curehi, poutput + 1u);
-							poutput += 2;
-						}
-						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(curelo);
-						}
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curmlo;
-						}
-						curmlo >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-						curelo &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curmlo0];
-						curmlo1 &= (1u << 8) - 1u;
-						curmlo2 &= (1u << 8) - 1u;
-						curmlo3 &= (1u << 8) - 1u;
-						curmlo4 &= (1u << 8) - 1u;
-						curmlo5 &= (1u << 8) - 1u;
-						curmlo6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the low half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[1].signexponent = static_cast<W>(curehi);
-						}
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[1].mantissa = curmhi;
-							poutput += 2;
-						}
-						curmhi >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-						curehi &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curmhi0];
-						curmhi1 &= (1u << 8) - 1u;
-						curmhi2 &= (1u << 8) - 1u;
-						curmhi3 &= (1u << 8) - 1u;
-						curmhi4 &= (1u << 8) - 1u;
-						curmhi5 &= (1u << 8) - 1u;
-						curmhi6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							poutput[0].mantissa = curm;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to one at a time when there's few registers
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					++pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
+						++poutput;
 					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+					unsigned curm1{static_cast<unsigned>(curm) >> 11};
+					unsigned curm2{static_cast<unsigned>(curm) >> 22};
+					unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curm4{static_cast<unsigned>(curm >> 43)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+						++poutput;
+					}
+					curm >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+				}while(0 <= --i);
+#else// 64-bit and larger systems
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				do{
+					U curelo{static_cast<U>(pinput[0].signexponent)};
+					std::uint_least64_t curmlo{pinput[0].mantissa};
+					U curehi{static_cast<U>(pinput[1].signexponent)};
+					std::uint_least64_t curmhi{pinput[1].mantissa};
+					pinput += 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, poutput,
+							curmhi, curehi, poutput + 1u);
+						poutput += 2;
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curmlo;
+					}
+					curmlo >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= (1u << 11) - 1u;
+					curmlo2 &= (1u << 11) - 1u;
+					curmlo3 &= (1u << 11) - 1u;
+					curmlo4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].mantissa = curmhi;
+						poutput += 2;
+					}
+					curmhi >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= (1u << 11) - 1u;
+					curmhi2 &= (1u << 11) - 1u;
+					curmhi3 &= (1u << 11) - 1u;
+					curmhi4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+					unsigned curm1{static_cast<unsigned>(curm >> 11)};
+					unsigned curm2{static_cast<unsigned>(curm >> 22)};
+					unsigned curm3{static_cast<unsigned>(curm >> 33)};
+					unsigned curm4{static_cast<unsigned>(curm >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[0].mantissa = curm;
+					}
+					curm >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					curm2 &= (1u << 11) - 1u;
+					curm3 &= (1u << 11) - 1u;
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 				}
+#endif
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
 				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
@@ -14158,192 +14471,84 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer + loc;
 					pbufferhi = buffer + (count - loc);
 				}
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					do{
-						U curelo{pinputlo->signexponent};
-						std::uint_least64_t curmlo{pinputlo->mantissa};
-						U curehi{pinputhi->signexponent};
-						std::uint_least64_t curmhi{pinputhi->mantissa};
-						// register pressure performance issue on several platforms: first do the low half here
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, pbufferhi);
-							--pinputhi;
-							--pbufferhi;
-						}
-						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputhi[0].signexponent = static_cast<W>(curelo);
-							pbufferhi[0].signexponent = static_cast<W>(curelo);
-						}
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputhi[0].mantissa = curmlo;
-							--pinputhi;
-							pbufferhi[0].mantissa = curmlo;
-							--pbufferhi;
-						}
-						curmlo >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= (1u << 8) - 1u;
-						curmlo2 &= (1u << 8) - 1u;
-						curmlo3 &= (1u << 8) - 1u;
-						curmlo4 &= (1u << 8) - 1u;
-						curmlo5 &= (1u << 8) - 1u;
-						curmlo6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, pbufferlo);
-							++pinputlo;
-							++pbufferlo;
-						}
-						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputlo[0].signexponent = static_cast<W>(curehi);
-							pbufferlo[0].signexponent = static_cast<W>(curehi);
-						}
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputlo[0].mantissa = curmlo;
-							++pinputlo;
-							pbufferlo[0].mantissa = curmhi;
-							++pbufferlo;
-						}
-						curmhi >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= (1u << 8) - 1u;
-						curmhi2 &= (1u << 8) - 1u;
-						curmhi3 &= (1u << 8) - 1u;
-						curmhi4 &= (1u << 8) - 1u;
-						curmhi5 &= (1u << 8) - 1u;
-						curmhi6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-					}while(pinputlo < pinputhi);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					do{
-						U curelo{pinputlo->signexponent};
-						std::uint_least64_t curmlo{pinputlo->mantissa};
-						U curehi{pinputhi->signexponent};
-						std::uint_least64_t curmhi{pinputhi->mantissa};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(
-								curmlo, curelo, pinputhi, pbufferhi,
-								curmhi, curehi, pinputlo, pbufferlo);
-							--pinputhi;
-							--pbufferhi;
-							++pinputlo;
-							++pbufferlo;
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputhi[0].signexponent = static_cast<W>(curelo);
-							pbufferhi[0].signexponent = static_cast<W>(curelo);
-						}
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputhi[0].mantissa = curmlo;
-							--pinputhi;
-							pbufferhi[0].mantissa = curmlo;
-							--pbufferhi;
-						}
-						curmlo >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmlo0];
-						curmlo1 &= (1u << 8) - 1u;
-						curmlo2 &= (1u << 8) - 1u;
-						curmlo3 &= (1u << 8) - 1u;
-						curmlo4 &= (1u << 8) - 1u;
-						curmlo5 &= (1u << 8) - 1u;
-						curmlo6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputlo[0].signexponent = static_cast<W>(curehi);
-							pbufferlo[0].signexponent = static_cast<W>(curehi);
-						}
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pinputlo[0].mantissa = curmlo;
-							++pinputlo;
-							pbufferlo[0].mantissa = curmhi;
-							++pbufferlo;
-						}
-						curmhi >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-						++offsets[curmhi0];
-						curmhi1 &= (1u << 8) - 1u;
-						curmhi2 &= (1u << 8) - 1u;
-						curmhi3 &= (1u << 8) - 1u;
-						curmhi4 &= (1u << 8) - 1u;
-						curmhi5 &= (1u << 8) - 1u;
-						curmhi6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-					}while(pinputlo < pinputhi);
-				}
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to one at a time when there's few registers
+				do{
+					U curelo{pinputlo->signexponent};
+					std::uint_least64_t curmlo{pinputlo->mantissa};
+					U curehi{pinputhi->signexponent};
+					std::uint_least64_t curmhi{pinputhi->mantissa};
+					// register pressure performance issue on several platforms: first do the low half here
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, pbufferhi);
+						--pinputhi;
+						--pbufferhi;
+					}
+					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						pbufferhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo) & (1u << 11) - 1u};
+					unsigned curmlo1{static_cast<unsigned>(curmlo) >> 11};
+					unsigned curmlo2{static_cast<unsigned>(curmlo) >> 22};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						pbufferhi[0].mantissa = curmlo;
+						--pbufferhi;
+					}
+					curmlo >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo0)];
+					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo3)];
+					curmlo4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
+					// register pressure performance issue on several platforms: do the high half here second
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, pbufferlo);
+						++pinputlo;
+						++pbufferlo;
+					}
+					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						pbufferlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi) & (1u << 11) - 1u};
+					unsigned curmhi1{static_cast<unsigned>(curmhi) >> 11};
+					unsigned curmhi2{static_cast<unsigned>(curmhi) >> 22};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmlo;
+						++pinputlo;
+						pbufferlo[0].mantissa = curmhi;
+						++pbufferlo;
+					}
+					curmhi >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi0)];
+					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi3)];
+					curmhi4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi4)];
+				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
 					U cure{static_cast<U>(pinputlo[0].signexponent)};
 					std::uint_least64_t curm{pinputlo[0].mantissa};
@@ -14356,210 +14561,294 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferhi[0].signexponent = static_cast<W>(cure);
 					}
 					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
+					unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+					unsigned curm1{static_cast<unsigned>(curm) >> 11};
+					unsigned curm2{static_cast<unsigned>(curm) >> 22};
+					unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curm4{static_cast<unsigned>(curm >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pbufferhi[0].mantissa = curm;
 					}
-					curm >>= 56;
-					++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-					cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+					curm >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 					++offsets[curm0];
-					curm1 &= (1u << 8) - 1u;
-					curm2 &= (1u << 8) - 1u;
-					curm3 &= (1u << 8) - 1u;
-					curm4 &= (1u << 8) - 1u;
-					curm5 &= (1u << 8) - 1u;
-					curm6 &= (1u << 8) - 1u;
-					++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-					++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-					++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-					++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-					++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-					++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-					++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-					++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+					curm1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
 				}
+#else// 64-bit and larger systems
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				do{
+					U curelo{pinputlo->signexponent};
+					std::uint_least64_t curmlo{pinputlo->mantissa};
+					U curehi{pinputhi->signexponent};
+					std::uint_least64_t curmhi{pinputhi->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pinputhi, pbufferhi,
+							curmhi, curehi, pinputlo, pbufferlo);
+						--pinputhi;
+						--pbufferhi;
+						++pinputlo;
+						++pbufferlo;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].signexponent = static_cast<W>(curelo);
+						pbufferhi[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputhi[0].mantissa = curmlo;
+						--pinputhi;
+						pbufferhi[0].mantissa = curmlo;
+						--pbufferhi;
+					}
+					curmlo >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= (1u << 11) - 1u;
+					curmlo2 &= (1u << 11) - 1u;
+					curmlo3 &= (1u << 11) - 1u;
+					curmlo4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].signexponent = static_cast<W>(curehi);
+						pbufferlo[0].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pinputlo[0].mantissa = curmlo;
+						++pinputlo;
+						pbufferlo[0].mantissa = curmhi;
+						++pbufferlo;
+					}
+					curmhi >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= (1u << 11) - 1u;
+					curmhi2 &= (1u << 11) - 1u;
+					curmhi3 &= (1u << 11) - 1u;
+					curmhi4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+				}while(pinputlo < pinputhi);
+				if(pinputlo == pinputhi){// fill in the final item for odd counts
+					U cure{static_cast<U>(pinputlo[0].signexponent)};
+					std::uint_least64_t curm{pinputlo[0].mantissa};
+					// no write to input, as this is the midpoint
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbufferhi);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbufferhi[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+					unsigned curm1{static_cast<unsigned>(curm >> 11)};
+					unsigned curm2{static_cast<unsigned>(curm >> 22)};
+					unsigned curm3{static_cast<unsigned>(curm >> 33)};
+					unsigned curm4{static_cast<unsigned>(curm >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbufferhi[0].mantissa = curm;
+					}
+					curm >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					curm2 &= (1u << 11) - 1u;
+					curm3 &= (1u << 11) - 1u;
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
+				}
+#endif
 			}else{// not in reverse order
 				T *pinput{input};
 				T *pbuffer{buffer};
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					do{
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						++pinput;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
-							++pbuffer;
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].mantissa = curm;
-							++pbuffer;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-					}while(0 <= --i);
-				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					do{
-						U curelo{static_cast<U>(pinput[0].signexponent)};
-						std::uint_least64_t curmlo{pinput[0].mantissa};
-						U curehi{static_cast<U>(pinput[1].signexponent)};
-						std::uint_least64_t curmhi{pinput[1].mantissa};
-						pinput += 2;
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(
-								curmlo, curelo, pbuffer,
-								curmhi, curehi, pbuffer + 1u);
-							pbuffer += 2;
-						}
-						// register pressure performance issue on several platforms: first do the low half here
-						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].signexponent = static_cast<W>(curelo);
-						}
-						curelo >>= 8;
-						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-						unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-						unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-						unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-						unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-						unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-						unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].mantissa = curmlo;
-						}
-						curmlo >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-						curelo &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curmlo0];
-						curmlo1 &= (1u << 8) - 1u;
-						curmlo2 &= (1u << 8) - 1u;
-						curmlo3 &= (1u << 8) - 1u;
-						curmlo4 &= (1u << 8) - 1u;
-						curmlo5 &= (1u << 8) - 1u;
-						curmlo6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-						// register pressure performance issue on several platforms: do the high half here second
-						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[1].signexponent = static_cast<W>(curehi);
-						}
-						curehi >>= 8;
-						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-						unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-						unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-						unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-						unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-						unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-						unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[1].signexponent = static_cast<W>(curmhi);
-							pbuffer += 2;
-						}
-						curmhi >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-						curehi &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curmhi0];
-						curmhi1 &= (1u << 8) - 1u;
-						curmhi2 &= (1u << 8) - 1u;
-						curmhi3 &= (1u << 8) - 1u;
-						curmhi4 &= (1u << 8) - 1u;
-						curmhi5 &= (1u << 8) - 1u;
-						curmhi6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-						i -= 2;
-					}while(0 < i);
-					if(!(1 & i)){// fill in the final item for odd counts
-						U cure{pinput->signexponent};
-						std::uint_least64_t curm{pinput->mantissa};
-						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
-						}
-						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].signexponent = static_cast<W>(cure);
-						}
-						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							pbuffer[0].mantissa = curm;
-						}
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				do{
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					++pinput;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
+						++pbuffer;
 					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+					unsigned curm1{static_cast<unsigned>(curm) >> 11};
+					unsigned curm2{static_cast<unsigned>(curm) >> 22};
+					unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+					unsigned curm4{static_cast<unsigned>(curm >> 43)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curm;
+						++pbuffer;
+					}
+					curm >>= 54;
+					++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+				}while(0 <= --i);
+#else// 64-bit and larger systems
+				// architecture: do not limit as much when there's a reasonable amount of registers
+				if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				do{
+					U curelo{static_cast<U>(pinput[0].signexponent)};
+					std::uint_least64_t curmlo{pinput[0].mantissa};
+					U curehi{static_cast<U>(pinput[1].signexponent)};
+					std::uint_least64_t curmhi{pinput[1].mantissa};
+					pinput += 2;
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(
+							curmlo, curelo, pbuffer,
+							curmhi, curehi, pbuffer + 1u);
+						pbuffer += 2;
+					}
+					// register pressure performance issue on several platforms: first do the low half here
+					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(curelo);
+					}
+					curelo >>= 8;
+					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+					unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+					unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+					unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curmlo;
+					}
+					curmlo >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmlo0];
+					curmlo1 &= (1u << 11) - 1u;
+					curmlo2 &= (1u << 11) - 1u;
+					curmlo3 &= (1u << 11) - 1u;
+					curmlo4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+					// register pressure performance issue on several platforms: do the high half here second
+					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[1].signexponent = static_cast<W>(curehi);
+					}
+					curehi >>= 8;
+					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+					unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+					unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+					unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[1].signexponent = static_cast<W>(curmhi);
+						pbuffer += 2;
+					}
+					curmhi >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curmhi0];
+					curmhi1 &= (1u << 11) - 1u;
+					curmhi2 &= (1u << 11) - 1u;
+					curmhi3 &= (1u << 11) - 1u;
+					curmhi4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+					i -= 2;
+				}while(0 < i);
+				if(!(1 & i)){// fill in the final item for odd counts
+					U cure{pinput->signexponent};
+					std::uint_least64_t curm{pinput->mantissa};
+					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
+					}
+					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].signexponent = static_cast<W>(cure);
+					}
+					cure >>= 8;
+					unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+					unsigned curm1{static_cast<unsigned>(curm >> 11)};
+					unsigned curm2{static_cast<unsigned>(curm >> 22)};
+					unsigned curm3{static_cast<unsigned>(curm >> 33)};
+					unsigned curm4{static_cast<unsigned>(curm >> 44)};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pbuffer[0].mantissa = curm;
+					}
+					curm >>= 55;
+					++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+					cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+					++offsets[curm0];
+					curm1 &= (1u << 11) - 1u;
+					curm2 &= (1u << 11) - 1u;
+					curm3 &= (1u << 11) - 1u;
+					curm4 &= (1u << 11) - 1u;
+					++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+					++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+					++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+					++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+					++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+					++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 				}
+#endif
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
 				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
@@ -14645,14 +14934,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
@@ -14682,310 +14964,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				// unsigned counter, not zero inclusive inside the loop
-				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
-				--loc;// allow indexing inside the loop here
-				input += count - i - loc;
-				pout += loc;
-				pdst += loc;
-				do{
-					V *p{*input++};
-					auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
-					pout[i] = p;
-					pdst[i] = p;
-					auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
-					std::uint64_t curm{cur.mantissa};
-					U cure{static_cast<U>(cur.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-					}
-					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-					cure >>= 8;
-					unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-					unsigned curm1{static_cast<unsigned>(curm >> 8)};
-					unsigned curm2{static_cast<unsigned>(curm >> 16)};
-					unsigned curm3{static_cast<unsigned>(curm >> 24)};
-					unsigned curm4{static_cast<unsigned>(curm >> 32)};
-					unsigned curm5{static_cast<unsigned>(curm >> 40)};
-					unsigned curm6{static_cast<unsigned>(curm >> 48)};
-					curm >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(cure0)];
-					cure &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curm0];
-					curm1 &= (1u << 8) - 1u;
-					curm2 &= (1u << 8) - 1u;
-					curm3 &= (1u << 8) - 1u;
-					curm4 &= (1u << 8) - 1u;
-					curm5 &= (1u << 8) - 1u;
-					curm6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curm)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(cure)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curm1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curm2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curm3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curm4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curm5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curm6)];
-				}while(--i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				// unsigned counter, not zero inclusive inside the loop
-				auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
-				--loc;// allow indexing inside the loop here
-				input += count - i - loc;
-				pout += loc;
-				pdst += loc;
-				do{
-					V *plo{input[0]};
-					V *phi{input[1]};
-					input += 2;
-					auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
-					pout[i] = plo;
-					pdst[i] = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
-					pout[i - 1] = phi;
-					pdst[i - 1] = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponen)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					// register pressure performance issue on several platforms: first do the low half here
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-					}
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(i -= 2);
-			}
-		}else{// !isinputconst
-			// unsigned counter, not zero inclusive inside the loop
-			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-			V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					// register pressure performance issue on several platforms: first do the low half here
-					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
-					}
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
-					}
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				do{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
-					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
-					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
-					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-					std::uint64_t curmlo{curlo.mantissa};
-					U curelo{static_cast<U>(curlo.signexponent)};
-					std::uint64_t curmhi{curhi.mantissa};
-					U curehi{static_cast<U>(curhi.signexponent)};
-					// register pressure performance issue on several platforms: first do the low half here
-					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-					}
-					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-					curelo >>= 8;
-					unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-					unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-					unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-					unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-					unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-					unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-					unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-					curmlo >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-					curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmlo0];
-					curmlo1 &= (1u << 8) - 1u;
-					curmlo2 &= (1u << 8) - 1u;
-					curmlo3 &= (1u << 8) - 1u;
-					curmlo4 &= (1u << 8) - 1u;
-					curmlo5 &= (1u << 8) - 1u;
-					curmlo6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-					// register pressure performance issue on several platforms: do the high half here second
-					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-					curehi >>= 8;
-					unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-					unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-					unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-					unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-					unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-					unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-					unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-					curmhi >>= 56;
-					++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-					curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-					++offsetscompanion[curmhi0];
-					curmhi1 &= (1u << 8) - 1u;
-					curmhi2 &= (1u << 8) - 1u;
-					curmhi3 &= (1u << 8) - 1u;
-					curmhi4 &= (1u << 8) - 1u;
-					curmhi5 &= (1u << 8) - 1u;
-					curmhi6 &= (1u << 8) - 1u;
-					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-					++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-					++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-					++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-					++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-					++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-					++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-					++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				}while(--i);
-			}
-		}
-	}else{// not in reverse order
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to one at a time when there's few registers
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
 			--loc;// allow indexing inside the loop here
-			input += loc;
+			input += count - i - loc;
 			pout += loc;
+			pdst += loc;
 			do{
-				V *p{input[i]};
-				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				V *p{*input++};
+				auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 				pout[i] = p;
-				auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+				pdst[i] = p;
+				auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 				std::uint64_t curm{cur.mantissa};
 				U cure{static_cast<U>(cur.signexponent)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -14993,112 +14985,340 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
 				cure >>= 8;
-				unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-				unsigned curm1{static_cast<unsigned>(curm >> 8)};
-				unsigned curm2{static_cast<unsigned>(curm >> 16)};
-				unsigned curm3{static_cast<unsigned>(curm >> 24)};
-				unsigned curm4{static_cast<unsigned>(curm >> 32)};
-				unsigned curm5{static_cast<unsigned>(curm >> 40)};
-				unsigned curm6{static_cast<unsigned>(curm >> 48)};
-				curm >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(cure0)];
-				cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+				unsigned curm1{static_cast<unsigned>(curm) >> 11};
+				unsigned curm2{static_cast<unsigned>(curm) >> 22};
+				unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curm4{static_cast<unsigned>(curm >> 43)};
+				curm >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+				cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curm0];
-				curm1 &= (1u << 8) - 1u;
-				curm2 &= (1u << 8) - 1u;
-				curm3 &= (1u << 8) - 1u;
-				curm4 &= (1u << 8) - 1u;
-				curm5 &= (1u << 8) - 1u;
-				curm6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curm)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(cure)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curm1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curm2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curm3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curm4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curm5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curm6)];
+				curm1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curm2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+				curm4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curm1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
 			}while(--i);
-		}else{// architecture: do not limit as much when there's a reasonable amount of registers
+#else// 64-bit and larger systems
+			// architecture: do not limit as much when there's a reasonable amount of registers
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
 			--loc;// allow indexing inside the loop here
-			input += loc;
+			input += count - i - loc;
 			pout += loc;
+			pdst += loc;
 			do{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
-				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-				pout[i] = phi;
-				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-				pout[i - 1] = plo;
-				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+				V *plo{input[0]};
+				V *phi{input[1]};
+				input += 2;
+				auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
+				pout[i] = plo;
+				pdst[i] = plo;
+				auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
+				pout[i - 1] = phi;
+				pdst[i - 1] = phi;
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
+				std::uint64_t curmlo{curlo.mantissa};
+				U curelo{static_cast<U>(curlo.signexponen)};
 				std::uint64_t curmhi{curhi.mantissa};
 				U curehi{static_cast<U>(curhi.signexponent)};
+				// register pressure performance issue on several platforms: first do the low half here
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+				}
+				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+				curmlo >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= (1u << 11) - 1u;
+				curmlo2 &= (1u << 11) - 1u;
+				curmlo3 &= (1u << 11) - 1u;
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+				// register pressure performance issue on several platforms: do the high half here second
+				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+				curmhi >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= (1u << 11) - 1u;
+				curmhi2 &= (1u << 11) - 1u;
+				curmhi3 &= (1u << 11) - 1u;
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+			}while(i -= 2);
+#endif
+		}else{// !isinputconst
+			// unsigned counter, not zero inclusive inside the loop
+			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
+			V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
+			V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to one at a time when there's few registers
+			do{
+				V *plo{pinputlo[0]};
+				V *phi{pinputhi[0]};
+				// register pressure performance issue on several platforms: first do the low half here
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+				*pinputhi-- = plo;
+				*poutputhi-- = plo;
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				std::uint64_t curmlo{curlo.mantissa};
 				U curelo{static_cast<U>(curlo.signexponent)};
-				// register pressure performance issue on several platforms: first do the high half here
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+				}
+				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+				curelo >>= 8;
+				unsigned curmlo0{static_cast<unsigned>(curmlo) & (1u << 11) - 1u};
+				unsigned curmlo1{static_cast<unsigned>(curmlo) >> 11};
+				unsigned curmlo2{static_cast<unsigned>(curmlo) >> 22};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
+				curmlo >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmlo0];
+				curmlo1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo3)];
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
+				// register pressure performance issue on several platforms: do the high half here second
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+				*pinputlo++ = phi;
+				*poutputlo++ = phi;
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+				std::uint64_t curmhi{curhi.mantissa};
+				U curehi{static_cast<U>(curhi.signexponent)};
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
 				}
 				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
 				curehi >>= 8;
-				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-				unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-				unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-				unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-				unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-				unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-				unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-				curmhi >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curehi0)];
-				curehi &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				unsigned curmhi0{static_cast<unsigned>(curmhi) & (1u << 11) - 1u};
+				unsigned curmhi1{static_cast<unsigned>(curmhi) >> 11};
+				unsigned curmhi2{static_cast<unsigned>(curmhi) >> 22};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 32) & (1u << 11) - 1u};// decompose
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
+				curmhi >>= 54;
+				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curmhi0];
-				curmhi1 &= (1u << 8) - 1u;
-				curmhi2 &= (1u << 8) - 1u;
-				curmhi3 &= (1u << 8) - 1u;
-				curmhi4 &= (1u << 8) - 1u;
-				curmhi5 &= (1u << 8) - 1u;
-				curmhi6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmhi)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curehi)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-				// register pressure performance issue on several platforms: do the low half here second
+				curmhi1 &= (1u << 11) - 1u;
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi3)];
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi4)];
+			}while(--i);
+#else// 64-bit and larger systems
+			// architecture: do not limit as much when there's a reasonable amount of registers
+			do{
+				V *plo{pinputlo[0]};
+				V *phi{pinputhi[0]};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+				*pinputhi-- = plo;
+				*poutputhi-- = plo;
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+				*pinputlo++ = phi;
+				*poutputlo++ = phi;
+				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+				std::uint64_t curmlo{curlo.mantissa};
+				U curelo{static_cast<U>(curlo.signexponent)};
+				std::uint64_t curmhi{curhi.mantissa};
+				U curehi{static_cast<U>(curhi.signexponent)};
+				// register pressure performance issue on several platforms: first do the low half here
+				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+				}
 				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
 				curelo >>= 8;
-				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-				unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-				unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-				unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-				unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-				unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-				unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-				curmlo >>= 56;
-				++offsetscompanion[(8u << 8) + static_cast<std::size_t>(curelo0)];
-				curelo &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+				unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+				unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+				unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+				unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+				unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+				curmlo >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+				curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 				++offsetscompanion[curmlo0];
-				curmlo1 &= (1u << 8) - 1u;
-				curmlo2 &= (1u << 8) - 1u;
-				curmlo3 &= (1u << 8) - 1u;
-				curmlo4 &= (1u << 8) - 1u;
-				curmlo5 &= (1u << 8) - 1u;
-				curmlo6 &= (1u << 8) - 1u;
-				++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curmlo)];
-				++offsetscompanion[(9u << 8) + static_cast<std::size_t>(curelo)];
-				++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-				++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-				++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-				++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-				++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-				++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-			}while(i -= 2);
+				curmlo1 &= (1u << 11) - 1u;
+				curmlo2 &= (1u << 11) - 1u;
+				curmlo3 &= (1u << 11) - 1u;
+				curmlo4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+				// register pressure performance issue on several platforms: do the high half here second
+				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+				curehi >>= 8;
+				unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+				unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+				unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+				unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+				curmhi >>= 55;
+				++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+				curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+				++offsetscompanion[curmhi0];
+				curmhi1 &= (1u << 11) - 1u;
+				curmhi2 &= (1u << 11) - 1u;
+				curmhi3 &= (1u << 11) - 1u;
+				curmhi4 &= (1u << 11) - 1u;
+				++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+				++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+				++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+				++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+				++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+				++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+			}while(--i);
+#endif
 		}
+	}else{// not in reverse order
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+		// architecture: limit to one at a time when there's few registers
+		// unsigned counter, not zero inclusive inside the loop
+		auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
+		--loc;// allow indexing inside the loop here
+		input += loc;
+		pout += loc;
+		do{
+			V *p{input[i]};
+			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+			pout[i] = p;
+			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+			std::uint64_t curm{cur.mantissa};
+			U cure{static_cast<U>(cur.signexponent)};
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+			}
+			unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+			cure >>= 8;
+			unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+			unsigned curm1{static_cast<unsigned>(curm) >> 11};
+			unsigned curm2{static_cast<unsigned>(curm) >> 22};
+			unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+			unsigned curm4{static_cast<unsigned>(curm >> 43)};
+			curm >>= 54;
+			++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+			cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curm0];
+			curm1 &= (1u << 11) - 1u;
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curm2)];
+			++offsetscompanion[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+			curm4 &= (1u << 11) - 1u;
+			++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+			++offsetscompanion[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curm1)];
+			++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+		}while(--i);
+#else// 64-bit and larger systems
+		// architecture: do not limit as much when there's a reasonable amount of registers
+		// unsigned counter, not zero inclusive inside the loop
+		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
+		--loc;// allow indexing inside the loop here
+		input += loc;
+		pout += loc;
+		do{
+			V *phi{input[i]};
+			V *plo{input[i - 1]};
+			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+			pout[i] = phi;
+			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+			pout[i - 1] = plo;
+			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+			std::uint64_t curmhi{curhi.mantissa};
+			U curehi{static_cast<U>(curhi.signexponent)};
+			std::uint64_t curmlo{curlo.mantissa};
+			U curelo{static_cast<U>(curlo.signexponent)};
+			// register pressure performance issue on several platforms: first do the high half here
+			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+				filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+			}
+			unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+			curehi >>= 8;
+			unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+			unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+			unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+			unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+			unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+			curmhi >>= 55;
+			++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+			curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curmhi0];
+			curmhi1 &= (1u << 11) - 1u;
+			curmhi2 &= (1u << 11) - 1u;
+			curmhi3 &= (1u << 11) - 1u;
+			curmhi4 &= (1u << 11) - 1u;
+			++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmhi)];
+			++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+			++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+			++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+			// register pressure performance issue on several platforms: do the low half here second
+			unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+			curelo >>= 8;
+			unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+			unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+			unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+			unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+			unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+			curmlo >>= 55;
+			++offsetscompanion[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+			curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+			++offsetscompanion[curmlo0];
+			curmlo1 &= (1u << 11) - 1u;
+			curmlo2 &= (1u << 11) - 1u;
+			curmlo3 &= (1u << 11) - 1u;
+			curmlo4 &= (1u << 11) - 1u;
+			++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curmlo)];
+			++offsetscompanion[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+			++offsetscompanion[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+			++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+			++offsetscompanion[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+			++offsetscompanion[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+		}while(i -= 2);
+#endif
 	}
 	return offsetscompanion;
 }
@@ -15109,14 +15329,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
@@ -15147,19 +15360,84 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if((80u >> 3) - 2u == shifter)
+	if(offsetsloopcount<T> - 2u == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handlebelowtop;// rare, but possible
-	if((80u >> 3) - 2u < shifter)
+	if(offsetsloopcount<T> - 2u < shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+	while(32u > shifter){
+		// architecture: limit to two at a time when there's few registers
+		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+		do{// fill the array, two at a time
+			V *pa{psrchi[0]};
+			V *pb{psrchi[-1]};
+			psrchi -= 2;
+			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+			auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+			auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+			auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
+			std::size_t offsetb{poffset[curb]--};
+			pdst[offseta] = pa;
+			pdst[offsetb] = pb;
+		}while(--j);
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += typeradix<T>;
+		poffset += 1u << typeradix<T>;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrchi = pdst;
+		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
+		pdst = pdstnext;
+		pdstnext = psrchi;
+		psrchi += count;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * typeradix<T>;
+		poffset += static_cast<std::size_t>(index) << typeradix<T>;
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if(!old) do{
+				spinpause();
+			}while(atomiclightbarrier.load(std::memory_order_relaxed));
+		}else{// detect exceptions
+			if(!old) do{
+				spinpause();
+				old = atomiclightbarrier.load(std::memory_order_relaxed);
+			}while(~std::uintptr_t{} == old);
+			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
+		}
+	}
+	if((offsetsloopcount<T> - 2u) * typeradix<T> == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handlebelowtop;// rare, but possible
+	if((offsetsloopcount<T> - 2u) * typeradix<T> < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop;// rare, but possible
+	// also compensate for the remainder radix difference
+	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
+	poffset -= (1u << typeradix<T>) - (1u << typeradixremainder<T>);
+#endif
 	for(;;){
-		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+		{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
 			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
@@ -15169,13 +15447,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
 				pdst[offseta] = pa;
 				pdst[offsetb] = pb;
 			}while(--j);
-		}else{// architecture: limit to four at a time when there's a decent amount of registers
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
 			std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
 			do{// fill the array, four at a time
 				V *pa{psrchi[0]};
@@ -15201,13 +15480,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetc] = pc;
 				pdst[offsetd] = pd;
 			}while(--j);
+#endif
 		}
 		runsteps >>= 1;
 		if(!runsteps)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -15235,65 +15515,67 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		// handle the top two parts differently
-		if(80u - 16u <= shifter)
+		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
 		{
-			if(80u - 16u == shifter)
+			if(offsetsloopcountsplitup<T> * typeradix<T> == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 			{
 handlebelowtop:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T> - (1u << 8)]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T> - (1u << 8)]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						V *pc{psrchi[-2]};
-						V *pd{psrchi[-3]};
-						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T> - (1u << 8)]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T> - (1u << 8)]--};
-						std::size_t offsetc{offsetscompanion[curc + offsetsbodylength<T> - (1u << 8)]--};
-						std::size_t offsetd{offsetscompanion[curd + offsetsbodylength<T> - (1u << 8)]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}while(--j);
-				}
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to two at a time when there's few registers
+				std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+				do{// fill the array, two at a time
+					V *pa{psrchi[0]};
+					V *pb{psrchi[-1]};
+					psrchi -= 2;
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsetscompanion[cura + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (4u << 11) + (2u << 10)]--};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}while(--j);
+#else// 64-bit and larger systems
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
+				do{// fill the array, four at a time
+					V *pa{psrchi[0]};
+					V *pb{psrchi[-1]};
+					V *pc{psrchi[-2]};
+					V *pd{psrchi[-3]};
+					psrchi -= 4;
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsetscompanion[cura + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
+					std::size_t offsetb{offsetscompanion[curb + (5u << 11) + (1u << 9)]--};
+					std::size_t offsetc{offsetscompanion[curc + (5u << 11) + (1u << 9)]--};
+					std::size_t offsetd{offsetscompanion[curd + (5u << 11) + (1u << 9)]--};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}while(--j);
+#endif
 				if(1u == runsteps)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 					[[unlikely]]
 #endif
-					break;
+					return;
 				{
 					std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 					// swap the pointers for the next round, data is moved on each iteration
@@ -15313,52 +15595,54 @@ handlebelowtop:
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the main thread produced an exception
 					}
 				}
-handletop:
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
-					do{// fill the array, two at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						psrchi -= 2;
-						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T>]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-					}while(--j);
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
-					std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
-					do{// fill the array, four at a time
-						V *pa{psrchi[0]};
-						V *pb{psrchi[-1]};
-						V *pc{psrchi[-2]};
-						V *pd{psrchi[-3]};
-						psrchi -= 4;
-						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
-						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
-						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
-						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
-						std::size_t offsetb{offsetscompanion[curb + offsetsbodylength<T>]--};
-						std::size_t offsetc{offsetscompanion[curc + offsetsbodylength<T>]--};
-						std::size_t offsetd{offsetscompanion[curd + offsetsbodylength<T>]--};
-						pdst[offseta] = pa;
-						pdst[offsetb] = pb;
-						pdst[offsetc] = pc;
-						pdst[offsetd] = pd;
-					}while(--j);
-				}
-				break;// no further processing beyond the top part
 			}
+handletop:
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
+			std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
+			do{// fill the array, two at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				psrchi -= 2;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (4u << 11) + (2u << 10)]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}while(--j);
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::size_t j{(count + 1u + 4u) >> 3};// rounded up in the top part
+			do{// fill the array, four at a time
+				V *pa{psrchi[0]};
+				V *pb{psrchi[-1]};
+				V *pc{psrchi[-2]};
+				V *pd{psrchi[-3]};
+				psrchi -= 4;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
+				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				std::size_t offsetc{offsetscompanion[curc + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				std::size_t offsetd{offsetscompanion[curd + (1u << 8) + (5u << 11) + (1u << 9)]--};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}while(--j);
+#endif
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -15368,14 +15652,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
@@ -15405,81 +15682,41 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
-	if((80u >> 3) - 2u == shifter)
+	if(offsetsloopcount<T> - 2u == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
-	goto handlebelowtop;// rare, but possible
-	if((80u >> 3) - 2u < shifter)
+		goto handlebelowtop;// rare, but possible
+	if(offsetsloopcount<T> - 2u < shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 		[[unlikely]]
 #endif
-	goto handletop;// rare, but possible
+		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
-	for(;;){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+	while(32u > shifter){
 		if constexpr(ismultithreadcapable){
-			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-					auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-				}
-			}else{// architecture: limit to four at a time when there's a decent amount of registers
-				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
-				while(0 <= --j){// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
-					psrclo += 4;
-					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
-					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
-					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-					auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					std::size_t offsetc{poffset[curc]++};
-					std::size_t offsetd{poffset[curd]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-					pdst[offsetc] = pc;
-					pdst[offsetd] = pd;
-				}
-				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					psrclo += 2;
-					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-					auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
-					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
-					std::size_t offsetb{poffset[curb]++};
-					pdst[offseta] = pa;
-					pdst[offsetb] = pb;
-				}
+			// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
 				V *p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
 			}
@@ -15492,7 +15729,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-				auto[curlo, curhi]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
 				pdst[offsetlo] = plo;
@@ -15502,7 +15739,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
 				std::size_t offset{poffset[cur]};
 				pdst[offset] = p;
 			}
@@ -15512,7 +15749,168 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
+		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
+		shifter += typeradix<T>;
+		poffset += 1u << typeradix<T>;
+		// swap the pointers for the next round, data is moved on each iteration
+		psrclo = pdst;
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+		[[maybe_unused]]
+#endif
+		std::uintptr_t old;
+		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+		pdst = pdstnext;
+		pdstnext = psrclo;
+		// skip a step if possible
+		runsteps >>= index;
+		shifter += index * typeradix<T>;
+		poffset += static_cast<std::size_t>(index) << typeradix<T>;
+		if constexpr(ismultithreadcapable){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if(!old) do{
+					spinpause();
+				}while(atomiclightbarrier.load(std::memory_order_relaxed));
+			}else{// detect exceptions
+				if(!old) do{
+					spinpause();
+					old = atomiclightbarrier.load(std::memory_order_relaxed);
+				}while(~std::uintptr_t{} == old);
+				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+			}
+		}
+	}
+	if((offsetsloopcount<T> - 2u) * typeradix<T> == shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handlebelowtop;// rare, but possible
+	if((offsetsloopcount<T> - 2u) * typeradix<T> < shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		goto handletop;// rare, but possible
+	// also compensate for the remainder radix difference
+	shifter -= 32u + typeradix<T> - typeradixremainder<T>;
+	poffset -= (1u << typeradix<T>) - (1u << typeradixremainder<T>);
+#endif
+	for(;;){
+		if constexpr(ismultithreadcapable){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+			// architecture: limit to two at a time when there's few registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, two at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+#else// 64-bit and larger systems
+			// architecture: limit to four at a time when there's a decent amount of registers
+			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
+			while(0 <= --j){// fill the array, four at a time
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				V *pc{psrclo[2]};
+				V *pd{psrclo[3]};
+				psrclo += 4;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+				auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+				auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+				auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				std::size_t offsetc{poffset[curc]++};
+				std::size_t offsetd{poffset[curd]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+				pdst[offsetc] = pc;
+				pdst[offsetd] = pd;
+			}
+			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
+				V *pa{psrclo[0]};
+				V *pb{psrclo[1]};
+				psrclo += 2;
+				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+				auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+				auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
+				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
+				std::size_t offsetb{poffset[curb]++};
+				pdst[offseta] = pa;
+				pdst[offsetb] = pb;
+			}
+#endif
+			if(!(1u & count)){// fill in the final item for odd counts
+				V *p{psrclo[0]};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+				std::size_t cur{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}else{// !ismultithreadcapable
+			V *const *psrchi{psrclo + count};
+			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+				V *plo{*psrclo++};
+				V *phi{*psrchi--};
+				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+				auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+				auto[curlo, curhi]{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
+				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
+				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+				pdst[offsetlo] = plo;
+				pdst[offsethi] = phi;
+			}while(psrclo < psrchi);
+			if(psrclo == psrchi){// fill in the final item for odd counts
+				V *p{*psrclo};
+				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+				std::size_t cur{
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					filtershifthi
+#else// 64-bit and larger systems
+					filtershift
+#endif
+					<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
+				std::size_t offset{poffset[cur]};
+				pdst[offset] = p;
+			}
+		}
+		runsteps >>= 1;
+		if(!runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+			[[unlikely]]
+#endif
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -15545,140 +15943,20 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		// handle the top two parts differently
-		if(80u - 16u <= shifter)
+		if(offsetsloopcountsplitup<T> * typeradix<T> <= shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
 		{
-			if(80u - 16u == shifter)
+			if(offsetsloopcountsplitup<T> * typeradix<T> == shifter)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 			{
 handlebelowtop:
 				if constexpr(ismultithreadcapable){
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, two at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-							auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-						}
-					}else{// architecture: limit to four at a time when there's a decent amount of registers
-						std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
-						while(0 <= --j){// fill the array, four at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							V *pc{psrclo[2]};
-							V *pd{psrclo[3]};
-							psrclo += 4;
-							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-							auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
-							auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-							auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
-							auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-							auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							std::size_t offsetc{offsets[curc + offsetsbodylength<T> - (1u << 8)]++};
-							std::size_t offsetd{offsets[curd + offsetsbodylength<T> - (1u << 8)]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-							pdst[offsetc] = pc;
-							pdst[offsetd] = pd;
-						}
-						if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							psrclo += 2;
-							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
-							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
-							auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
-							auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-							auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-							std::size_t offseta{offsets[cura + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-							std::size_t offsetb{offsets[curb + offsetsbodylength<T> - (1u << 8)]++};
-							pdst[offseta] = pa;
-							pdst[offsetb] = pb;
-						}
-					}
-					if(!(1u & count)){// fill in the final item for odd counts
-						V *p{psrclo[0]};
-						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-						std::size_t offset{offsets[cur + offsetsbodylength<T> - (1u << 8)]};
-						pdst[offset] = p;
-					}
-				}else{// !ismultithreadcapable
-					V *const *psrchi{psrclo + count};
-					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
-						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-						auto[curlo, curhi]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
-						std::size_t offsetlo{offsets[curlo + offsetsbodylength<T> - (1u << 8)]++};// the next item will be placed one higher
-						std::size_t offsethi{offsets[curhi + offsetsbodylength<T> - (1u << 8) + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-						pdst[offsetlo] = plo;
-						pdst[offsethi] = phi;
-					}while(psrclo < psrchi);
-					if(psrclo == psrchi){// fill in the final item for odd counts
-						V *p{*psrclo};
-						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-						std::size_t offset{offsets[cur + offsetsbodylength<T> - (1u << 8)]};
-						pdst[offset] = p;
-					}
-				}
-			}
-			if(1u == runsteps)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-				[[unlikely]]
-#endif
-				break;
-			{
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
-				[[maybe_unused]]
-#endif
-				std::uintptr_t old;
-				if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
-				// swap the pointers for the next round, data is moved on each iteration
-				psrclo = pdst;
-				pdst = pdstnext;
-				// unused: pdstnext = psrclo;
-				if constexpr(ismultithreadcapable){
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-						if(!old) do{
-							spinpause();
-						}while(atomiclightbarrier.load(std::memory_order_relaxed));
-					}else{// detect exceptions
-						if(!old) do{
-							spinpause();
-							old = atomiclightbarrier.load(std::memory_order_relaxed);
-						}while(~std::uintptr_t{} == old);
-						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
-					}
-				}
-			}
-handletop:
-			if constexpr(ismultithreadcapable){
-				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to two at a time when there's few registers
 					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, two at a time
 						V *pa{psrclo[0]};
@@ -15688,13 +15966,14 @@ handletop:
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
+						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (4u << 11) + (2u << 10)]++};
 						pdst[offseta] = pa;
 						pdst[offsetb] = pb;
 					}
-				}else{// architecture: limit to four at a time when there's a decent amount of registers
+#else// 64-bit and larger systems
+					// architecture: limit to four at a time when there's a decent amount of registers
 					std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
 					while(0 <= --j){// fill the array, four at a time
 						V *pa{psrclo[0]};
@@ -15710,11 +15989,11 @@ handletop:
 						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 						auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
-						std::size_t offsetc{offsets[curc + offsetsbodylength<T>]++};
-						std::size_t offsetd{offsets[curd + offsetsbodylength<T>]++};
+						auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
+						std::size_t offsetc{offsets[curc + (5u << 11) + (1u << 9)]++};
+						std::size_t offsetd{offsets[curd + (5u << 11) + (1u << 9)]++};
 						pdst[offseta] = pa;
 						pdst[offsetb] = pb;
 						pdst[offsetc] = pc;
@@ -15728,19 +16007,172 @@ handletop:
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 						auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
-						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
-						std::size_t offsetb{offsets[curb + offsetsbodylength<T>]++};
+						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
 						pdst[offseta] = pa;
 						pdst[offsetb] = pb;
 					}
+#endif
+					if(!(1u & count)){// fill in the final item for odd counts
+						V *p{psrclo[0]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							]};
+						pdst[offset] = p;
+					}
+				}else{// !ismultithreadcapable
+					V *const *psrchi{psrclo + count};
+					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
+						V *plo{*psrclo++};
+						V *phi{*psrchi--};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						auto[curlo, curhi]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
+						std::size_t offsetlo{offsets[curlo +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							]++};// the next item will be placed one higher
+						std::size_t offsethi{offsets[curhi +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+						pdst[offsetlo] = plo;
+						pdst[offsethi] = phi;
+					}while(psrclo < psrchi);
+					if(psrclo == psrchi){// fill in the final item for odd counts
+						V *p{*psrclo};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
+						std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+							(4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+							(5u << 11) + (1u << 9)
+#endif
+							]};
+						pdst[offset] = p;
+					}
 				}
+				if(1u == runsteps)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+					[[unlikely]]
+#endif
+					return;
+				{
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
+					[[maybe_unused]]
+#endif
+					std::uintptr_t old;
+					if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
+					// swap the pointers for the next round, data is moved on each iteration
+					psrclo = pdst;
+					pdst = pdstnext;
+					// unused: pdstnext = psrclo;
+					if constexpr(ismultithreadcapable){
+						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+							if(!old) do{
+								spinpause();
+							}while(atomiclightbarrier.load(std::memory_order_relaxed));
+						}else{// detect exceptions
+							if(!old) do{
+								spinpause();
+								old = atomiclightbarrier.load(std::memory_order_relaxed);
+							}while(~std::uintptr_t{} == old);
+							if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == old) return;// the companion thread produced an exception
+						}
+					}
+				}
+			}
+handletop:
+			if constexpr(ismultithreadcapable){
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+				// architecture: limit to two at a time when there's few registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, two at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (4u << 11) + (2u << 10)]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+#else// 64-bit and larger systems
+				// architecture: limit to four at a time when there's a decent amount of registers
+				std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (2u + usemultithread))};// rounded down in the bottom part
+				while(0 <= --j){// fill the array, four at a time
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					V *pc{psrclo[2]};
+					V *pd{psrclo[3]};
+					psrclo += 4;
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
+					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
+					auto outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
+					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					std::size_t offsetc{offsets[curc + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					std::size_t offsetd{offsets[curd + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+					pdst[offsetc] = pc;
+					pdst[offsetd] = pd;
+				}
+				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
+					V *pa{psrclo[0]};
+					V *pb{psrclo[1]};
+					psrclo += 2;
+					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
+					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
+					auto outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
+					auto outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
+					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
+					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
+					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
+					pdst[offseta] = pa;
+					pdst[offsetb] = pb;
+				}
+#endif
 				if(!(1u & count)){// fill in the final item for odd counts
 					V *p{psrclo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-					std::size_t offset{offsets[cur + offsetsbodylength<T>]};
+					std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]};
 					pdst[offset] = p;
 				}
 			}else{// !ismultithreadcapable
@@ -15753,8 +16185,20 @@ handletop:
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					auto outhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
-					std::size_t offsetlo{offsets[curlo + offsetsbodylength<T>]++};// the next item will be placed one higher
-					std::size_t offsethi{offsets[curhi + offsetsbodylength<T> + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
+					std::size_t offsetlo{offsets[curlo +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]++};// the next item will be placed one higher
+					std::size_t offsethi{offsets[curhi +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
 					pdst[offsetlo] = plo;
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
@@ -15763,11 +16207,17 @@ handletop:
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
-					std::size_t offset{offsets[cur + offsetsbodylength<T>]};
+					std::size_t offset{offsets[cur +
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+						(1u << 8) + (4u << 11) + (2u << 10)
+#else// 64-bit and larger systems
+						(1u << 8) + (5u << 11) + (1u << 9)
+#endif
+						]};
 					pdst[offset] = p;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -15777,14 +16227,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
@@ -15913,14 +16356,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -16023,324 +16459,276 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(isrevorder){
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
-						do{
-							V *p{*pinput++};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							output[i] = p;
-							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-						}while(0 <= --i);
-					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
-						do{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
-							pinput += 2;
-							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							output[i] = plo;
-							buffer[i] = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							output[i - 1] = phi;
-							buffer[i - 1] = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-							std::uint64_t curmlo{curlo.mantissa};
-							U curelo{static_cast<U>(curlo.signexponent)};
-							std::uint64_t curmhi{curhi.mantissa};
-							U curehi{static_cast<U>(curhi.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-							}
-							// register pressure performance issue on several platforms: first do the low half here
-							unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-							curelo >>= 8;
-							unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-							unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-							unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-							unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-							unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-							unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-							unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-							curmlo >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-							curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmlo0];
-							curmlo1 &= (1u << 8) - 1u;
-							curmlo2 &= (1u << 8) - 1u;
-							curmlo3 &= (1u << 8) - 1u;
-							curmlo4 &= (1u << 8) - 1u;
-							curmlo5 &= (1u << 8) - 1u;
-							curmlo6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-							// register pressure performance issue on several platforms: do the high half here second
-							unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-							curehi >>= 8;
-							unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-							unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-							unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-							unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-							unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-							unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-							unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-							curmhi >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-							curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmhi0];
-							curmhi1 &= (1u << 8) - 1u;
-							curmhi2 &= (1u << 8) - 1u;
-							curmhi3 &= (1u << 8) - 1u;
-							curmhi4 &= (1u << 8) - 1u;
-							curmhi5 &= (1u << 8) - 1u;
-							curmhi6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-							i -= 2;
-						}while(0 < i);
-						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{pinput[0]};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							output[0] = p;
-							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					V *const *pinput{input + (count - i)};
+					do{
+						V *p{*pinput++};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						output[i] = p;
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+						unsigned curm1{static_cast<unsigned>(curm) >> 11};
+						unsigned curm2{static_cast<unsigned>(curm) >> 22};
+						unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curm4{static_cast<unsigned>(curm >> 43)};
+						curm >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+					}while(0 <= --i);
+#else// 64-bit and larger systems
+					// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					V *const *pinput{input + (count - i)};
+					do{
+						V *plo{pinput[0]};
+						V *phi{pinput[1]};
+						pinput += 2;
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						output[i] = plo;
+						buffer[i] = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						output[i - 1] = phi;
+						buffer[i - 1] = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+						curmlo >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= (1u << 11) - 1u;
+						curmlo2 &= (1u << 11) - 1u;
+						curmlo3 &= (1u << 11) - 1u;
+						curmlo4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+						curmhi >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= (1u << 11) - 1u;
+						curmhi2 &= (1u << 11) - 1u;
+						curmhi3 &= (1u << 11) - 1u;
+						curmhi4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{pinput[0]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						output[0] = p;
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+						unsigned curm1{static_cast<unsigned>(curm >> 11)};
+						unsigned curm2{static_cast<unsigned>(curm >> 22)};
+						unsigned curm3{static_cast<unsigned>(curm >> 33)};
+						unsigned curm4{static_cast<unsigned>(curm >> 44)};
+						curm >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						curm2 &= (1u << 11) - 1u;
+						curm3 &= (1u << 11) - 1u;
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 					}
+#endif
 				}else{// not in reverse order
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						do{
-							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							output[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-						}while(0 <= --i);
-					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						do{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							output[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							output[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-							std::uint64_t curmhi{curhi.mantissa};
-							U curehi{static_cast<U>(curhi.signexponent)};
-							std::uint64_t curmlo{curlo.mantissa};
-							U curelo{static_cast<U>(curlo.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
-							}
-							// register pressure performance issue on several platforms: first do the high half here
-							unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-							curehi >>= 8;
-							unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-							unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-							unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-							unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-							unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-							unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-							unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-							curmhi >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-							curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmhi0];
-							curmhi1 &= (1u << 8) - 1u;
-							curmhi2 &= (1u << 8) - 1u;
-							curmhi3 &= (1u << 8) - 1u;
-							curmhi4 &= (1u << 8) - 1u;
-							curmhi5 &= (1u << 8) - 1u;
-							curmhi6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-							// register pressure performance issue on several platforms: do the low half here second
-							unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-							curelo >>= 8;
-							unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-							unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-							unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-							unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-							unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-							unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-							unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-							curmlo >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-							curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmlo0];
-							curmlo1 &= (1u << 8) - 1u;
-							curmlo2 &= (1u << 8) - 1u;
-							curmlo3 &= (1u << 8) - 1u;
-							curmlo4 &= (1u << 8) - 1u;
-							curmlo5 &= (1u << 8) - 1u;
-							curmlo6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-							i -= 2;
-						}while(0 < i);
-						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							output[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					do{
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						output[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+						unsigned curm1{static_cast<unsigned>(curm) >> 11};
+						unsigned curm2{static_cast<unsigned>(curm) >> 22};
+						unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curm4{static_cast<unsigned>(curm >> 43)};
+						curm >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+					}while(0 <= --i);
+#else// 64-bit and larger systems
+					// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					do{
+						V *phi{input[i]};
+						V *plo{input[i - 1]};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						output[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						output[i - 1] = plo;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+						curmhi >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= (1u << 11) - 1u;
+						curmhi2 &= (1u << 11) - 1u;
+						curmhi3 &= (1u << 11) - 1u;
+						curmhi4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+						// register pressure performance issue on several platforms: do the low half here second
+						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+						curmlo >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= (1u << 11) - 1u;
+						curmlo2 &= (1u << 11) - 1u;
+						curmlo3 &= (1u << 11) - 1u;
+						curmlo4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						output[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+						unsigned curm1{static_cast<unsigned>(curm >> 11)};
+						unsigned curm2{static_cast<unsigned>(curm >> 22)};
+						unsigned curm3{static_cast<unsigned>(curm >> 33)};
+						unsigned curm4{static_cast<unsigned>(curm >> 44)};
+						curm >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						curm2 &= (1u << 11) - 1u;
+						curm3 &= (1u << 11) - 1u;
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 					}
+#endif
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
 					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
@@ -16433,14 +16821,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
@@ -16562,14 +16943,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	(std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest80<isabsvalue, issignmode, isfltpmode>> ||
-	std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, long double> &&
-	64 == LDBL_MANT_DIG &&
-	16384 == LDBL_MAX_EXP &&
-	128u >= CHAR_BIT * sizeof(long double) &&
-	64u < CHAR_BIT * sizeof(long double)),
+	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -16681,162 +17055,70 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer + loc;
 						pbufferhi = buffer + (count - loc);
 					}
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						do{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
-							// register pressure performance issue on several platforms: first do the low half here
-							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							*pinputhi-- = plo;
-							*pbufferhi-- = plo;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-							std::uint64_t curmlo{curlo.mantissa};
-							U curelo{static_cast<U>(curlo.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
-							}
-							unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-							curelo >>= 8;
-							unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-							unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-							unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-							unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-							unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-							unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-							unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-							curmlo >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-							curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmlo0];
-							curmlo1 &= (1u << 8) - 1u;
-							curmlo2 &= (1u << 8) - 1u;
-							curmlo3 &= (1u << 8) - 1u;
-							curmlo4 &= (1u << 8) - 1u;
-							curmlo5 &= (1u << 8) - 1u;
-							curmlo6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-							// register pressure performance issue on several platforms: do the high half here second
-							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							*pinputlo++ = phi;
-							*pbufferlo++ = phi;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-							std::uint64_t curmhi{curhi.mantissa};
-							U curehi{static_cast<U>(curhi.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
-							}
-							unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-							curehi >>= 8;
-							unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-							unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-							unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-							unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-							unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-							unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-							unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-							curmhi >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-							curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmhi0];
-							curmhi1 &= (1u << 8) - 1u;
-							curmhi2 &= (1u << 8) - 1u;
-							curmhi3 &= (1u << 8) - 1u;
-							curmhi4 &= (1u << 8) - 1u;
-							curmhi5 &= (1u << 8) - 1u;
-							curmhi6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-						}while(pinputlo < pinputhi);
-					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						do{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
-							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							*pinputhi-- = plo;
-							*pbufferhi-- = plo;
-							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							*pinputlo++ = phi;
-							*pbufferlo++ = phi;
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-							std::uint64_t curmlo{curlo.mantissa};
-							U curelo{static_cast<U>(curlo.signexponent)};
-							std::uint64_t curmhi{curhi.mantissa};
-							U curehi{static_cast<U>(curhi.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
-							}
-							// register pressure performance issue on several platforms: first do the low half here
-							unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-							curelo >>= 8;
-							unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-							unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-							unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-							unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-							unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-							unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-							unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-							curmlo >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-							curelo &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmlo0];
-							curmlo1 &= (1u << 8) - 1u;
-							curmlo2 &= (1u << 8) - 1u;
-							curmlo3 &= (1u << 8) - 1u;
-							curmlo4 &= (1u << 8) - 1u;
-							curmlo5 &= (1u << 8) - 1u;
-							curmlo6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-							// register pressure performance issue on several platforms: do the high half here second
-							unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-							curehi >>= 8;
-							unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-							unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-							unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-							unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-							unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-							unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-							unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-							curmhi >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-							curehi &= ((1u << 8) - 1u) >> static_cast<unsigned char>(isabsvalue && issignmode && isfltpmode);
-							++offsets[curmhi0];
-							curmhi1 &= (1u << 8) - 1u;
-							curmhi2 &= (1u << 8) - 1u;
-							curmhi3 &= (1u << 8) - 1u;
-							curmhi4 &= (1u << 8) - 1u;
-							curmhi5 &= (1u << 8) - 1u;
-							curmhi6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-						}while(pinputlo < pinputhi);
-					}
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to one at a time when there's few registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						// register pressure performance issue on several platforms: first do the low half here
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo);
+						}
+						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo) & (1u << 11) - 1u};
+						unsigned curmlo1{static_cast<unsigned>(curmlo) >> 11};
+						unsigned curmlo2{static_cast<unsigned>(curmlo) >> 22};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
+						curmlo >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo0)];
+						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo3)];
+						curmlo4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curelo)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
+						// register pressure performance issue on several platforms: do the high half here second
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi);
+						}
+						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi) & (1u << 11) - 1u};
+						unsigned curmhi1{static_cast<unsigned>(curmhi) >> 11};
+						unsigned curmhi2{static_cast<unsigned>(curmhi) >> 22};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
+						curmhi >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi0)];
+						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi3)];
+						curmhi4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(curehi)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi4)];
+					}while(pinputlo < pinputhi);
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
 						V *p{pinputlo[0]};
 						// no write to input, as this is the midpoint
@@ -16850,189 +17132,256 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
 						cure >>= 8;
-						unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-						unsigned curm1{static_cast<unsigned>(curm >> 8)};
-						unsigned curm2{static_cast<unsigned>(curm >> 16)};
-						unsigned curm3{static_cast<unsigned>(curm >> 24)};
-						unsigned curm4{static_cast<unsigned>(curm >> 32)};
-						unsigned curm5{static_cast<unsigned>(curm >> 40)};
-						unsigned curm6{static_cast<unsigned>(curm >> 48)};
-						curm >>= 56;
-						++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-						cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
+						unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+						unsigned curm1{static_cast<unsigned>(curm) >> 11};
+						unsigned curm2{static_cast<unsigned>(curm) >> 22};
+						unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curm4{static_cast<unsigned>(curm >> 43)};
+						curm >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
 						++offsets[curm0];
-						curm1 &= (1u << 8) - 1u;
-						curm2 &= (1u << 8) - 1u;
-						curm3 &= (1u << 8) - 1u;
-						curm4 &= (1u << 8) - 1u;
-						curm5 &= (1u << 8) - 1u;
-						curm6 &= (1u << 8) - 1u;
-						++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-						++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-						++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-						++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-						++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-						++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-						++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-						++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+						curm1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
 					}
+#else// 64-bit and larger systems
+					// architecture: do not limit as much when there's a reasonable amount of registers
+					do{
+						V *plo{pinputlo[0]};
+						V *phi{pinputhi[0]};
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						*pinputhi-- = plo;
+						*pbufferhi-- = plo;
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						*pinputlo++ = phi;
+						*pbufferlo++ = phi;
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, curmhi, curehi);
+						}
+						// register pressure performance issue on several platforms: first do the low half here
+						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+						curmlo >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= (1u << 11) - 1u;
+						curmlo2 &= (1u << 11) - 1u;
+						curmlo3 &= (1u << 11) - 1u;
+						curmlo4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+						// register pressure performance issue on several platforms: do the high half here second
+						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+						curmhi >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= (1u << 11) - 1u;
+						curmhi2 &= (1u << 11) - 1u;
+						curmhi3 &= (1u << 11) - 1u;
+						curmhi4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+					}while(pinputlo < pinputhi);
+					if(pinputlo == pinputhi){// fill in the final item for odd counts
+						V *p{pinputlo[0]};
+						// no write to input, as this is the midpoint
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						*pbufferhi = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+						unsigned curm1{static_cast<unsigned>(curm >> 11)};
+						unsigned curm2{static_cast<unsigned>(curm >> 22)};
+						unsigned curm3{static_cast<unsigned>(curm >> 33)};
+						unsigned curm4{static_cast<unsigned>(curm >> 44)};
+						curm >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						curm2 &= (1u << 11) - 1u;
+						curm3 &= (1u << 11) - 1u;
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
+					}
+#endif
 				}else{// not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						do{
-							V *p{input[i]};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							buffer[i] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
-						}while(0 <= --i);
-					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						do{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
-							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							buffer[i] = phi;
-							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							buffer[i - 1] = plo;
-							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
-							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
-							std::uint64_t curmhi{curhi.mantissa};
-							U curehi{static_cast<U>(curhi.signexponent)};
-							std::uint64_t curmlo{curlo.mantissa};
-							U curelo{static_cast<U>(curlo.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
-							}
-							// register pressure performance issue on several platforms: first do the low half here
-							unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
-							curehi >>= 8;
-							unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 8) - 1u)};
-							unsigned curmhi1{static_cast<unsigned>(curmhi >> 8)};
-							unsigned curmhi2{static_cast<unsigned>(curmhi >> 16)};
-							unsigned curmhi3{static_cast<unsigned>(curmhi >> 24)};
-							unsigned curmhi4{static_cast<unsigned>(curmhi >> 32)};
-							unsigned curmhi5{static_cast<unsigned>(curmhi >> 40)};
-							unsigned curmhi6{static_cast<unsigned>(curmhi >> 48)};
-							curmhi >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curehi0)];
-							curehi &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curmhi0];
-							curmhi1 &= (1u << 8) - 1u;
-							curmhi2 &= (1u << 8) - 1u;
-							curmhi3 &= (1u << 8) - 1u;
-							curmhi4 &= (1u << 8) - 1u;
-							curmhi5 &= (1u << 8) - 1u;
-							curmhi6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmhi)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curehi)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmhi1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmhi2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmhi3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmhi4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmhi5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmhi6)];
-							// register pressure performance issue on several platforms: do the high half here second
-							unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
-							curelo >>= 8;
-							unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 8) - 1u)};
-							unsigned curmlo1{static_cast<unsigned>(curmlo >> 8)};
-							unsigned curmlo2{static_cast<unsigned>(curmlo >> 16)};
-							unsigned curmlo3{static_cast<unsigned>(curmlo >> 24)};
-							unsigned curmlo4{static_cast<unsigned>(curmlo >> 32)};
-							unsigned curmlo5{static_cast<unsigned>(curmlo >> 40)};
-							unsigned curmlo6{static_cast<unsigned>(curmlo >> 48)};
-							curmlo >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(curelo0)];
-							curelo &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curmlo0];
-							curmlo1 &= (1u << 8) - 1u;
-							curmlo2 &= (1u << 8) - 1u;
-							curmlo3 &= (1u << 8) - 1u;
-							curmlo4 &= (1u << 8) - 1u;
-							curmlo5 &= (1u << 8) - 1u;
-							curmlo6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curmlo)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(curelo)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curmlo1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curmlo2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curmlo3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curmlo4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curmlo5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curmlo6)];
-							i -= 2;
-						}while(0 < i);
-						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
-							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
-							buffer[0] = p;
-							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
-							std::uint64_t curm{cur.mantissa};
-							U cure{static_cast<U>(cur.signexponent)};
-							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
-								filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
-							}
-							unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
-							cure >>= 8;
-							unsigned curm0{static_cast<unsigned>(curm & (1u << 8) - 1u)};
-							unsigned curm1{static_cast<unsigned>(curm >> 8)};
-							unsigned curm2{static_cast<unsigned>(curm >> 16)};
-							unsigned curm3{static_cast<unsigned>(curm >> 24)};
-							unsigned curm4{static_cast<unsigned>(curm >> 32)};
-							unsigned curm5{static_cast<unsigned>(curm >> 40)};
-							unsigned curm6{static_cast<unsigned>(curm >> 48)};
-							curm >>= 56;
-							++offsets[(8u << 8) + static_cast<std::size_t>(cure0)];
-							cure &= (1u << (8 - (isabsvalue && issignmode && isfltpmode))) - 1u;
-							++offsets[curm0];
-							curm1 &= (1u << 8) - 1u;
-							curm2 &= (1u << 8) - 1u;
-							curm3 &= (1u << 8) - 1u;
-							curm4 &= (1u << 8) - 1u;
-							curm5 &= (1u << 8) - 1u;
-							curm6 &= (1u << 8) - 1u;
-							++offsets[(7u << 8) + static_cast<std::size_t>(curm)];
-							++offsets[(9u << 8) + static_cast<std::size_t>(cure)];
-							++offsets[(1u << 8) + static_cast<std::size_t>(curm1)];
-							++offsets[(2u << 8) + static_cast<std::size_t>(curm2)];
-							++offsets[(3u << 8) + static_cast<std::size_t>(curm3)];
-							++offsets[(4u << 8) + static_cast<std::size_t>(curm4)];
-							++offsets[(5u << 8) + static_cast<std::size_t>(curm5)];
-							++offsets[(6u << 8) + static_cast<std::size_t>(curm6)];
+#if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
+					// architecture: limit to one at a time when there's few registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					do{
+						V *p{input[i]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						buffer[i] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
 						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm) & (1u << 11) - 1u};
+						unsigned curm1{static_cast<unsigned>(curm) >> 11};
+						unsigned curm2{static_cast<unsigned>(curm) >> 22};
+						unsigned curm3{static_cast<unsigned>(curm >> 32) & (1u << 11) - 1u};// decompose
+						unsigned curm4{static_cast<unsigned>(curm >> 43)};
+						curm >>= 54;
+						++offsets[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(2u << 11) + (1u << 10) + static_cast<std::size_t>(curm3)];
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (4u << 11) + (2u << 10) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curm4)];
+					}while(0 <= --i);
+#else// 64-bit and larger systems
+					// architecture: do not limit as much when there's a reasonable amount of registers
+					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					do{
+						V *phi{input[i]};
+						V *plo{input[i - 1]};
+						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
+						buffer[i] = phi;
+						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
+						buffer[i - 1] = plo;
+						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
+						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
+						std::uint64_t curmhi{curhi.mantissa};
+						U curehi{static_cast<U>(curhi.signexponent)};
+						std::uint64_t curmlo{curlo.mantissa};
+						U curelo{static_cast<U>(curlo.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, curmlo, curelo);
+						}
+						// register pressure performance issue on several platforms: first do the high half here
+						unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
+						curehi >>= 8;
+						unsigned curmhi0{static_cast<unsigned>(curmhi & (1u << 11) - 1u)};
+						unsigned curmhi1{static_cast<unsigned>(curmhi >> 11)};
+						unsigned curmhi2{static_cast<unsigned>(curmhi >> 22)};
+						unsigned curmhi3{static_cast<unsigned>(curmhi >> 33)};
+						unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
+						curmhi >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi0)];
+						curehi &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmhi0];
+						curmhi1 &= (1u << 11) - 1u;
+						curmhi2 &= (1u << 11) - 1u;
+						curmhi3 &= (1u << 11) - 1u;
+						curmhi4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmhi)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curehi)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmhi1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmhi2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmhi3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
+						// register pressure performance issue on several platforms: do the low half here second
+						unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
+						curelo >>= 8;
+						unsigned curmlo0{static_cast<unsigned>(curmlo & (1u << 11) - 1u)};
+						unsigned curmlo1{static_cast<unsigned>(curmlo >> 11)};
+						unsigned curmlo2{static_cast<unsigned>(curmlo >> 22)};
+						unsigned curmlo3{static_cast<unsigned>(curmlo >> 33)};
+						unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
+						curmlo >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo0)];
+						curelo &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curmlo0];
+						curmlo1 &= (1u << 11) - 1u;
+						curmlo2 &= (1u << 11) - 1u;
+						curmlo3 &= (1u << 11) - 1u;
+						curmlo4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curmlo)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(curelo)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curmlo1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curmlo2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curmlo3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curmlo4)];
+						i -= 2;
+					}while(0 < i);
+					if(!(1 & i)){// fill in the final item for odd counts
+						V *p{input[0]};
+						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
+						buffer[0] = p;
+						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
+						std::uint64_t curm{cur.mantissa};
+						U cure{static_cast<U>(cur.signexponent)};
+						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
+							filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure);
+						}
+						unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
+						cure >>= 8;
+						unsigned curm0{static_cast<unsigned>(curm & (1u << 11) - 1u)};
+						unsigned curm1{static_cast<unsigned>(curm >> 11)};
+						unsigned curm2{static_cast<unsigned>(curm >> 22)};
+						unsigned curm3{static_cast<unsigned>(curm >> 33)};
+						unsigned curm4{static_cast<unsigned>(curm >> 44)};
+						curm >>= 55;
+						++offsets[(5u << 11) + (1u << 9) + static_cast<std::size_t>(cure0)];
+						cure &= ((1u << 8) - 1u) >> static_cast<unsigned>(isabsvalue && issignmode && isfltpmode);
+						++offsets[curm0];
+						curm1 &= (1u << 11) - 1u;
+						curm2 &= (1u << 11) - 1u;
+						curm3 &= (1u << 11) - 1u;
+						curm4 &= (1u << 11) - 1u;
+						++offsets[(5u << 11) + static_cast<std::size_t>(curm)];
+						++offsets[(1u << 8) + (5u << 11) + (1u << 9) + static_cast<std::size_t>(cure)];
+						++offsets[(1u << 11) + static_cast<std::size_t>(curm1)];
+						++offsets[(2u << 11) + static_cast<std::size_t>(curm2)];
+						++offsets[(3u << 11) + static_cast<std::size_t>(curm3)];
+						++offsets[(4u << 11) + static_cast<std::size_t>(curm4)];
 					}
+#endif
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
 					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
@@ -17530,7 +17879,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 		shifter += typeradix<T>;
 		poffset += 1u << typeradix<T>;
@@ -17583,7 +17932,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -17628,7 +17977,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				pdst[offsetc] = outc;
 				pdst[offsetd] = outd;
 			}while(--j);
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -17820,7 +18169,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -17903,7 +18252,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = out;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -19042,15 +19391,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
@@ -19365,15 +19706,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -19510,7 +19843,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -19571,7 +19904,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				pdst[offsetc] = pc;
 				pdst[offsetd] = pd;
 			}while(--j);
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -19581,15 +19914,7 @@ template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -19823,7 +20148,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -19936,7 +20261,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -19946,15 +20271,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
@@ -20082,15 +20399,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -20548,15 +20857,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
@@ -20677,15 +20978,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
-	128u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<false, true, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, false, true>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, false>> &&
-	!std::is_same_v<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, longdoubletest128<true, true, true>>,
+	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
@@ -21727,7 +22020,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 		shifter += typeradix<T>;
 		poffset += 1u << typeradix<T>;
@@ -21790,7 +22083,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -21847,7 +22140,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetd] = outd;
 				}while(--j);
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -22063,7 +22356,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -22158,7 +22451,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = out;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -24015,7 +24308,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -24092,7 +24385,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetd] = pd;
 				}while(--j);
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -24368,7 +24661,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 			unsigned index{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
 			shifter += typeradix<T>;
@@ -24497,7 +24790,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -28193,7 +28486,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -28256,7 +28549,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetd] = static_cast<T>(outd);
 				}while(--j);
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -28368,7 +28661,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -28469,7 +28762,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = static_cast<T>(out);
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -35343,7 +35636,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -35426,7 +35719,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetd] = pd;
 				}while(--j);
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
@@ -35561,7 +35854,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
 			[[unlikely]]
 #endif
-			break;
+			return;
 		{
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
@@ -35696,7 +35989,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}
-			break;// no further processing beyond the top part
+			return;// no further processing beyond the top part
 		}
 	}
 }
