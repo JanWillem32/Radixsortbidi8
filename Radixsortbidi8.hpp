@@ -13088,6 +13088,7 @@ handletop:
 }
 
 // main part for the radixsortcopynoallocmulti() and radixsortnoallocmultimain() function implementation templates for 80-bit-based long double types without indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -13683,6 +13684,7 @@ handletop:
 }
 
 // multithreading companion for the radixsortcopynoallocmultimain() function implementation template for 80-bit-based long double types without indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -14276,6 +14278,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // multithreading companion for the radixsortnoallocmultimain() function implementation template for 80-bit-based long double types without indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -15659,6 +15662,7 @@ handletop:
 }
 
 // main part for the radixsortcopynoallocmulti() and radixsortnoallocmultimain() function implementation templates for 80-bit-based long double types with indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<auto indirection1, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, bool ismultithreadcapable, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -16234,6 +16238,7 @@ handletop:
 }
 
 // multithreading companion for the radixsortcopynoallocmultimain() function implementation template for 80-bit-based long double types with indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
@@ -16828,6 +16833,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 }
 
 // multithreading companion for the radixsortnoallocmultimain() function implementation template for 80-bit-based long double types with indirection
+// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
 template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, std::ptrdiff_t indirection2, bool isindexed2, typename V, typename X, typename... vararguments>
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
