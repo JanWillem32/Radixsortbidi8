@@ -12816,7 +12816,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
-	while(32u > shifter){
+	while(32u > shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// low 32 bits
 		// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 		do{// fill the array, two at a time
@@ -13128,7 +13132,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
-	while(32u > shifter){
+	while(32u > shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			// architecture: limit to two at a time when there's few registers
 			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
@@ -15386,7 +15394,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
-	while(32u > shifter){
+	while(32u > shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// low 32 bits
 		// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 		do{// fill the array, two at a time
@@ -15709,7 +15721,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		goto handletop;// rare, but possible
 	shifter *= typeradix<T>;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
-	while(32u > shifter){
+	while(32u > shifter)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+		[[likely]]
+#endif
+	{// low 32 bits
 		if constexpr(ismultithreadcapable){
 			// architecture: limit to two at a time when there's few registers
 			std::ptrdiff_t j{static_cast<std::ptrdiff_t>((count + 1u) >> (1u + usemultithread))};// rounded down in the bottom part
