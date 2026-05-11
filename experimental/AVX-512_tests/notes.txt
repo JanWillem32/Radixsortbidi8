@@ -1,0 +1,18 @@
+On 2026-05-10 the trial with an x64 AVX-512 test version ended unsuccesfully. It succeeded in the sorting tests, but remained nearly 50% slower than the conventional version. Its reliance on still rather slow gather and scatter operations, and a lot of shuffles to offset the issues with hard to vectorise sequences in the code just do not offer much of a chance to optimise the code this way.
+
+17865970858 / 11955242594 = 1.4944
+18104796402 / 12143450948 = 1.4909
+
+The log from the AVX-512 version, locked to 2 threads, with 64-bit indices:
+00000001  0.00000000 [14204]          40041458357 w
+00000002  6.34693861 [14204] std::uint64_t rsbd8::radixsort() test
+00000003  6.34704494 [14204]          17865970858
+00000004 11.86375237 [14204] std::uint64_t rsbd8::radixsortcopy() test
+00000005 11.86385345 [14204]          18104796402
+
+The log from the conventional version, locked to 2 threads, with 64-bit indices:
+00000001  0.00000000 [16464]          40342047379 w
+00000002  4.69249582 [16464] std::uint64_t rsbd8::radixsort() test
+00000003  4.69261217 [16464]          11955242594
+00000004  8.50396919 [16464] std::uint64_t rsbd8::radixsortcopy() test
+00000005  8.50408363 [16464]          12143450948
