@@ -4,22 +4,27 @@
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-// WindowsProject1.cpp : Defines the entry point for the application.
+// This test suite and the library header allows some configuration with macros.
+// The library itself does not require any of its macros to be defined for normal operation.
 // the test batch size for the performance tests (8 GiB default)
-// suggestions, all prime numbers to make sure all sorts of count leftover paths are touched inside the functions:
-// 251uz, the largest prime that will fit into an 8-bit unsigned integer (allocates 2 MiB with regular large pages enabled)
-// 65521uz, the largest prime that will fit into a 16-bit unsigned integer (allocates 2 MiB with regular large pages enabled)
-// 1073741789uz, the largest prime that will just allocate 1 GiB
-// 4294967291uz, the largest prime that will fit into a 32-bit unsigned integer (allocates 4 GiB)
-// 4294967311uz, the first prime that breaks the 32-bit unsigned integer limit, (allocates 4 GiB + 2 MiB with regular large pages enabled)
-#define RSBD8_TEST_BATCH_SIZE 8uz * 1024 * 1024 * 1024
+// suggestions, all powers of 2 minus one except for the last item, to make sure most sorts of count leftover paths are touched inside the functions:
+// 0xFFuz, the 8-bit unsigned integer limit (allocates 2 MiB with regular large pages enabled)
+// 0xFFFFuz, the 16-bit unsigned integer limit (allocates 2 MiB with regular large pages enabled)
+// 0x3FFFFFFFuz, the largest number that will just allocate 1 GiB
+// 0xFFFFFFFFuz, the 32-bit unsigned integer limit (allocates 4 GiB)
+// 4294967311uz, the first prime number past the 32-bit unsigned integer limit, (allocates 4 GiB + 2 MiB with regular large pages enabled)
+#define RSBD8_TEST_BATCH_SIZE 4uz * 1024 * 1024 * 1024
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
 #define RSBD8_DISABLE_BENCHMARK_EXTERNAL
 #endif
 // the maximum and minimum number of threads to use for the performance tests can optionally be set here
+// Available hardware threads are always obtained with std::thread::hardware_concurrency() when RSBD8_THREAD_MAXIMUM is above 1, even if RSBD8_THREAD_MINIMUM is defined.
+// This implies that testing with multithreading enabled is always limited to the number of hardware threads available.
 //#define RSBD8_THREAD_MAXIMUM 99
 //#define RSBD8_THREAD_MINIMUM 1
+
+#include "..\..\Radixsortbidi8.hpp"
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
@@ -50,10 +55,24 @@ __declspec(noalias safebuffers) __forceinline void insertion_sort(std::size_t n,
 
 // new implementation of the MSD radix sort
 
+struct shmbuffer{
+	__declspec(noalias safebuffers) __forceinline void *operator new[](std::size_t size){
+		// warning: the size has to be a multiple of 2 MiB for MEM_LARGE_PAGES
+		void *p{VirtualAlloc(nullptr, size, MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE)};
+		if(!p) throw std::bad_alloc{};
+		return{p};
+	}
+	__declspec(noalias safebuffers) __forceinline void operator delete[](void *p)noexcept{
+		BOOL bo{VirtualFree(p, 0, MEM_RELEASE)};
+		assert(bo);
+	}
+};
+
 template<unsigned radixbits, typename T>// the std::shared_ptr is just for releasing the resource when the function is called by std::async, and is not used in the function itself
-__declspec(noalias safebuffers) void experimentalMSD_sort_bottomlevel(std::size_t n, T array[], std::size_t count[], unsigned reportedcores, std::atomic_uint &coresused, std::shared_ptr<size_t[]>){
+__declspec(noalias safebuffers) void experimentalMSD_sort_bottomlevel(std::size_t n, T array[], std::size_t count[], unsigned reportedcores, std::atomic_uint &coresused, std::shared_ptr<shmbuffer[]>){
 	// the top bit of reportedcores indicates if this call is made by std::async, and a release on coresused at the end is required
-	static unsigned constexpr mask{(1u << radixbits) - 1u};
+	static unsigned constexpr segmentremainder{CHAR_BIT * sizeof(T) % radixbits};
+	static unsigned constexpr mask{(1u << (segmentremainder? segmentremainder : radixbits)) - 1u};
 	// Create holes
 	std::size_t loc[mask + 1u];
 	T unsorted[mask + 1u];
@@ -87,7 +106,7 @@ __declspec(noalias safebuffers) void experimentalMSD_sort_bottomlevel(std::size_
 }
 
 template<std::size_t bit, unsigned radixbits, typename T>// the std::shared_ptr is just for releasing the resource when the function is called by std::async, and is not used in the function itself
-__declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std::size_t n, T array[], std::size_t count[], unsigned reportedcores, std::atomic_uint &coresused, std::shared_ptr<size_t[]>){
+__declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std::size_t n, T array[], std::size_t count[], unsigned reportedcores, std::atomic_uint &coresused, std::shared_ptr<shmbuffer[]>){
 	// the top bit of reportedcores indicates if this call is made by std::async, and a release on coresused at the end is required
 	static unsigned constexpr mask{(1u << radixbits) - 1u};
 	// Create holes
@@ -108,12 +127,19 @@ __declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std
 	--live;
 	// Perform sort and make new counts for the next level
 	// raw pointer here, as the soring part can't throw anyway, later on a std::shared_ptr is used to pass on the resource to the children
-	std::size_t *nextcounts{new std::size_t[(mask + 1u) * (mask + 1u)]{}};
+	static unsigned constexpr segmentremainder{CHAR_BIT * sizeof(T) % radixbits};
+	static unsigned constexpr secondmask{(1u << ((radixbits <= bit)? radixbits : segmentremainder)) - 1u};
+	shmbuffer *pbuffer{new shmbuffer[sizeof(std::size_t) * (mask + 1u) * (secondmask + 1u)]};// allocate the buffer for the next level, using shmbuffer to ensure it's allocated with large pages, and make sure to allocate enough for all children, but not more, to save memory
+	std::size_t *nextcounts{reinterpret_cast<std::size_t *>(pbuffer)};
 	std::size_t j{n};
 	do{
 		T val{unsorted[live]};
 		T d{val >> bit & mask};
-		T dchild{val >> (bit - radixbits) & ((1u << 2u * radixbits) - 1u)};// double the width
+		T dchild{val};
+		if constexpr(bit > radixbits){
+			dchild >>= bit - radixbits;
+			dchild &= (1u << 2u * radixbits) - 1u;// double the width
+		}else dchild &= (1u << (segmentremainder? segmentremainder + radixbits : 2u * radixbits)) - 1u;// less than double the width
 		std::size_t cur{loc[d]};
 		++nextcounts[dchild];
 		array[cur] = val;
@@ -123,54 +149,52 @@ __declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_midlevel(std
 		live -= cur == count[d];
 		assert((j == 1u)? SIZE_MAX == live : mask >= live);
 	}while(--j);
-	// Pass on to the next level, using the new counts and async calls for the children
-	std::size_t *pcounts{nextcounts};
 	n = 0u;
 	std::size_t k{};
 	if constexpr(radixbits < bit){
+		// Pass on to the next level, using the new counts and async calls for the children
 		// careful with this line, it's basically a matroshka of nested std::vector<std::future<internaltype>> (std::vector<std::future<void>> at the bottom) and took well over an hour to figure out how to write correctly, and the error messages for getting it wrong are very confusing, so don't change it without fully understanding it
-		using internaltype = typename std::conditional_t<radixbits < bit, std::invoke_result<decltype(experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>), std::size_t, T[], std::size_t[], unsigned, std::atomic_uint &, std::shared_ptr<size_t[]>>, std::enable_if<true, void>>::type;
+		using internaltype = typename std::conditional_t<radixbits < bit, std::invoke_result<decltype(experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>), std::size_t, T[], std::size_t[], unsigned, std::atomic_uint &, std::shared_ptr<shmbuffer[]>>, std::enable_if<true, void>>::type;
 		std::vector<std::future<internaltype>> vecasync;
 		{// limit the scope of the shared pointer to less than that of vecasync
-			std::shared_ptr<std::size_t[]> spchildrencounts(nextcounts);
+			std::shared_ptr<shmbuffer[]> spchildrencounts(pbuffer);
 			do{// mid-level
 				std::size_t currentindex{count[k]};
 				++k;
 				std::size_t currentcount{currentindex - n};
-				if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
+				if(mask < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 					if((reportedcores & INT_MAX) > coresused){// mask out the possible high bit of reportedcores
 						++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-						vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
-					}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, pcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<std::size_t[]>{});// do the work here, mask out the possible high bit of reportedcores
+						vecasync.emplace_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, nextcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
+					}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, nextcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<shmbuffer[]>{});// do the work here, mask out the possible high bit of reportedcores
 				}else insertion_sort<T>(currentcount, array);
 				n = currentindex;
 				array += currentcount;
-				pcounts += mask + 1u;// move to the next set of counts for the next child
+				nextcounts += mask + 1u;// move to the next set of counts for the next child
 			}while(mask >= k);
 		}
 		coresused -= reportedcores >> (CHAR_BIT * sizeof(reportedcores) - 1u);// make space for another thread if high bit of reportedcores is set
 		return vecasync;
 	}else{
-		std::vector<std::future<void>> vecasync;
 		{// limit the scope of the shared pointer to less than that of vecasync
-			std::shared_ptr<std::size_t[]> spchildrencounts(nextcounts);
+			//std::shared_ptr<shmbuffer[]> spchildrencounts(pbuffer);
 			do{// bottom-level
 				std::size_t currentindex{count[k]};
 				++k;
 				std::size_t currentcount{currentindex - n};
-				if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
-					if((reportedcores & INT_MAX) > coresused){// mask out the possible high bit of reportedcores
-						++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-						vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
-					}else experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, pcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<std::size_t[]>{});// do the work here, mask out the possible high bit of reportedcores
-				}else insertion_sort<T>(currentcount, array);
+				if(1u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
+					//if((reportedcores & INT_MAX) > coresused){// mask out the possible high bit of reportedcores
+						//++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
+						//vecasync.emplace_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, nextcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
+					//}else
+					experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, nextcounts, reportedcores & INT_MAX, coresused, std::shared_ptr<shmbuffer[]>{});// do the work here, mask out the possible high bit of reportedcores
+				}//else insertion_sort<T>(currentcount, array);
 				n = currentindex;
 				array += currentcount;
-				pcounts += mask + 1u;// move to the next set of counts for the next child
+				nextcounts += secondmask + 1u;// move to the next set of counts for the next child, specific to the bottom level
 			}while(mask >= k);
 		}
 		coresused -= reportedcores >> (CHAR_BIT * sizeof(reportedcores) - 1u);// make space for another thread if high bit of reportedcores is set
-		return vecasync;
 	}
 }
 
@@ -235,7 +259,7 @@ __declspec(noalias safebuffers) decltype(auto) experimentalMSD_sort_toplevelinit
 	return localcount;
 }
 
-template<unsigned radixbits = 8u, typename T>
+template<unsigned radixbits = 11u, typename T>
 __declspec(noalias safebuffers) __forceinline void experimentalMSD_sort(std::size_t n, T array[]){
 	if(2u <= n){
 		if(2u != n){// filter out 0, 1 and 2 in two simple chained conditional jumps
@@ -280,7 +304,10 @@ singlethreadinit:
 				}
 				assert(n == std::accumulate(count.begin(), count.end(), 0u));
 			}
-			std::size_t *nextcounts{new std::size_t[(mask + 1u) * (mask + 1u)]{}};
+			static unsigned constexpr segmentremainder{CHAR_BIT * sizeof(T) % radixbits};
+			static unsigned constexpr secondmask{(1u << ((radixbits <= bit)? radixbits : segmentremainder)) - 1u};
+			shmbuffer *pbuffer{new shmbuffer[sizeof(std::size_t) * (mask + 1u) * (secondmask + 1u)]};// allocate the buffer for the next level, using shmbuffer to ensure it's allocated with large pages, and make sure to allocate enough for all children, but not more, to save memory
+			std::size_t *nextcounts{reinterpret_cast<std::size_t *>(pbuffer)};
 			// Create holes
 			// these two sequences are unfortunately not bidirectionally parallelizable by the not-stable, in-place MSD radix sort, unlike the stable, out-of-place LSD radix sort version
 			std::size_t loc[mask + 1u];
@@ -304,7 +331,10 @@ singlethreadinit:
 			do{
 				T val{unsorted[live]};
 				T d{val >> bit};// no mask, as the top bits are all that matter for the first level of sorting
-				T dchild{val >> (bit - radixbits)};// same as above, just with double the width
+				T dchild{val};
+				if constexpr(bit > radixbits){
+					dchild >>= bit - radixbits;// same as above, just with double the width
+				}
 				std::size_t cur{loc[d]};
 				++nextcounts[dchild];
 				array[cur] = val;
@@ -316,52 +346,52 @@ singlethreadinit:
 			}while(--j);
 			// Pass on to the next level, using the new counts and async calls for the children
 			std::atomic_uint coresused{1u};// do count the current thread, as this can disable multithreading if needed
-			std::size_t *pcounts{nextcounts};
 			n = 0u;
 			std::size_t k{};
-			reportedcores += (reportedcores >> 1u) + ((reportedcores + 1u) >> 2u);// allow over-subscription of threads by 75%, as the tasks are not perfectly balanced and some overhead is involved in pushing tasks into the vector and creating threads, so this should allow for better thread utilization without pushing too many tasks into the vector, which would cause too much overhead and reduce performance
+			//reportedcores += (reportedcores >> 1u) + ((reportedcores + 1u) >> 2u);// allow over-subscription of threads by 75%, as the tasks are not perfectly balanced and some overhead is involved in pushing tasks into the vector and creating threads, so this should allow for better thread utilization without pushing too many tasks into the vector, which would cause too much overhead and reduce performance
 			assert(!(reportedcores & INT_MIN));// the top level never has the top bit set
 			if constexpr(radixbits < bit){
 				// careful with this line, it's basically a matroshka of nested std::vector<std::future<internaltype>> (std::vector<std::future<void>> at the bottom) and took well over an hour to figure out how to write correctly, and the error messages for getting it wrong are very confusing, so don't change it without fully understanding it
-				using internaltype = typename std::conditional_t<radixbits < bit, std::invoke_result<decltype(experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>), std::size_t, T[], std::size_t[], unsigned, std::atomic_uint &, std::shared_ptr<size_t[]>>, std::enable_if<true, void>>::type;
+				using internaltype = typename std::conditional_t<radixbits < bit, std::invoke_result<decltype(experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>), std::size_t, T[], std::size_t[], unsigned, std::atomic_uint &, std::shared_ptr<shmbuffer[]>>, std::enable_if<true, void>>::type;
 				std::vector<std::future<internaltype>> vecasync;
 				vecasync.reserve(reportedcores - 1u);// pre-allocate space here, given the most likely scenario of the current thread pushing out more than enough std::async tasks
 				{// limit the scope of the shared pointer to less than that of vecasync
-					std::shared_ptr<std::size_t[]> spchildrencounts(nextcounts);
+					std::shared_ptr<shmbuffer[]> spchildrencounts(pbuffer);
 					do{// mid-level
 						std::size_t currentindex{count[k]};
 						++k;
 						std::size_t currentcount{currentindex - n};
-						if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
+						if(mask < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
 							if(reportedcores > coresused){
 								++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-								vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
-							}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, pcounts, reportedcores, coresused, std::shared_ptr<std::size_t[]>{});// do the work here
+								vecasync.emplace_back(std::async(std::launch::async, experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>, currentcount, array, nextcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
+							}else experimentalMSD_sort_midlevel<bit - radixbits, radixbits, T>(currentcount, array, nextcounts, reportedcores, coresused, std::shared_ptr<shmbuffer[]>{});// do the work here
 						}else insertion_sort<T>(currentcount, array);
 						n = currentindex;
 						array += currentcount;
-						pcounts += mask + 1u;// move to the next set of counts for the next child
+						nextcounts += mask + 1u;// move to the next set of counts for the next child
 					}while(mask >= k);
 				}
 				--coresused;// release it at the end, before the destructor of vecasync
 			}else if constexpr(bit){// disable this part if T is sorted in one pass, as the mid-level is not needed in that case
-				std::vector<std::future<void>> vecasync;
-				vecasync.reserve(reportedcores - 1u);// pre-allocate space here, given the most likely scenario of the current thread pushing out more than enough std::async tasks
+				//std::vector<std::future<void>> vecasync;
+				//vecasync.reserve(reportedcores - 1u);// pre-allocate space here, given the most likely scenario of the current thread pushing out more than enough std::async tasks
 				{// limit the scope of the shared pointer to less than that of vecasync
-					std::shared_ptr<std::size_t[]> spchildrencounts(nextcounts);
+					//std::shared_ptr<shmbuffer[]> spchildrencounts(pbuffer);
 					do{// bottom-level
 						std::size_t currentindex{count[k]};
 						++k;
 						std::size_t currentcount{currentindex - n};
-						if(20u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
-							if(reportedcores > coresused){
-								++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
-								vecasync.push_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, pcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
-							}else experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, pcounts, reportedcores, coresused, std::shared_ptr<std::size_t[]>{});// do the work here
-						}else insertion_sort<T>(currentcount, array);
+						if(1u < currentcount){// If replaced by 1u < n, insertion_sort is not needed.
+							//if(reportedcores > coresused){
+								//++coresused;// it doesn't matter if this is incremented by more than one thread at a time, as the check for whether to push into the vector is only an optimization to avoid pushing too many tasks into the vector, and pushing a few extra tasks in the vector won't cause any problems
+								//vecasync.emplace_back(std::async(std::launch::async, experimentalMSD_sort_bottomlevel<radixbits, T>, currentcount, array, nextcounts, reportedcores | INT_MIN, std::ref(coresused), spchildrencounts));
+							//}else
+							experimentalMSD_sort_bottomlevel<radixbits, T>(currentcount, array, nextcounts, reportedcores, coresused, std::shared_ptr<shmbuffer[]>{});// do the work here
+						}//else insertion_sort<T>(currentcount, array);
 						n = currentindex;
 						array += currentcount;
-						pcounts += mask + 1u;// move to the next set of counts for the next child
+						nextcounts += secondmask + 1u;// move to the next set of counts for the next child, specific to the bottom level
 					}while(mask >= k);
 				}
 				--coresused;// release it at the end, before the destructor of vecasync
@@ -1120,7 +1150,8 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	bool succeeded;// used to check for successful sorting, or repeat runs if needed
 
 	// one experimental part of the MSD radix sort
-	do{/* enable this if you have tme to waste, as even the optimised version is just over 21 times slower on 4294967311 B (just over 4 GiB) of data than the LSD radix sort, and the original version is over 100 times slower, so this is not really useful for benchmarking, but it can be used for testing and debugging
+	// enable this if you have tme to waste, as even the optimised version is 3.4 times slower on 4 GiB of data than the LSD radix sort, and the original version is over 100 times slower, so this is not really useful for benchmarking, but it can be used for testing and debugging
+	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
 		std::memcpy(out, in, (RSBD8_TEST_BATCH_SIZE));// copy, and warm up some of the caches
@@ -1161,7 +1192,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 			curlo = curhi;
 		}while(--k);
 #endif
-	}while(!succeeded);*/
+	}while(!succeeded);
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
