@@ -23,6 +23,8 @@
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
 #define RSBD8_DISABLE_BENCHMARK_EXTERNAL
 #endif
+// the entire benchmarks for the copy version of the radix sort can be disabled to further reduce the test time
+#define RSBD8_DISABLE_BENCHMARK_COPYVERSION
 // the maximum and minimum number of threads to use for the performance tests can optionally be set here
 // Available hardware threads are always obtained with std::thread::hardware_concurrency() when RSBD8_THREAD_MAXIMUM is above 1, even if RSBD8_THREAD_MINIMUM is defined.
 // This implies that testing with multithreading enabled is always limited to the number of hardware threads available.
@@ -374,6 +376,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}
 	}
 
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	{// unit tests with the 3 simulated 80-bit long double types
 		// direct sorting tests with the 80-bit long double types
 
@@ -623,6 +626,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		// TODO: add more unit tests
 	}
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 
 	// allocate RSBD8_TEST_BATCH_SIZE for the in- and outputs
 	assert(sizeof(void *) <= static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE));// RSBD8_TEST_BATCH_SIZE must be greater than or equal to sizeof(void *)
@@ -871,6 +875,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -915,6 +920,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -957,6 +963,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -998,6 +1005,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1039,6 +1047,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1080,6 +1089,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1124,6 +1134,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1168,6 +1179,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #endif
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
@@ -1268,6 +1280,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1309,6 +1322,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1408,6 +1422,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1449,6 +1464,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1551,6 +1567,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1595,6 +1612,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1694,6 +1712,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1735,6 +1754,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1834,6 +1854,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1875,6 +1896,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1977,6 +1999,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2021,6 +2044,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2120,6 +2144,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2161,6 +2186,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2260,6 +2286,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2301,6 +2328,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2345,6 +2373,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2389,6 +2418,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2488,6 +2518,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2529,6 +2560,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2628,6 +2660,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2669,6 +2702,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2713,6 +2747,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#ifdef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2757,6 +2792,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 		}while(--k);
 	}
 #endif
+#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
