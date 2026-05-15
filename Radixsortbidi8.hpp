@@ -11094,7 +11094,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
-			offset -= difference * (isdescsort * 2u - 1u);
+			offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
 	}else{// unsigned or signed absolute
@@ -11672,7 +11672,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 				t += 1 - isdescsort * 2;
-				offset -= difference * (isdescsort * 2u - 1u);
+				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
@@ -11739,7 +11739,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				*t = static_cast<X>(offset);
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
 				t += 1 - isdescsort * 2;
-				offset -= difference * (isdescsort * 2u - 1u);
+				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
@@ -13738,7 +13738,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -14210,7 +14211,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -14325,7 +14327,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -14873,7 +14876,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -16306,7 +16310,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -16763,7 +16768,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -16894,7 +16900,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -17417,7 +17424,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -18334,7 +18342,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -18774,7 +18783,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -18886,7 +18896,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -19340,7 +19351,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -20351,7 +20363,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -20800,7 +20813,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -20930,7 +20944,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -21386,7 +21401,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -22533,7 +22549,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -22985,7 +23002,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -23097,7 +23115,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -23638,7 +23657,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -24878,7 +24898,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -25329,7 +25350,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -25459,7 +25481,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -25974,7 +25997,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -28848,7 +28872,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -30690,7 +30715,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -30806,7 +30832,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -33225,7 +33252,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -36080,7 +36108,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -37979,7 +38008,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -38110,7 +38140,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -40499,7 +40530,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -41263,7 +41295,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -41356,7 +41389,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -41611,7 +41645,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -41853,7 +41888,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -41927,7 +41963,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -42018,7 +42055,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -42273,7 +42311,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -42507,7 +42546,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+				auto const &slicedata{slicehandle.get()};
+				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}
 		}
 
@@ -42926,7 +42966,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -43250,7 +43291,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
@@ -43365,7 +43407,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			--assignedslice;
 		}while(--i);
 		for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicehandle.get().begin(), offsetscompanion.begin(), std::plus<X>{});
+			auto const &slicedata{slicehandle.get()};
+			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 		}
 	}
 
@@ -43689,7 +43732,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector){// combine the data from several threads
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicehandle.get().begin(), offsets.begin(), std::plus<X>{});
+					auto const &slicedata{slicehandle.get()};
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 				}
 			}
 
