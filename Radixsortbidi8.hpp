@@ -13878,7 +13878,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
@@ -14464,7 +14464,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
@@ -16476,7 +16476,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -17063,7 +17063,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -18486,7 +18486,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
@@ -19037,7 +19037,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
@@ -20527,7 +20527,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -21105,7 +21105,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -22693,7 +22693,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
@@ -23256,7 +23256,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
@@ -25060,7 +25060,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -25642,7 +25642,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -29012,7 +29012,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
@@ -30969,7 +30969,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
@@ -36265,7 +36265,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -38294,7 +38294,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -41476,7 +41476,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
@@ -41771,7 +41771,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
@@ -42142,7 +42142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
@@ -42435,7 +42435,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned assignedslice;
 			if constexpr(ismultithreadcapable){
 				static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, false>()};
-				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 				try{
 					asynchandle = std::async(std::launch::async, radixsortnoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, std::ref(atomiclightbarrier));
@@ -43098,7 +43098,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, std::ref(atomiclightbarrier), varparameters...);
@@ -43539,7 +43539,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned assignedslice;
 				if constexpr(ismultithreadcapable){
 					static std::size_t constexpr limit2way{base2waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, true>()};
-					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / ((limit2way + 1u) >> 1)));// simple safety limit on the maximum thread count
+					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count * 2u + 2u) / limit2way));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
 					try{
 						asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
@@ -43840,36 +43840,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 		}else{// single-threaded
 			pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -43927,36 +43927,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 		}else{// single-threaded
 			pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -44020,36 +44020,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 		}else{// single-threaded
 			pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -44106,36 +44106,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 		}else{// single-threaded
 			pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -44192,36 +44192,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 		}else{// single-threaded
 			pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocsinglemain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -44286,36 +44286,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 		}else{// single-threaded
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -44374,36 +44374,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 		}else{// single-threaded
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -44468,36 +44468,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 		}else{// single-threaded
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -44555,36 +44555,36 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			if(static_cast<unsigned>(RSBD8_THREAD_MAXIMUM) < reportedcores) reportedcores = static_cast<unsigned>(RSBD8_THREAD_MAXIMUM);
 #endif
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 		}else{// single-threaded
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -47340,7 +47340,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 2u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -47362,19 +47362,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 #else// pre-computed index size (X)
@@ -47384,11 +47384,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-				if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-					&& limit4way < count
-#endif
-					){// 4-way limit
+				if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
 					std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 					std::size_t const halfcount{count >> 1};// rounded down
@@ -47412,6 +47408,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores >> 1};
+					assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount);
@@ -47452,19 +47449,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -47510,7 +47507,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 2u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -47532,19 +47529,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 			}
 #else// pre-computed index size (X)
@@ -47554,11 +47551,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-				if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-					&& limit4way < count
-#endif
-					){// 4-way limit
+				if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
 					std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 					std::size_t const halfcount{count >> 1};// rounded down
@@ -47582,6 +47575,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores >> 1};
+					assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer);
@@ -47627,19 +47621,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -48688,19 +48682,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -48710,14 +48704,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 3u
 #endif
 				};
-				if(5u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
-					&& limit6way < count
-#endif
-					){// 6-way limit
+				if(5u < reportedcores && limit6way <= count){// 6-way limit
 					std::size_t const thirdcount{count / 3u};// rounded down
 					std::size_t const thirdcountmid{(count + 1u) / 3u};
 					std::size_t const twothirdscount{thirdcount + thirdcountmid};
@@ -48742,6 +48732,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores / 3u};
+					assert(1u < reportedcorestemp);// each of the three parts will use at least two threads
 					try{
 						// process the middle third (rounded in between) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, thirdcountmid, input + thirdcount, buffer + thirdcount, output + thirdcount);
@@ -48785,19 +48776,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -48843,19 +48834,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -48865,14 +48856,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 3u
 #endif
 				};
-				if(5u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
-					&& limit6way < count
-#endif
-					){// 6-way limit
+				if(5u < reportedcores && limit6way <= count){// 6-way limit
 					std::size_t const thirdcount{count / 3u};// rounded down
 					std::size_t const thirdcountmid{(count + 1u) / 3u};
 					std::size_t const twothirdscount{thirdcount + thirdcountmid};
@@ -48897,6 +48884,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores / 3u};
+					assert(1u < reportedcorestemp);// each of the three parts will use at least two threads
 					try{
 						// process the middle third (rounded in between) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, thirdcountmid, input + thirdcount, buffer + thirdcount, !movetobuffer);
@@ -48945,19 +48933,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -49009,7 +48997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 4u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -49031,31 +49019,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				// initial phase with regular sorting of both halves
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 				}
-				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 				}
-				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 				}
-				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 				}
-				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 				}
 #else// pre-computed index size (X)
@@ -49065,11 +49049,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{
 					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-					if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-						&& limit8way < count
-#endif
-						){// 8-way limit
+					if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -49093,6 +49073,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned reportedcorestemp{reportedcores >> 1};
+						assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount);
@@ -49133,19 +49114,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 				}
 			}
@@ -49153,19 +49134,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -49211,7 +49192,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 4u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -49233,31 +49214,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				// initial phase with regular sorting of both halves
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 				}
-				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 				}
-				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 				}
-				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 				}
-				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 				}
 #else// pre-computed index size (X)
@@ -49267,11 +49244,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{
 					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-					if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-						&& limit8way < count
-#endif
-						){// 8-way limit
+					if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -49295,6 +49268,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned reportedcorestemp{reportedcores >> 1};
+						assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer);
@@ -49340,19 +49314,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 				}
 			}
@@ -49360,19 +49334,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -49420,43 +49394,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 					base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 4u
 #endif
 				};
-				if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-					&& limit8way < count
-#endif
-					){// 8-way limit
+				if(7u < reportedcores && limit8way <= count){// 8-way limit
 					// initial phase with regular sorting of both halves
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 					}
-					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 					}
-					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 					}
-					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 					}
-					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
@@ -49466,14 +49432,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-							limit2way
+							limit2way * 8u
 #endif
 						};
-						if(15u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
-							&& limit16way < count
-#endif
-							){// 16-way limit
+						if(15u < reportedcores && limit16way <= count){// 16-way limit
 							std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 							std::size_t const halfcount{count >> 1};// rounded down
 							// select the smallest unsigned type for the indices
@@ -49496,6 +49458,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 							unsigned reportedcorestemp{reportedcores >> 1};
+							assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount);
@@ -49531,19 +49494,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-					if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 					}
-					if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 					}
-					if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 					}
-					if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 					}
-					if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
 				}
@@ -49551,19 +49514,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 				}
 			}
@@ -49571,19 +49534,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, false>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, false>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, false>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, false>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, false>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, false>;
 			}
 		}
@@ -49623,43 +49586,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 					base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 4u
 #endif
 				};
-				if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-					&& limit8way < count
-#endif
-					){// 8-way limit
+				if(7u < reportedcores && limit8way <= count){// 8-way limit
 					// initial phase with regular sorting of both halves
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 					}
-					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 					}
-					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 					}
-					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 					}
-					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
@@ -49669,14 +49624,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-							limit2way
+							limit2way * 8u
 #endif
 						};
-						if(15u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
-							&& limit16way < count
-#endif
-							){// 16-way limit
+						if(15u < reportedcores && limit16way <= count){// 16-way limit
 							std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 							std::size_t const halfcount{count >> 1};// rounded down
 							// select the smallest unsigned type for the indices
@@ -49699,6 +49650,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 							unsigned reportedcorestemp{reportedcores >> 1};
+							assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer);
@@ -49739,19 +49691,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t>;
-					if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long>;
 					}
-					if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long>;
 					}
-					if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned>;
 					}
-					if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short>;
 					}
-					if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char>;
 					}
 				}
@@ -49759,19 +49711,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, std::size_t, true>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long long, true>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned long, true>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned, true>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned short, true>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmultimain<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, unsigned char, true>;
 				}
 			}
@@ -50188,7 +50140,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 2u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -50210,19 +50162,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 #else// pre-computed index size (X)
@@ -50232,11 +50184,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-				if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-					&& limit4way < count
-#endif
-					){// 4-way limit
+				if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
 					std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 					std::size_t const halfcount{count >> 1};// rounded down
@@ -50260,6 +50208,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores >> 1};
+					assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -50298,19 +50247,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -50350,7 +50299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 		base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 2u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -50372,19 +50321,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 #else// pre-computed index size (X)
@@ -50394,11 +50343,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			{
 				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
-				if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-					&& limit4way < count
-#endif
-					){// 4-way limit
+				if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
 					std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 					std::size_t const halfcount{count >> 1};// rounded down
@@ -50422,6 +50367,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 					unsigned reportedcorestemp{reportedcores >> 1};
+					assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 					try{
 						// process the upper half (rounded up) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
@@ -50465,19 +50411,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -51142,19 +51088,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -51164,14 +51110,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 3u
 #endif
 				};
-				if(5u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
-					&& limit6way < count
-#endif
-					){// 6-way limit
+				if(5u < reportedcores && limit6way <= count){// 6-way limit
 					std::size_t const thirdcount{count / 3u};// rounded down
 					std::size_t const thirdcountmid{(count + 1u) / 3u};
 					std::size_t const twothirdscount{thirdcount + thirdcountmid};
@@ -51195,7 +51137,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pcallsmaller = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
-					unsigned reportedcorestemp{reportedcores >> 1};
+					unsigned reportedcorestemp{reportedcores / 3u};
+					assert(1u < reportedcorestemp);// each of the three parts will use at least two threads
 					try{
 						// process the middle third (rounded in between) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, thirdcountmid, input + thirdcount, buffer + thirdcount, output + thirdcount, varparameters...);
@@ -51239,19 +51182,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -51296,19 +51239,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 			}
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
@@ -51318,14 +51261,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 					base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 3u
 #endif
 				};
-				if(5u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
-					&& limit6way < count
-#endif
-					){// 6-way limit
+				if(5u < reportedcores && limit6way <= count){// 6-way limit
 					std::size_t const thirdcount{count / 3u};// rounded down
 					std::size_t const thirdcountmid{(count + 1u) / 3u};
 					std::size_t const twothirdscount{thirdcount + thirdcountmid};
@@ -51349,7 +51288,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pcallsmaller = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 					}
 					// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
-					unsigned reportedcorestemp{reportedcores >> 1};
+					unsigned reportedcorestemp{reportedcores / 3u};
+					assert(1u < reportedcorestemp);// each of the three parts will use at least two threads
 					try{
 						// process the middle third (rounded in between) separately if possible
 						asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, thirdcountmid, input + thirdcount, buffer + thirdcount, !movetobuffer, varparameters...);
@@ -51398,19 +51338,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -51456,7 +51396,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 4u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -51478,31 +51418,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				// initial phase with regular sorting of both halves
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 				}
 #else// pre-computed index size (X)
@@ -51512,11 +51448,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{
 					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-					if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-						&& limit8way < count
-#endif
-						){// 8-way limit
+					if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -51540,6 +51472,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned reportedcorestemp{reportedcores >> 1};
+						assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -51578,19 +51511,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 				}
 			}
@@ -51598,19 +51531,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -51650,7 +51583,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 		base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-		limit2way
+		limit2way * 4u
 #endif
 	};
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -51672,31 +51605,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				// initial phase with regular sorting of both halves
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-				if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 				}
 #else// pre-computed index size (X)
@@ -51706,11 +51635,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{
 					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
-					if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-						&& limit8way < count
-#endif
-						){// 8-way limit
+					if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -51734,6 +51659,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 						unsigned reportedcorestemp{reportedcores >> 1};
+						assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 						try{
 							// process the upper half (rounded up) separately if possible
 							asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
@@ -51777,19 +51703,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 				}
 			}
@@ -51797,19 +51723,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -51862,43 +51788,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 					base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 4u
 #endif
 				};
-				if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-					&& limit8way < count
-#endif
-					){// 8-way limit
+				if(7u < reportedcores && limit8way <= count){// 8-way limit
 					// initial phase with regular sorting of both halves
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 					}
-					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 					}
-					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 					}
-					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 					}
-					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
@@ -51908,14 +51826,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-							limit2way
+							limit2way * 8u
 #endif
 						};
-						if(15u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
-							&& limit16way < count
-#endif
-							){// 16-way limit
+						if(15u < reportedcores && limit16way <= count){// 16-way limit
 							std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 							std::size_t const halfcount{count >> 1};// rounded down
 							// select the smallest unsigned type for the indices
@@ -51938,6 +51852,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 							unsigned reportedcorestemp{reportedcores >> 1};
+							assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, output + halfcount, varparameters...);
@@ -51973,19 +51888,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-					if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 					}
-					if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 					}
-					if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 					}
-					if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 					}
-					if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortcopynoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
 				}
@@ -51993,19 +51908,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 				}
 			}
@@ -52013,19 +51928,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortcopynoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
@@ -52070,43 +51985,35 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
 				base4waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-				limit2way
+				limit2way * 2u
 #endif
 			};
-			if(3u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 4 > (RSBD8_THREAD_MINIMUM)
-				&& limit4way < count
-#endif
-				){// 4-way limit
+			if(3u < reportedcores && limit4way <= count){// 4-way limit
 				static std::size_t constexpr limit8way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
 					base8waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-					limit2way
+					limit2way * 4u
 #endif
 				};
-				if(7u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 8 > (RSBD8_THREAD_MINIMUM)
-					&& limit8way < count
-#endif
-					){// 8-way limit
+				if(7u < reportedcores && limit8way <= count){// 8-way limit
 					// initial phase with regular sorting of both halves
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-					if constexpr(ULLONG_MAX > limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit8way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 					}
-					if constexpr(ULONG_MAX > limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit8way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 					}
-					if constexpr(UINT_MAX > limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit8way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 					}
-					if constexpr(USHRT_MAX > limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit8way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 					}
-					if constexpr(UCHAR_MAX > limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit8way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti8thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
 					std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
@@ -52116,14 +52023,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
 							base16waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
 #else
-							limit2way
+							limit2way * 8u
 #endif
 						};
-						if(15u < reportedcores
-#if !defined(RSBD8_THREAD_MINIMUM) || 16 > (RSBD8_THREAD_MINIMUM)
-							&& limit16way < count
-#endif
-							){// 16-way limit
+						if(15u < reportedcores && limit16way <= count){// 16-way limit
 							std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 							std::size_t const halfcount{count >> 1};// rounded down
 							// select the smallest unsigned type for the indices
@@ -52146,6 +52049,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							}
 							// round the available cores down, as there is no point in distributing the leftovers as every load is the same anyway and the overhead of doing so would be non-negligible
 							unsigned reportedcorestemp{reportedcores >> 1};
+							assert(1u < reportedcorestemp);// each of the two parts will use at least two threads
 							try{
 								// process the upper half (rounded up) separately if possible
 								asynchandle = std::async(std::launch::async, pcallsmaller, reportedcorestemp, halfcounttop, input + halfcount, buffer + halfcount, !movetobuffer, varparameters...);
@@ -52186,19 +52090,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// select the smallest unsigned type for the indices
 					// architecture: this compiles into just a few conditional move instructions on most platforms
 					pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, vararguments...>;
-					if constexpr(ULLONG_MAX > limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+					if constexpr(ULLONG_MAX >= limit4way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, vararguments...>;
 					}
-					if constexpr(ULONG_MAX > limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+					if constexpr(ULONG_MAX >= limit4way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, vararguments...>;
 					}
-					if constexpr(UINT_MAX > limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+					if constexpr(UINT_MAX >= limit4way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, vararguments...>;
 					}
-					if constexpr(USHRT_MAX > limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+					if constexpr(USHRT_MAX >= limit4way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, vararguments...>;
 					}
-					if constexpr(UCHAR_MAX > limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+					if constexpr(UCHAR_MAX >= limit4way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 						pcall = radixsortnoallocmulti4thread<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, vararguments...>;
 					}
 				}
@@ -52206,19 +52110,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// select the smallest unsigned type for the indices
 				// architecture: this compiles into just a few conditional move instructions on most platforms
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, true, vararguments...>;
-				if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+				if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, true, vararguments...>;
 				}
-				if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+				if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, true, vararguments...>;
 				}
-				if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+				if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, true, vararguments...>;
 				}
-				if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+				if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, true, vararguments...>;
 				}
-				if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+				if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 					pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, true, vararguments...>;
 				}
 			}
@@ -52226,19 +52130,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			// select the smallest unsigned type for the indices
 			// architecture: this compiles into just a few conditional move instructions on most platforms
 			pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, std::size_t, false, vararguments...>;
-			if constexpr(ULLONG_MAX > limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
+			if constexpr(ULLONG_MAX >= limit2way && ULLONG_MAX < SIZE_MAX && ULLONG_MAX != ULONG_MAX) if(ULLONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long long, false, vararguments...>;
 			}
-			if constexpr(ULONG_MAX > limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
+			if constexpr(ULONG_MAX >= limit2way && ULONG_MAX < SIZE_MAX && ULONG_MAX != UINT_MAX) if(ULONG_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned long, false, vararguments...>;
 			}
-			if constexpr(UINT_MAX > limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
+			if constexpr(UINT_MAX >= limit2way && UINT_MAX < SIZE_MAX && UINT_MAX != USHRT_MAX) if(UINT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned, false, vararguments...>;
 			}
-			if constexpr(USHRT_MAX > limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
+			if constexpr(USHRT_MAX >= limit2way && USHRT_MAX < SIZE_MAX && USHRT_MAX != UCHAR_MAX) if(USHRT_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned short, false, vararguments...>;
 			}
-			if constexpr(UCHAR_MAX > limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
+			if constexpr(UCHAR_MAX >= limit2way && UCHAR_MAX < SIZE_MAX) if(UCHAR_MAX >= count){
 				pcall = radixsortnoallocmultimain<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, unsigned char, false, vararguments...>;
 			}
 		}
