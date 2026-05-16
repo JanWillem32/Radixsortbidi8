@@ -43833,7 +43833,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -43920,7 +43920,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44013,7 +44013,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44099,7 +44099,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44185,7 +44185,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44279,7 +44279,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44367,7 +44367,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44461,7 +44461,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -44548,7 +44548,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -47352,7 +47352,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -47519,7 +47519,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -48672,7 +48672,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -48824,7 +48824,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -49009,7 +49009,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -49204,7 +49204,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -49384,7 +49384,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -49576,7 +49576,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -50152,7 +50152,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -50311,7 +50311,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51078,7 +51078,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51229,7 +51229,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51408,7 +51408,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51595,7 +51595,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51778,7 +51778,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
@@ -51975,7 +51975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::conditional_t<limit2way <= ULONG_MAX, unsigned long,
 		std::conditional_t<limit2way <= ULLONG_MAX, unsigned long long,
 		std::size_t>>>>>, false, vararguments...>};
-	if(limit2way < count){
+	if(limit2way <= count){
 		reportedcores = std::thread::hardware_concurrency();// when this is 0, assume single-core
 		if(1u < reportedcores){// 2-way limit
 #if defined(RSBD8_THREAD_MAXIMUM)
