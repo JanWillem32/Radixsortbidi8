@@ -1631,7 +1631,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<true, true, true>>,
 	T> generatehighbit()noexcept{
 	// platforms with a native 80-bit long double type are all little endian, hence that is the only implementation here
-	return{{0u, 0x8000u}};
+	return{0u, 0x8000u};
 }
 
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// disable the recompose64<isfltpmode>() endianess helper and test64 struct on 64-bit and larger systems
@@ -40917,7 +40917,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pfill -= length;
 				std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
 				length = static_cast<U>(*t) + static_cast<U>(*u);
-				filler += isdescsort * 2u - 1u;
+				filler += static_cast<unsigned>(isdescsort * 2 - 1);
 				t += isdescsort * 2 - 1;
 				u += isdescsort * 2 - 1;
 			}while(--j);
@@ -40958,7 +40958,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pfill -= length;
 					std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
 					length = static_cast<U>(*t) + static_cast<U>(*u);
-					filler += isdescsort * 2u - 1u;
+					filler += static_cast<unsigned>(isdescsort * 2 - 1);
 					t += isdescsort * 2 - 1;
 					u += isdescsort * 2 - 1;
 				}while(--j);
