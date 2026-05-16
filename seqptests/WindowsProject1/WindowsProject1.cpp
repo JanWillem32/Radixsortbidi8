@@ -23,9 +23,15 @@ static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024};
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
 #define RSBD8_DISABLE_BENCHMARK_EXTERNAL
-#endif
+#endif// _DEBUG
 // the entire benchmarks for the copy version of the radix sort can be disabled to further reduce the test time
 #define RSBD8_DISABLE_BENCHMARK_COPYVERSION
+// the entire benchmarks for unsigned kinds of the radix sort can be disabled to further reduce the test time
+//#define RSBD8_DISABLE_BENCHMARK_UNSIGNED
+// the entire benchmarks for signed kinds of the radix sort can be disabled to further reduce the test time
+#define RSBD8_DISABLE_BENCHMARK_SIGNED
+// the entire benchmarks for floating-point kinds of the radix sort can be disabled to further reduce the test time
+//#define RSBD8_DISABLE_BENCHMARK_FLOATING
 // the entire benchmarks for all direct array sorting versions of the radix sort can be disabled to further reduce the test time
 //#define RSBD8_DISABLE_BENCHMARK_DIRECT
 // the entire benchmarks for all indirect array sorting versions of the radix sort can be disabled to further reduce the test time
@@ -633,7 +639,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		// TODO: add more unit tests
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
 
 	// allocate batchmaximum for the in- and outputs
 	static std::size_t constexpr batchmaximum{*(std::max_element(RSBD8_TEST_BATCH_SIZE, RSBD8_TEST_BATCH_SIZE + _countof(RSBD8_TEST_BATCH_SIZE)))};
@@ -841,8 +847,186 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	std::ptrdiff_t testloopcount{_countof(RSBD8_TEST_BATCH_SIZE) - 1};
 repeattest:
 	std::size_t currentbatchsize{RSBD8_TEST_BATCH_SIZE[testloopcount]};
+		WritePaddedu64(szTicksRu64Text, currentbatchsize);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"running a test batch of\n");
+		OutputDebugStringW(szTicksRu64Text);
 
 #ifndef RSBD8_DISABLE_BENCHMARK_DIRECT
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit signed rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsortcopy(currentbatchsize / 16, reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(in), reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> *>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit signed rsbd8::radixsortcopy() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
+		auto curlo{*piter++};
+		do{
+			auto curhi{*piter++};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			// shift up by one
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -886,7 +1070,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -931,9 +1115,11 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -974,7 +1160,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1016,8 +1202,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1058,7 +1246,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1100,8 +1288,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1145,7 +1335,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1190,9 +1380,11 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1250,7 +1442,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1291,7 +1483,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1333,8 +1525,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1392,7 +1586,7 @@ repeattest:
 		OutputDebugStringW(L"std::int64_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1433,7 +1627,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1475,8 +1669,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1534,7 +1730,7 @@ repeattest:
 		OutputDebugStringW(L"double std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1578,7 +1774,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1623,8 +1819,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1682,7 +1880,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1723,7 +1921,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1765,8 +1963,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1824,7 +2024,7 @@ repeattest:
 		OutputDebugStringW(L"std::int32_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1865,7 +2065,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1907,8 +2107,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -1966,7 +2168,7 @@ repeattest:
 		OutputDebugStringW(L"float std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2010,7 +2212,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2055,8 +2257,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2114,7 +2318,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2155,7 +2359,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2197,8 +2401,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2256,7 +2462,7 @@ repeattest:
 		OutputDebugStringW(L"std::int16_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2297,7 +2503,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2339,8 +2545,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2384,7 +2592,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2429,8 +2637,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2488,7 +2698,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2529,7 +2739,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2571,8 +2781,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2630,7 +2842,7 @@ repeattest:
 		OutputDebugStringW(L"std::int8_t std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2671,7 +2883,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2713,8 +2925,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2758,7 +2972,7 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
 #ifndef RSBD8_DISABLE_BENCHMARK_COPYVERSION
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -2803,10 +3017,66 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_COPYVERSION
-#endif// RSBD8_DISABLE_BENCHMARK_DIRECT
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_COPYVERSION
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// not RSBD8_DISABLE_BENCHMARK_DIRECT
 #ifndef RSBD8_DISABLE_BENCHMARK_INDIRECT
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
+	do{
+		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
+
+		rsbd8::helper::longdoubletest128<false, false, false> const *pSource{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(in)};
+		rsbd8::helper::longdoubletest128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const **>(out)};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
+		std::size_t i{testsize};
+		do{
+			*pDest++ = pSource++;
+		}while(--i);
+
+		// start measuring
+		{
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		std::uint64_t u64start{__rdtsc()};
+
+		succeeded = rsbd8::radixsort(testsize, reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> **>(out), upLargePageSize);
+
+		// stop measuring
+		std::uint64_t u64stop;
+		{
+			unsigned int uAux;// unused
+			u64stop = __rdtscp(&uAux);
+			int cpuInfo[4];// unused
+			__cpuid(cpuInfo, 0);// only used for serializing execution
+		}
+		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
+		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
+		// output debug strings to the system
+		OutputDebugStringW(L"encapsulated 80-bit unsigned, indirect rsbd8::radixsort() test\n");
+		OutputDebugStringW(szTicksRu64Text);
+	}while(!succeeded);
+#ifdef _DEBUG
+	{// verify if sorted
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
+		std::size_t k{testsize - 1};// -1 for the intial bounds
+		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *const *>(out)};
+		auto lo{*piter++};
+		auto curlo{*lo};
+		do{
+			auto hi{*piter++};
+			auto curhi{*hi};
+			if(curhi < curlo) __debugbreak();// break on error, this is more useful than using std::is_sorted(), as the pointer and two current values can be analysed here
+			else if(curhi == curlo && hi <= lo) __debugbreak();// break on error, this verifies the results are also ordered correctly
+			// shift up by one
+			lo = hi;
+			curlo = curhi;
+		}while(--k);
+	}
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2858,14 +3128,16 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
-		rsbd8::helper::test128<false, true, true> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(in)};
-		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
-		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
+		rsbd8::helper::test128<false, false, false> const *pSource{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(in)};
+		rsbd8::helper::test128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, false, false> const **>(out)};
+		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, false, false>), sizeof(void *))};
 		std::size_t i{testsize};
 		do{
 			*pDest++ = pSource++;
@@ -2911,7 +3183,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2963,8 +3237,10 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// 128-bit tests are only available on 64-bit and larger systems
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3001,7 +3277,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint64_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3053,7 +3329,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3090,7 +3368,7 @@ repeattest:
 		OutputDebugStringW(L"double, indirect std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3142,7 +3420,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3179,7 +3459,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint32_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3231,7 +3511,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3268,7 +3550,7 @@ repeattest:
 		OutputDebugStringW(L"float, indirect std::stable_sort() test\n");
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3320,7 +3602,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3357,7 +3641,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint16_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3409,7 +3693,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3461,7 +3747,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
@@ -3498,7 +3786,7 @@ repeattest:
 		OutputDebugStringW(L"std::uint8_t, indirect std::stable_sort() test\n"	);
 		OutputDebugStringW(szTicksRu64Text);
 	}
-#endif// RSBD8_DISABLE_BENCHMARK_EXTERNAL
+#endif// not RSBD8_DISABLE_BENCHMARK_EXTERNAL
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3550,7 +3838,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_UNSIGNED
+#ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 	do{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -3602,8 +3892,9 @@ repeattest:
 			curlo = curhi;
 		}while(--k);
 	}
-#endif
-#endif// RSBD8_DISABLE_BENCHMARK_INDIRECT
+#endif// _DEBUG
+#endif// not RSBD8_DISABLE_BENCHMARK_FLOATING
+#endif// not RSBD8_DISABLE_BENCHMARK_INDIRECT
 
 	// benchmark finished time
 	WritePaddedu64(szTicksRu64Text, PerfCounter100ns());
@@ -3693,5 +3984,5 @@ GetFirstMessage:
 		assert(boUnregisterClassW);
 	}else MessageBoxW(nullptr, L"RegisterClassExW() failed", nullptr, MB_SYSTEMMODAL | MB_ICONERROR);// The default and localized "error" title caption will be used.
 	return{0};// failure status
-#endif// RSBD8_DISABLE_BENCHMARK_WINDOW
+#endif// not RSBD8_DISABLE_BENCHMARK_WINDOW
 }
