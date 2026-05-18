@@ -486,6 +486,12 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 
 namespace rsbd8::helper{// avoid putting any include files into this library's namespace.
 RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the spinlocks used in multithreaded processing
+// simple forward declaration for the prefetch instructions
+// TODO: current tests were all with a stride of 512 bytes, but that could use some tuning
+RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept;// general prefetch, one stride backward (negative offset) from the given address
+RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept;// general prefetch, one stride forward (positive offset) from the given address
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept;// write-specific prefetch, one stride backward (negative offset) from the given address
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept;// write-specific prefetch, one stride forward (positive offset) from the given address
 }
 // C++17 features detection
 #if 201703L > __cplusplus
@@ -580,12 +586,32 @@ RSBD8_FUNC_INLINE void spinpause()noexcept;// simple forward declaration for the
 #include <intrin.h>
 #if (defined(_M_IX86) && !defined(_M_HYBRID_X86_ARM64)) || (defined(_M_X64) && !defined(_M_ARM64EC))
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - 512, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + 512, _MM_HINT_T0);}
+// a reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
+#ifdef _M_X64
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + 512);}
+#else
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - 512, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + 512, _MM_HINT_T0);}
+#endif
 
 #elif defined(_M_ARM64) || defined(_M_ARM64EC) || defined(_M_HYBRID_X86_ARM64)
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM64_BARRIER_ISHST); __yield();}
+// ARM64_PREFETCH_PLD | ARM64_PREFETCH_L1 | ARM64_PREFETCH_KEEP
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - 512, (0u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + 512, (0u << 3) | (0u << 1) | (0u << 0));}
+// ARM64_PREFETCH_PST | ARM64_PREFETCH_L1 | ARM64_PREFETCH_KEEP
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - 512, (2u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + 512, (2u << 3) | (0u << 1) | (0u << 0));}
 
 #elif defined(_M_ARM)
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM_BARRIER_ISHST); __yield();}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) + 512);}
 
 #else
 #error This is an unsupported system architecture in combination with this compiler. Edit this library to add support for it.
@@ -594,11 +620,27 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{__dmb(_ARM_BARRIER_ISH
 #elif defined(__armel__) || defined(__ARMEL__)
 // avoid using anything for this old ARM target
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
+#if !defined(__GNUC__) && !defined(__clang__)
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{}
+#endif
 
 #elif (defined(__GNUC__) || defined(__clang__)) && (defined(__x86_64__) || defined(__i386__))
 // GCC/Clang-compatible compiler, targeting x86/x86-64
 #include <x86intrin.h>
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{_mm_pause();}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - 512, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + 512, _MM_HINT_T0);}
+// a reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
+#ifdef _M_X64
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + 512);}
+#else
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - 512, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + 512, _MM_HINT_T0);}
+#endif
 
 #if defined(__has_builtin) && __has_builtin(__builtin_add_overflow)
 // solve the case of the missing compiler intrinsics, _subborrow_u16() is a bit more tricky (and resides in critical paths) for this library so these have asm/other statements per item
@@ -700,7 +742,27 @@ RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{
 // fallback, with warning
 #pragma message("Compiler and system architecture not detected. Edit this library to add support for it.")
 RSBD8_FUNC_INLINE void rsbd8::helper::spinpause()noexcept{}
+#if !defined(__GNUC__) && !defined(__clang__) && !defined(__xlC__)
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{}
 #endif
+#endif
+
+// use the generic prefetch intrinsic functions if available
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__x86_64__) && !defined(__i386__)
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - 512, 0, 3);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + 512, 0, 3);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - 512, 1, 3);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + 512, 1, 3);}
+#elif defined(__xlC__)
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchbackward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchforward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwritebackward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - 512);}
+RSBD8_FUNC_INLINE void rsbd8::helper::prefetchwriteforward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + 512);}
+#endif
+
 namespace rsbd8{// avoid putting any include files into this library's namespace
 namespace helper{// this libary defines a number of helper items, so categorise them as such
 
@@ -11075,8 +11137,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-			t += 1 - isdescsort * 2;
-			u += 1 - isdescsort * 2;
+			if constexpr(isdescsort){
+				prefetchbackward(t - 1);
+				--t;
+				prefetchbackward(u - 1);
+				--u;
+			}else{
+				prefetchforward(t + 1);
+				++t;
+				prefetchforward(u + 1);
+				++u;
+			}
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -11092,8 +11163,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-			t += 1 - isdescsort * 2;
-			u += 1 - isdescsort * 2;
+			if constexpr(isdescsort){
+				prefetchbackward(t - 1);
+				--t;
+				prefetchbackward(u - 1);
+				--u;
+			}else{
+				prefetchforward(t + 1);
+				++t;
+				prefetchforward(u + 1);
+				++u;
+			}
 			offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -11113,8 +11193,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 				t[3 - isdescsort * 6] = static_cast<X>(offset);
 				*u = static_cast<X>(offset - 1u);// even, high half
-				t += 2 - isdescsort * 4;// step forward twice
-				u += 2 - isdescsort * 4;
+				// step forward twice
+				if constexpr(isdescsort){
+					prefetchbackward(t - 2);
+					t -= 2;
+					prefetchbackward(u - 2);
+					u -= 2;
+				}else{
+					prefetchforward(t + 2);
+					t += 2;
+					prefetchforward(u + 2);
+					u += 2;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11127,8 +11217,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 				*t = static_cast<X>(offset);
 				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-				t += 1 - isdescsort * 2;
-				u += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+					prefetchbackward(u - 1);
+					--u;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+					prefetchforward(u + 1);
+					++u;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11178,8 +11277,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 			*u = static_cast<X>(offset);// high half
 			t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// low half
-			u += isdescsort * 2 - 1;
-			t += isdescsort * 2 - 1;
+			if constexpr(isdescsort){
+				prefetchforward(u + 1);
+				++u;
+				prefetchforward(t + 1);
+				++t;
+			}else{
+				prefetchbackward(u - 1);
+				--u;
+				prefetchbackward(t - 1);
+				--t;
+			}
 			offset -= difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -11201,8 +11309,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				difference = static_cast<U>(u[isdescsort * 6 - 3]) + static_cast<U>(t[isdescsort * 6 - 3]);// odd
 				u[isdescsort * 6 - 3] = static_cast<X>(offset);// odd, high half
 				*t = static_cast<X>(offset + 1u);// even, low half
-				u += isdescsort * 4 - 2u;// step forward twice
-				t += isdescsort * 4 - 2u;
+				// step forward twice
+				if constexpr(isdescsort){
+					prefetchforward(u + 2);
+					u += 2;
+					prefetchforward(t + 2);
+					t += 2;
+				}else{
+					prefetchbackward(u - 2);
+					u -= 2;
+					prefetchbackward(t - 2);
+					t -= 2;
+				}
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11224,8 +11342,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{static_cast<U>(*u) + static_cast<U>(*t)};
 				*u = static_cast<X>(offset);// even, high half
 				t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// odd, low half
-				u += isdescsort * 2 - 1;
-				t += isdescsort * 2 - 1;
+				if constexpr(isdescsort){
+					prefetchforward(u + 1);
+					++u;
+					prefetchforward(t + 1);
+					++t;
+				}else{
+					prefetchbackward(u - 1);
+					--u;
+					prefetchbackward(t - 1);
+					--t;
+				}
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11416,8 +11543,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 			*t = static_cast<X>(offset);// low half
 			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-			t += 1 - isdescsort * 2;
-			u += 1 - isdescsort * 2;
+			if constexpr(isdescsort){
+				prefetchbackward(t - 1);
+				--t;
+				prefetchbackward(u - 1);
+				--u;
+			}else{
+				prefetchforward(t + 1);
+				++t;
+				prefetchforward(u + 1);
+				++u;
+			}
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
@@ -11438,8 +11574,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 				t[3 - isdescsort * 6] = static_cast<X>(offset);// odd, low half
 				*u = static_cast<X>(offset - 1u);// even, high half
-				t += 2 - isdescsort * 4;// step forward twice
-				u += 2 - isdescsort * 4;
+				// step forward twice
+				if constexpr(isdescsort){
+					prefetchbackward(t - 2);
+					t -= 2;
+					prefetchbackward(u - 2);
+					u -= 2;
+				}else{
+					prefetchforward(t + 2);
+					t += 2;
+					prefetchforward(u + 2);
+					u += 2;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11460,8 +11606,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 				*t = static_cast<X>(offset);// even, low half
 				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// odd, high half
-				t += 1 - isdescsort * 2;
-				u += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+					prefetchbackward(u - 1);
+					--u;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+					prefetchforward(u + 1);
+					++u;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11502,7 +11657,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 				U difference{t[1 - isdescsort * 2]};
 				*t = static_cast<X>(offset);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 			}while(--j);
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
@@ -11515,7 +11676,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 				difference = *t;
 				*t = static_cast<X>(offset);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 			}while(--j);
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
@@ -11539,7 +11706,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[isdescsort * 2 - 1];// even
-					t += 2 - isdescsort * 4;// step forward twice
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchbackward(t - 2);
+						t -= 2;
+					}else{
+						prefetchforward(t + 2);
+						t += 2;
+					}
 				}while(--j);
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
@@ -11556,7 +11730,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[2 - isdescsort * 4];
 					*t = static_cast<X>(offset);
-					t += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+					}
 				}while(--j);
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
@@ -11574,7 +11754,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11587,7 +11773,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11604,7 +11796,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
 					t[3 - isdescsort * 6] = static_cast<X>(offset);
-					t += 2 - isdescsort * 4;// step forward twice
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchbackward(t - 2);
+						t -= 2;
+					}else{
+						prefetchforward(t + 2);
+						t += 2;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -11615,7 +11814,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				do{
 					U difference{*t};
 					*t = static_cast<X>(offset);
-					t += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -11656,7 +11861,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11671,7 +11882,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11690,7 +11907,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					difference = t[3 - isdescsort * 6];// odd
 					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + 3u - isdescsort * 6u] = static_cast<X>(offset);// high half
 					*t = static_cast<X>(offset - 1u);// even
-					t += 2 - isdescsort * 4;// step forward twice
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchbackward(t - 2);
+						t -= 2;
+					}else{
+						prefetchforward(t + 2);
+						t += 2;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -11702,7 +11926,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U difference{*t};
 					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(static_cast<X>(offset));// high half
 					t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
-					t += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -11723,7 +11953,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11738,7 +11974,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U difference{*t};
 				*t = static_cast<X>(offset);
 				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
@@ -11757,7 +11999,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					difference = t[3 - isdescsort * 6];// odd
 					t[3 - isdescsort * 6] = static_cast<X>(offset);
 					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset - 1u);// even, high half
-					t += 2 - isdescsort * 4;// step forward twice
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchbackward(t - 2);
+						t -= 2;
+					}else{
+						prefetchforward(t + 2);
+						t += 2;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -11769,7 +12018,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U difference{*t};
 					*t = static_cast<X>(offset);
 					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
-					t += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+					}
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 				}while(--j);
@@ -12370,10 +12625,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				U cure{static_cast<U>(input[0].signexponent)};
 				std::uint_least64_t curm{input[0].mantissa};
+				prefetchbackward(input - 1);
 				--input;
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout, pdst);
+					prefetchwriteforward(pout + 1);
 					++pout;
+					prefetchwriteforward(pdst + 1);
 					++pdst;
 				}
 				unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
@@ -12389,7 +12647,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curm4{static_cast<unsigned>(curm >> 43)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[0].mantissa = curm;
+					prefetchwriteforward(pout + 1);
+					++pout;
 					pdst[0].mantissa = curm;
+					prefetchwriteforward(pdst + 1);
+					++pdst;
 				}
 				curm >>= 54;
 				++offsetscompanion[(4u << 11) + (2u << 10) + static_cast<std::size_t>(cure0)];
@@ -12416,12 +12678,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least64_t curmlo{input[0].mantissa};
 				U curehi{static_cast<U>(input[-1].signexponent)};
 				std::uint_least64_t curmhi{input[-1].mantissa};
+				prefetchbackward(input - 2);
 				input -= 2;
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pout, pdst,
-						curmhi, curehi, pout + 1, pdst + 1u);
+						curmhi, curehi, pout + 1, pdst + 1);
+					prefetchwriteforward(pout + 2);
 					pout += 2;
+					prefetchwriteforward(pdst + 2);
 					pdst += 2;
 				}
 				// register pressure performance issue on several platforms: first do the low half here
@@ -12468,8 +12733,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[1].mantissa = curmhi;
+					prefetchwriteforward(pout + 2);
 					pout += 2;
 					pdst[1].mantissa = curmhi;
+					prefetchwriteforward(pdst + 2);
 					pdst += 2;
 				}
 				curmhi >>= 55;
@@ -12502,7 +12769,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// register pressure performance issue on several platforms: first do the low half here
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, poutputhi);
+					prefetchbackward(pinputhi - 1);
 					--pinputhi;
+					prefetchwritebackward(poutputhi - 1);
 					--poutputhi;
 				}
 				unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
@@ -12518,8 +12787,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
+					prefetchbackward(pinputhi - 1);
 					--pinputhi;
 					poutputhi[0].mantissa = curmlo;
+					prefetchwritebackward(poutputhi - 1);
 					--poutputhi;
 				}
 				curmlo >>= 54;
@@ -12537,7 +12808,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// register pressure performance issue on several platforms: do the high half here second
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, poutputlo);
+					prefetchforward(pinputlo + 1);
 					++pinputlo;
+					prefetchwriteforward(poutputlo + 1);
 					++poutputlo;
 				}
 				unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
@@ -12553,8 +12826,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmhi;
+					prefetchforward(pinputlo + 1);
 					++pinputlo;
 					poutputlo[0].mantissa = curmhi;
+					prefetchwriteforward(poutputlo + 1);
 					++poutputlo;
 				}
 				curmhi >>= 54;
@@ -12581,9 +12856,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curmlo, curelo, pinputhi, poutputhi,
 						curmhi, curehi, pinputlo, poutputlo);
+					prefetchbackward(pinputhi - 1);
 					--pinputhi;
+					prefetchwritebackward(poutputhi - 1);
 					--poutputhi;
+					prefetchforward(pinputlo + 1);
 					++pinputlo;
+					prefetchwriteforward(poutputlo + 1);
 					++poutputlo;
 				}
 				// register pressure performance issue on several platforms: first do the low half here
@@ -12600,8 +12879,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].mantissa = curmlo;
+					prefetchbackward(pinputhi - 1);
 					--pinputhi;
 					poutputhi[0].mantissa = curmlo;
+					prefetchwritebackward(poutputhi - 1);
 					--poutputhi;
 				}
 				curmlo >>= 55;
@@ -12632,8 +12913,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].mantissa = curmhi;
+					prefetchforward(pinputlo + 1);
 					++pinputlo;
 					poutputlo[0].mantissa = curmhi;
+					prefetchwriteforward(poutputlo + 1);
 					++poutputlo;
 				}
 				curmhi >>= 55;
@@ -12662,9 +12945,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			U cure{static_cast<U>(input[0].signexponent)};
 			std::uint_least64_t curm{input[0].mantissa};
+			prefetchforward(input + 1);
 			++input;
 			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pout);
+				prefetchwriteforward(pout + 1);
 				++pout;
 			}
 			unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
@@ -12679,6 +12964,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned curm4{static_cast<unsigned>(curm >> 43)};
 			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[0].mantissa = curm;
+				prefetchwriteforward(pout + 1);
 				++pout;
 			}
 			curm >>= 54;
@@ -12705,11 +12991,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uint_least64_t curmlo{input[0].mantissa};
 			U curehi{static_cast<U>(input[1].signexponent)};
 			std::uint_least64_t curmhi{input[1].mantissa};
+			prefetchforward(input + 2);
 			input += 2;
 			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(
 					curmlo, curelo, pout,
-					curmhi, curehi, pout + 1u);
+					curmhi, curehi, pout + 1);
+				prefetchwriteforward(pout + 2);
 				pout += 2;
 			}
 			// register pressure performance issue on several platforms: do the low half here first
@@ -12753,6 +13041,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[1].mantissa = curmhi;
+				prefetchwriteforward(pout + 2);
 				pout += 2;
 			}
 			curmhi >>= 55;
@@ -12828,6 +13117,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			std::uint_least64_t outma{psrchi[0].mantissa};
 			U outeb{static_cast<U>(psrchi[-1].signexponent)};
 			std::uint_least64_t outmb{psrchi[-1].mantissa};
+			prefetchbackward(psrchi - 2);
 			psrchi -= 2;
 			auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -12886,6 +13176,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outma{psrchi[0].mantissa};
 				U outeb{static_cast<U>(psrchi[-1].signexponent)};
 				std::uint_least64_t outmb{psrchi[-1].mantissa};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -12909,6 +13200,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outmc{psrchi[-2].mantissa};
 				U outed{static_cast<U>(psrchi[-3].signexponent)};
 				std::uint_least64_t outmd{psrchi[-3].mantissa};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -12974,6 +13266,7 @@ handlebelowtop:
 					std::uint_least64_t outma{psrchi[0].mantissa};
 					U outeb{static_cast<U>(psrchi[-1].signexponent)};
 					std::uint_least64_t outmb{psrchi[-1].mantissa};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 					std::size_t offseta{offsetscompanion[cura + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
@@ -12997,6 +13290,7 @@ handlebelowtop:
 					std::uint_least64_t outmc{psrchi[-2].mantissa};
 					U outed{static_cast<U>(psrchi[-3].signexponent)};
 					std::uint_least64_t outmd{psrchi[-3].mantissa};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
 					std::size_t offseta{offsetscompanion[cura + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
@@ -13043,6 +13337,7 @@ handletop:
 				std::uint_least64_t outma{psrchi[0].mantissa};
 				U outeb{static_cast<U>(psrchi[-1].signexponent)};
 				std::uint_least64_t outmb{psrchi[-1].mantissa};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
@@ -13066,6 +13361,7 @@ handletop:
 				std::uint_least64_t outmc{psrchi[-2].mantissa};
 				U outed{static_cast<U>(psrchi[-3].signexponent)};
 				std::uint_least64_t outmd{psrchi[-3].mantissa};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
 				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (5u << 11) + (1u << 9)]--};// the next item will be placed one lower
@@ -13145,6 +13441,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outma{psrclo[0].mantissa};
 				U outeb{static_cast<U>(psrclo[1].signexponent)};
 				std::uint_least64_t outmb{psrclo[1].mantissa};
+				prefetchforward(psrclo + 2);
 				psrclo += 2;
 				auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -13170,9 +13467,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				U outelo{static_cast<U>(psrclo[0].signexponent)};
 				std::uint_least64_t outmlo{psrclo[0].mantissa};
+				prefetchforward(psrclo + 1);
 				++psrclo;
 				U outehi{static_cast<U>(psrchi[0].signexponent)};
 				std::uint_least64_t outmhi{psrchi[0].mantissa};
+				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outmlo & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmlo >> 32), outelo, static_cast<std::uint_least32_t>(outmhi & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmhi >> 32), outehi, shifter)};// decompose
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
@@ -13234,6 +13533,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outma{psrclo[0].mantissa};
 				U outeb{static_cast<U>(psrclo[1].signexponent)};
 				std::uint_least64_t outmb{psrclo[1].mantissa};
+				prefetchforward(psrclo + 2);
 				psrclo += 2;
 				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -13257,6 +13557,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outmc{psrclo[2].mantissa};
 				U outed{static_cast<U>(psrclo[3].signexponent)};
 				std::uint_least64_t outmd{psrclo[3].mantissa};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -13311,9 +13612,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 				U outelo{static_cast<U>(psrclo[0].signexponent)};
 				std::uint_least64_t outmlo{psrclo[0].mantissa};
+				prefetchforward(psrclo + 1);
 				++psrclo;
 				U outehi{static_cast<U>(psrchi[0].signexponent)};
 				std::uint_least64_t outmhi{psrchi[0].mantissa};
+				prefetchbackward(psrchi - 1);
 				--psrchi;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 				auto[curlo, curhi]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outmlo & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmlo >> 32), outelo, static_cast<std::uint_least32_t>(outmhi & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmhi >> 32), outehi, shifter)};// decompose
@@ -13391,6 +13694,7 @@ handlebelowtop:
 						std::uint_least64_t outma{psrclo[0].mantissa};
 						U outeb{static_cast<U>(psrclo[1].signexponent)};
 						std::uint_least64_t outmb{psrclo[1].mantissa};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 						std::size_t offseta{offsets[cura + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
@@ -13414,6 +13718,7 @@ handlebelowtop:
 						std::uint_least64_t outmc{psrclo[2].mantissa};
 						U outed{static_cast<U>(psrclo[3].signexponent)};
 						std::uint_least64_t outmd{psrclo[3].mantissa};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto[cura, curb, curc, curd]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
 						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
@@ -13474,9 +13779,11 @@ handlebelowtop:
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 						U outelo{static_cast<U>(psrclo[0].signexponent)};
 						std::uint_least64_t outmlo{psrclo[0].mantissa};
+						prefetchforward(psrclo + 1);
 						++psrclo;
 						U outehi{static_cast<U>(psrchi[0].signexponent)};
 						std::uint_least64_t outmhi{psrchi[0].mantissa};
+						prefetchbackward(psrchi - 1);
 						--psrchi;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 						auto[curlo, curhi]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outmlo & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmlo >> 32), outelo, static_cast<std::uint_least32_t>(outmhi & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmhi >> 32), outehi)};// decompose
@@ -13553,6 +13860,7 @@ handletop:
 					std::uint_least64_t outma{psrclo[0].mantissa};
 					U outeb{static_cast<U>(psrclo[1].signexponent)};
 					std::uint_least64_t outmb{psrclo[1].mantissa};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 					std::size_t offseta{offsets[cura + (1u << 8) + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
@@ -13576,6 +13884,7 @@ handletop:
 					std::uint_least64_t outmc{psrclo[2].mantissa};
 					U outed{static_cast<U>(psrclo[3].signexponent)};
 					std::uint_least64_t outmd{psrclo[3].mantissa};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, outmc, outec, outmd, outed)};
 					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
@@ -13636,9 +13945,11 @@ handletop:
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
 					U outelo{static_cast<U>(psrclo[0].signexponent)};
 					std::uint_least64_t outmlo{psrclo[0].mantissa};
+					prefetchforward(psrclo + 1);
 					++psrclo;
 					U outehi{static_cast<U>(psrchi[0].signexponent)};
 					std::uint_least64_t outmhi{psrchi[0].mantissa};
+					prefetchbackward(psrchi - 1);
 					--psrchi;
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outmlo & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmlo >> 32), outelo, static_cast<std::uint_least32_t>(outmhi & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmhi >> 32), outehi)};// decompose
@@ -13907,10 +14218,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cure{pinput->signexponent};
 					std::uint_least64_t curm{pinput->mantissa};
+					prefetchbackward(pinput - 1);
 					--pinput;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput, pbuffer);
+						prefetchwriteforward(poutput + 1);
 						++poutput;
+						prefetchwriteforward(pbuffer + 1);
 						++pbuffer;
 					}
 					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
@@ -13926,8 +14240,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curm4{static_cast<unsigned>(curm >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						poutput[0].mantissa = curm;
+						prefetchwriteforward(poutput + 1);
 						++poutput;
 						pbuffer[0].mantissa = curm;
+						prefetchwriteforward(pbuffer + 1);
 						++pbuffer;
 					}
 					curm >>= 54;
@@ -13951,12 +14267,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curmhi{pinput[0].mantissa};
 					U curelo{static_cast<U>(pinput[-1].signexponent)};
 					std::uint_least64_t curmlo{pinput[-1].mantissa};
+					prefetchbackward(pinput - 2);
 					pinput -= 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curmhi, curehi, poutput, pbuffer,
 							curmlo, curelo, poutput + 1, pbuffer + 1u);
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -14003,8 +14322,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						poutput[1].mantissa = curmlo;
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
 						pbuffer[1].mantissa = curmlo;
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					curmlo >>= 55;
@@ -14069,9 +14390,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cure{pinput->signexponent};
 					std::uint_least64_t curm{pinput->mantissa};
+					prefetchforward(pinput + 1);
 					++pinput;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, poutput);
+						prefetchwriteforward(poutput + 1);
 						++poutput;
 					}
 					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
@@ -14086,6 +14409,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curm4{static_cast<unsigned>(curm >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						poutput[0].mantissa = curm;
+						prefetchwriteforward(poutput + 1);
 						++poutput;
 					}
 					curm >>= 54;
@@ -14109,11 +14433,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curmlo{pinput[0].mantissa};
 					U curehi{static_cast<U>(pinput[1].signexponent)};
 					std::uint_least64_t curmhi{pinput[1].mantissa};
+					prefetchforward(pinput + 2);
 					pinput += 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curmlo, curelo, poutput,
 							curmhi, curehi, poutput + 1u);
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
 					}
 					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
@@ -14156,6 +14482,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						poutput[1].mantissa = curmhi;
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
 					}
 					curmhi >>= 55;
@@ -14506,7 +14833,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: first do the low half here
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmlo, curelo, pinputhi, pbufferhi);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
 					}
 					unsigned curelo0{static_cast<unsigned>(curelo & (1u << 8) - 1u)};
@@ -14522,8 +14851,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmlo4{static_cast<unsigned>(curmlo >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].mantissa = curmlo;
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						pbufferhi[0].mantissa = curmlo;
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
 					}
 					curmlo >>= 54;
@@ -14541,7 +14872,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: do the high half here second
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curmhi, curehi, pinputlo, pbufferlo);
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					unsigned curehi0{static_cast<unsigned>(curehi & (1u << 8) - 1u)};
@@ -14557,8 +14890,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmhi4{static_cast<unsigned>(curmhi >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputlo[0].mantissa = curmlo;
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						pbufferlo[0].mantissa = curmhi;
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					curmhi >>= 54;
@@ -14618,9 +14953,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curmlo, curelo, pinputhi, pbufferhi,
 							curmhi, curehi, pinputlo, pbufferlo);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -14637,8 +14976,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmlo4{static_cast<unsigned>(curmlo >> 44)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].mantissa = curmlo;
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						pbufferhi[0].mantissa = curmlo;
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
 					}
 					curmlo >>= 55;
@@ -14669,8 +15010,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputlo[0].mantissa = curmlo;
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						pbufferlo[0].mantissa = curmhi;
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					curmhi >>= 55;
@@ -14733,9 +15076,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cure{pinput->signexponent};
 					std::uint_least64_t curm{pinput->mantissa};
+					prefetchforward(pinput + 1);
 					++pinput;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(curm, cure, pbuffer);
+						prefetchwriteforward(pbuffer + 1);
 						++pbuffer;
 					}
 					unsigned cure0{static_cast<unsigned>(cure & (1u << 8) - 1u)};
@@ -14750,6 +15095,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curm4{static_cast<unsigned>(curm >> 43)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pbuffer[0].mantissa = curm;
+						prefetchwriteforward(pbuffer + 1);
 						++pbuffer;
 					}
 					curm >>= 54;
@@ -14773,11 +15119,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curmlo{pinput[0].mantissa};
 					U curehi{static_cast<U>(pinput[1].signexponent)};
 					std::uint_least64_t curmhi{pinput[1].mantissa};
+					prefetchforward(pinput + 2);
 					pinput += 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curmlo, curelo, pbuffer,
 							curmhi, curehi, pbuffer + 1u);
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -14821,6 +15169,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					unsigned curmhi4{static_cast<unsigned>(curmhi >> 44)};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pbuffer[1].signexponent = static_cast<W>(curmhi);
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					curmhi >>= 55;
@@ -14999,10 +15348,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			pdst += loc;
 			do{
-				V *p{*input++};
+				V *p{*input};
+				prefetchforward(input + 1);
+				++input;
 				auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 				pout[i] = p;
+				prefetchwritebackward(pout + i - 1);
 				pdst[i] = p;
+				prefetchwritebackward(pdst + i - 1);
 				auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 				std::uint64_t curm{cur.mantissa};
 				U cure{static_cast<U>(cur.signexponent)};
@@ -15040,13 +15393,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *plo{input[0]};
 				V *phi{input[1]};
+				prefetchforward(input + 2);
 				input += 2;
 				auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 				pout[i] = plo;
 				pdst[i] = plo;
 				auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 				pout[i - 1] = phi;
+				prefetchwritebackward(pout + i - 2);
 				pdst[i - 1] = phi;
+				prefetchwritebackward(pdst + i - 2);
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 				std::uint64_t curmlo{curlo.mantissa};
@@ -15114,8 +15470,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *phi{pinputhi[0]};
 				// register pressure performance issue on several platforms: first do the low half here
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-				*pinputhi-- = plo;
-				*poutputhi-- = plo;
+				*pinputhi = plo;
+				prefetchbackward(pinputhi - 1);
+				--pinputhi;
+				*poutputhi = plo;
+				prefetchwritebackward(poutputhi - 1);
+				--poutputhi;
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				std::uint64_t curmlo{curlo.mantissa};
 				U curelo{static_cast<U>(curlo.signexponent)};
@@ -15143,8 +15503,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsetscompanion[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
 				// register pressure performance issue on several platforms: do the high half here second
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-				*pinputlo++ = phi;
-				*poutputlo++ = phi;
+				*pinputlo = phi;
+				prefetchforward(pinputlo + 1);
+				++pinputlo;
+				*poutputlo = phi;
+				prefetchwriteforward(poutputlo + 1);
+				++poutputlo;
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 				std::uint64_t curmhi{curhi.mantissa};
 				U curehi{static_cast<U>(curhi.signexponent)};
@@ -15177,11 +15541,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *plo{pinputlo[0]};
 				V *phi{pinputhi[0]};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-				*pinputhi-- = plo;
-				*poutputhi-- = plo;
+				*pinputhi = plo;
+				prefetchbackward(pinputhi - 1);
+				--pinputhi;
+				*poutputhi = plo;
+				prefetchwritebackward(poutputhi - 1);
+				--poutputhi;
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-				*pinputlo++ = phi;
-				*poutputlo++ = phi;
+				*pinputlo = phi;
+				prefetchforward(pinputlo + 1);
+				++pinputlo;
+				*poutputlo = phi;
+				prefetchwriteforward(poutputlo + 1);
+				++poutputlo;
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 				std::uint64_t curmlo{curlo.mantissa};
@@ -15248,8 +15620,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		pout += loc;
 		do{
 			V *p{input[i]};
+			prefetchbackward(input + i - 1);
 			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 			pout[i] = p;
+			prefetchwritebackward(pout + i - 1);
 			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 			std::uint64_t curm{cur.mantissa};
 			U cure{static_cast<U>(cur.signexponent)};
@@ -15286,10 +15660,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			V *phi{input[i]};
 			V *plo{input[i - 1]};
+			prefetchbackward(input + i - 2);
 			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 			pout[i] = phi;
 			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 			pout[i - 1] = plo;
+			prefetchwritebackward(pout + i - 2);
 			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 			std::uint64_t curmhi{curhi.mantissa};
@@ -15408,6 +15784,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{// fill the array, two at a time
 			V *pa{psrchi[0]};
 			V *pb{psrchi[-1]};
+			prefetchbackward(psrchi - 2);
 			psrchi -= 2;
 			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15472,6 +15849,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15491,6 +15869,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15562,6 +15941,7 @@ handlebelowtop:
 				do{// fill the array, two at a time
 					V *pa{psrchi[0]};
 					V *pb{psrchi[-1]};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15581,6 +15961,7 @@ handlebelowtop:
 					V *pb{psrchi[-1]};
 					V *pc{psrchi[-2]};
 					V *pd{psrchi[-3]};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15633,6 +16014,7 @@ handletop:
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15652,6 +16034,7 @@ handletop:
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15736,6 +16119,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			while(0 <= --j){// fill the array, two at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
+				prefetchforward(psrclo + 2);
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15758,8 +16142,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -15837,6 +16225,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			while(0 <= --j){// fill the array, two at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
+				prefetchforward(psrclo + 2);
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15856,6 +16245,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrclo[1]};
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -15907,8 +16297,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -15996,6 +16390,7 @@ handlebelowtop:
 					while(0 <= --j){// fill the array, two at a time
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -16015,6 +16410,7 @@ handlebelowtop:
 						V *pb{psrclo[1]};
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -16066,8 +16462,12 @@ handlebelowtop:
 				}else{// !ismultithreadcapable
 					V *const *psrchi{psrclo + count};
 					do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
+						V *plo{*psrclo};
+						prefetchforward(psrclo + 1);
+						++psrclo;
+						V *phi{*psrchi};
+						prefetchbackward(psrchi - 1);
+						--psrchi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -16143,6 +16543,7 @@ handletop:
 				while(0 <= --j){// fill the array, two at a time
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -16162,6 +16563,7 @@ handletop:
 					V *pb{psrclo[1]};
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -16213,8 +16615,12 @@ handletop:
 			}else{// !ismultithreadcapable
 				V *const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *plo{*psrclo};
+					++psrclo;
+					prefetchforward(psrclo + 1);
+					V *phi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -16501,10 +16907,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					do{
-						V *p{*pinput++};
+						V *p{*pinput};
+						prefetchforward(pinput + 1);
+						++pinput;
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
+						prefetchwritebackward(output + i - 1);
 						buffer[i] = p;
+						prefetchwritebackward(buffer + i - 1);
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::uint64_t curm{cur.mantissa};
 						U cure{static_cast<U>(cur.signexponent)};
@@ -16538,13 +16948,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *plo{pinput[0]};
 						V *phi{pinput[1]};
+						prefetchforward(pinput + 2);
 						pinput += 2;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						output[i] = plo;
 						buffer[i] = plo;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						output[i - 1] = phi;
+						prefetchwritebackward(output + i - 2);
 						buffer[i - 1] = phi;
+						prefetchwritebackward(buffer + i - 2);
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						std::uint64_t curmlo{curlo.mantissa};
@@ -16640,8 +17053,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						V *p{input[i]};
+						prefetchbackward(input + i - 1);
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
+						prefetchwritebackward(output + i - 1);
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::uint64_t curm{cur.mantissa};
 						U cure{static_cast<U>(cur.signexponent)};
@@ -16674,10 +17089,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						output[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						output[i - 1] = plo;
+						prefetchwritebackward(output + i - 2);
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						std::uint64_t curmhi{curhi.mantissa};
@@ -17102,8 +17519,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*pbufferhi = plo;
+						prefetchwritebackward(pbufferhi - 1);
+						--pbufferhi;
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						std::uint64_t curmlo{curlo.mantissa};
 						U curelo{static_cast<U>(curlo.signexponent)};
@@ -17131,8 +17552,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmlo4)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*pbufferlo = phi;
+						prefetchwriteforward(pbufferlo + 1);
+						++pbufferlo;
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						std::uint64_t curmhi{curhi.mantissa};
 						U curehi{static_cast<U>(curhi.signexponent)};
@@ -17196,11 +17621,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*pbufferhi = plo;
+						prefetchwritebackward(pbufferhi - 1);
+						--pbufferhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*pbufferlo = phi;
+						prefetchwriteforward(pbufferlo + 1);
+						++pbufferlo;
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						std::uint64_t curmlo{curlo.mantissa};
@@ -17296,8 +17729,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						V *p{input[i]};
+						prefetchbackward(input + i - 1);
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[i] = p;
+						prefetchwritebackward(buffer + i - 1);
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::uint64_t curm{cur.mantissa};
 						U cure{static_cast<U>(cur.signexponent)};
@@ -17330,10 +17765,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						buffer[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						buffer[i - 1] = plo;
+						prefetchwritebackward(buffer + i - 2);
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						std::uint64_t curmhi{curhi.mantissa};
@@ -17557,12 +17994,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				T curhi{input[0]};
 				T curlo{input[-1]};
+				prefetchbackward(input - 2);
 				input -= 2;
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curhi.data[LO], curhi.data[HI], pout, pdst,
-						curlo.data[LO], curlo.data[HI], pout + 1, pdst + 1u);
+						curlo.data[LO], curlo.data[HI], pout + 1, pdst + 1);
+					prefetchwriteforward(pout + 2);
 					pout += 2;
+					prefetchwriteforward(pdst + 2);
 					pdst += 2;
 				}
 				// register pressure performance issue on several platforms: first do the high half here
@@ -17625,8 +18065,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least64_t curlo9{curlo.data[HI] >> 44};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pout[1].data[HI] = curlo.data[HI];
+					prefetchwriteforward(pout + 2);
 					pout += 2;
 					pdst[1].data[HI] = curlo.data[HI];
+					prefetchwriteforward(pdst + 2);
 					pdst += 2;
 				}
 				curlo.data[HI] >>= 55;
@@ -17665,10 +18107,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(
 						curlo.data[LO], curlo.data[HI], pinputhi, poutputhi,
 						curhi.data[LO], curhi.data[HI], pinputlo, poutputlo);
-						--pinputhi;
-						--poutputhi;
-						++pinputlo;
-						++poutputlo;
+					prefetchbackward(pinputhi - 1);
+					--pinputhi;
+					prefetchwritebackward(poutputhi - 1);
+					--poutputhi;
+					prefetchforward(pinputlo + 1);
+					++pinputlo;
+					prefetchwriteforward(poutputlo + 1);
+					++poutputlo;
 				}
 				// register pressure performance issue on several platforms: first do the low half here
 				std::uint_least64_t curlo0{curlo.data[LO] & (1u << 11) - 1u};
@@ -17688,8 +18134,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least64_t curlo9{curlo.data[HI] >> 44};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputhi[0].data[HI] = curlo.data[HI];
+					prefetchbackward(pinputhi - 1);
 					--pinputhi;
 					poutputhi[0].data[HI] = curlo.data[HI];
+					prefetchwritebackward(poutputhi - 1);
 					--poutputhi;
 				}
 				curlo.data[HI] >>= 55;
@@ -17732,8 +18180,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least64_t curhi9{curhi.data[HI] >> 44};
 				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 					pinputlo[0].data[HI] = curhi.data[HI];
+					prefetchforward(pinputlo + 1);
 					++pinputlo;
 					poutputlo[0].data[HI] = curhi.data[HI];
+					prefetchwriteforward(poutputlo + 1);
 					++poutputlo;
 				}
 				curhi.data[HI] >>= 55;
@@ -17770,11 +18220,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			T curhi{input[0]};
 			T curlo{input[1]};
+			prefetchforward(input + 2);
 			input += 2;
 			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(
 					curhi.data[LO], curhi.data[HI], pout,
-					curlo.data[LO], curlo.data[HI], pout + 1u);
+					curlo.data[LO], curlo.data[HI], pout + 1);
+				prefetchwriteforward(pout + 2);
 				pout += 2;
 			}
 			// register pressure performance issue on several platforms: first do the high half here
@@ -17828,6 +18280,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::uint_least64_t curlo9{curlo.data[HI] >> 44};
 			if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 				pout[1].data[HI] = curlo.data[HI];
+				prefetchwriteforward(pout + 2);
 				pout += 2;
 			}
 			curlo.data[HI] >>= 55;
@@ -17904,6 +18357,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			T outb{psrchi[-1]};
 			T outc{psrchi[-2]};
 			T outd{psrchi[-3]};
+			prefetchbackward(psrchi - 4);
 			psrchi -= 4;
 			auto[cura, curb, curc, curd]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -17956,6 +18410,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				T outb{psrchi[-1]};
 				T outc{psrchi[-2]};
 				T outd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -18007,6 +18462,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				T outb{psrchi[-1]};
 				T outc{psrchi[-2]};
 				T outd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 				std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
@@ -18071,6 +18527,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				T outb{psrclo[1]};
 				T outc{psrclo[2]};
 				T outd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -18101,8 +18558,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			T const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				T outlo{*psrclo++};
-				T outhi{*psrchi--};
+				T outlo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				T outhi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -18160,6 +18621,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				T outb{psrclo[1]};
 				T outc{psrclo[2]};
 				T outd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -18190,8 +18652,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			T const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				T outlo{*psrclo++};
-				T outhi{*psrchi--};
+				T outlo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				T outhi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto[curlo, curhi]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -18248,6 +18714,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					T outb{psrclo[1]};
 					T outc{psrclo[2]};
 					T outd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 					std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
@@ -18278,8 +18745,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				T const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					T outlo{*psrclo++};
-					T outhi{*psrchi--};
+					T outlo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					T outhi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(outlo.data[HI], outhi.data[HI])};
 					std::size_t offsetlo{offsets[curlo + offsetsbodylength<T>]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + offsetsbodylength<T> + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -18514,12 +18985,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					T curhi{pinput[0]};
 					T curlo{pinput[-1]};
+					prefetchbackward(pinput - 2);
 					pinput -= 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi.data[LO], curhi.data[HI], poutput, pbuffer,
 							curlo.data[LO], curlo.data[HI], poutput + 1, pbuffer + 1u);
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					// register pressure performance issue on several platforms: first do the high half here
@@ -18570,12 +19044,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curlo2{curlo.data[LO] >> 22};
 					std::uint_least64_t curlo3{curlo.data[LO] >> 33};
 					std::uint_least64_t curlo4{curlo.data[LO] >> 44};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].data[LO] = curlo.data[LO];
+						pbuffer[1].data[LO] = curlo.data[LO];
+					}
 					curlo.data[LO] >>= 55;
 					std::uint_least64_t curlo5{curlo.data[HI] & (1u << 11) - 1u};
 					std::uint_least64_t curlo6{curlo.data[HI] >> 11};
 					std::uint_least64_t curlo7{curlo.data[HI] >> 22};
 					std::uint_least64_t curlo8{curlo.data[HI] >> 33};
 					std::uint_least64_t curlo9{curlo.data[HI] >> 44};
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						poutput[1].data[HI] = curlo.data[HI];
+						prefetchwriteforward(poutput + 2);
+						poutput += 2;
+						pbuffer[1].data[HI] = curlo.data[HI];
+						prefetchwriteforward(pbuffer + 2);
+						pbuffer += 2;
+					}
 					curlo.data[HI] >>= 55;
 					++offsets[curlo0];
 					curlo1 &= (1u << 11) - 1u;
@@ -18656,11 +19142,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					T curlo{pinput[0]};
 					T curhi{pinput[1]};
+					prefetchforward(pinput + 2);
 					pinput += 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curlo.data[LO], curlo.data[HI], poutput,
 							curhi.data[LO], curhi.data[HI], poutput + 1u);
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -18714,6 +19202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curhi9{curhi.data[HI] >> 44};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						poutput[1].data[HI] = curhi.data[HI];
+						prefetchwriteforward(poutput + 2);
 						poutput += 2;
 					}
 					curhi.data[HI] >>= 55;
@@ -19079,9 +19568,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curlo.data[LO], curlo.data[HI], pinputhi, pbufferhi,
 							curhi.data[LO], curhi.data[HI], pinputlo, pbufferlo);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -19102,8 +19595,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curlo9{curlo.data[HI] >> 44};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].data[HI] = curlo.data[HI];
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						pbufferhi[0].data[HI] = curlo.data[HI];
+						prefetchwritebackward(pbufferhi - 1);
 						--pbufferhi;
 					}
 					curlo.data[HI] >>= 55;
@@ -19146,8 +19641,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curhi9{curhi.data[HI] >> 44};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputlo[0].data[HI] = curhi.data[HI];
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						pbufferlo[0].data[HI] = curhi.data[HI];
+						prefetchwriteforward(pbufferlo + 1);
 						++pbufferlo;
 					}
 					curhi.data[HI] >>= 55;
@@ -19224,11 +19721,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					T curlo{pinput[0]};
 					T curhi{pinput[1]};
+					prefetchforward(pinput + 2);
 					pinput += 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curlo.data[LO], curlo.data[HI], pbuffer,
 							curhi.data[LO], curhi.data[HI], pbuffer + 1u);
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -19282,6 +19781,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least64_t curhi9{curhi.data[HI] >> 44};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pbuffer[1].data[HI] = curhi.data[HI];
+						prefetchwriteforward(pbuffer + 2);
 						pbuffer += 2;
 					}
 					curhi.data[HI] >>= 55;
@@ -19476,13 +19976,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *phi{input[0]};
 				V *plo{input[1]};
+				prefetchforward(input + 2);
 				input += 2;
 				auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 				pout[i] = phi;
 				pdst[i] = phi;
 				auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 				pout[i - 1] = plo;
+				prefetchwritebackward(pout + i - 2);
 				pdst[i - 1] = plo;
+				prefetchwritebackward(pdst + i - 2);
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -19569,11 +20072,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				V *plo{pinputlo[0]};
 				V *phi{pinputhi[0]};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-				*pinputhi-- = plo;
-				*poutputhi-- = plo;
+				*pinputhi = plo;
+				prefetchbackward(pinputhi - 1);
+				--pinputhi;
+				*poutputhi = plo;
+				prefetchwritebackward(poutputhi - 1);
+				--poutputhi;
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-				*pinputlo++ = phi;
-				*poutputlo++ = phi;
+				*pinputlo = phi;
+				prefetchforward(pinputlo + 1);
+				++pinputlo;
+				*poutputlo = phi;
+				prefetchwriteforward(poutputlo + 1);
+				++poutputlo;
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -19662,10 +20173,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			V *phi{input[i]};
 			V *plo{input[i - 1]};
+			prefetchbackward(input + i - 2);
 			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 			pout[i] = phi;
 			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 			pout[i - 1] = plo;
+			prefetchwritebackward(pout + i - 2);
 			auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 			auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 			if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -19795,6 +20308,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			V *pb{psrchi[-1]};
 			V *pc{psrchi[-2]};
 			V *pd{psrchi[-3]};
+			prefetchbackward(psrchi - 4);
 			psrchi -= 4;
 			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -19863,6 +20377,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -19930,6 +20445,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -20004,6 +20520,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrclo[1]};
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -20048,8 +20565,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -20123,6 +20644,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrclo[1]};
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -20167,8 +20689,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -20241,6 +20767,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					V *pb{psrclo[1]};
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -20285,8 +20812,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				V *const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *plo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					V *phi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -20554,13 +21085,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{pinput[0]};
 						V *plo{pinput[1]};
+						prefetchforward(pinput + 2);
 						pinput += 2;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						output[i] = phi;
 						buffer[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						output[i - 1] = plo;
+						prefetchwritebackward(output + i - 2);
 						buffer[i - 1] = plo;
+						prefetchwritebackward(buffer + i - 2);
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -20688,10 +21222,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						output[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						output[i - 1] = plo;
+						prefetchwritebackward(output + i - 2);
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -21144,11 +21680,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*pbufferhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*pbufferhi = plo;
+						prefetchwritebackward(pbufferhi - 1);
+						--pbufferhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*pbufferlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*pbufferlo = phi;
+						prefetchwriteforward(pbufferlo + 1);
+						++pbufferlo;
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -21276,10 +21820,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[i]};
 						V *plo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						buffer[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						buffer[i - 1] = plo;
+						prefetchwritebackward(buffer + i - 2);
 						auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -21532,9 +22078,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				pdst += loc;
 				do{
-					T cur{*input++};
+					T cur{*input};
+					prefetchforward(input + 1);
+					++input;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), pout + i, pdst + i);
+						prefetchwritebackward(pout + i - 1);
+						prefetchwritebackward(pdst + i - 1);
 					}
 					std::uint_least32_t cur0{cur.data[LO] & (1u << 8) - 1u};
 					std::uint_least32_t cur1{cur.data[LO] >> 8};
@@ -21549,7 +22099,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t cur6{cur.data[HI] >> 16};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pout[i].data[HI] = cur.data[HI];
+						prefetchwritebackward(pout + i - 1);
 						pdst[i].data[HI] = cur.data[HI];
+						prefetchwritebackward(pdst + i - 1);
 					}
 					cur.data[HI] >>= 24;
 					++offsetscompanion[cur0];
@@ -21574,9 +22126,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				pdst += loc;
 				do{
-					T cur{*input++};
+					T cur{*input};
+					prefetchforward(input + 1);
+					++input;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), pout + i, pdst + i);
+						prefetchwritebackward(pout + i - 1);
+						prefetchwritebackward(pdst + i - 1);
 					}
 					std::uint_least32_t cur0{cur.data[LO] & (1u << 11) - 1u};
 					std::uint_least32_t cur1{cur.data[LO] >> 11};
@@ -21589,7 +22145,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t cur3{cur.data[HI] >> 11};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pout[i].data[HI] = cur.data[HI];
+						prefetchwritebackward(pout + i - 1);
 						pdst[i].data[HI] = cur.data[HI];
+						prefetchwritebackward(pdst + i - 1);
 					}
 					cur.data[HI] >>= 22;
 					++offsetscompanion[cur0];
@@ -21612,11 +22170,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					T curhi{input[0]};
 					T curlo{input[1]};
+					prefetchforward(input + 2);
 					input += 2;
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 							reinterpret_cast<std::uint_least64_t &>(curhi), pout + i, pdst + i,
 							reinterpret_cast<std::uint_least64_t &>(curlo), pout + i - 1, pdst + i - 1);
+						prefetchwritebackward(pout + i - 2);
+						prefetchwritebackward(pdst + i - 2);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -21647,7 +22208,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curlo1{curlo.data[LO] >> 11};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pout[i - 1].data[LO] = curlo.data[LO];
+						prefetchwritebackward(pout + i - 2);
 						pdst[i - 1].data[LO] = curlo.data[LO];
+						prefetchwritebackward(pdst + i - 2);
 					}
 					curlo.data[LO] >>= 22;
 					std::uint_least32_t curlo2{curlo.data[HI] & (1u << 11) - 1u};
@@ -21680,7 +22243,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: first do the low half here
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, poutputhi);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
 					}
 					std::uint_least32_t curlo0{curlo.data[LO] & (1u << 11) - 1u};
@@ -21694,8 +22259,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curlo3{curlo.data[HI] >> 11};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].data[HI] = curlo.data[HI];
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						poutputhi[0].data[HI] = curlo.data[HI];
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
 					}
 					curlo.data[HI] >>= 22;
@@ -21711,7 +22278,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: do the high half here second
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, poutputlo);
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(poutputlo + 1);
 						++poutputlo;
 					}
 					std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -21725,8 +22294,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputlo[0].data[HI] = curhi.data[HI];
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						poutputlo[0].data[HI] = curhi.data[HI];
+						prefetchwriteforward(poutputlo + 1);
 						++poutputlo;
 					}
 					curhi.data[HI] >>= 22;
@@ -21747,7 +22318,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: first do the low half here
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, poutputhi);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
 					}
 					std::uint_least32_t curlo0{curlo.data[LO] & (1u << 11) - 1u};
@@ -21761,8 +22334,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curlo3{curlo.data[HI] >> 11};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].data[HI] = curlo.data[HI];
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						poutputhi[0].data[HI] = curlo.data[HI];
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
 					}
 					curlo.data[HI] >>= 22;
@@ -21778,7 +22353,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					// register pressure performance issue on several platforms: do the high half here second
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, poutputlo);
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(poutputlo + 1);
 						++poutputlo;
 					}
 					std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -21792,8 +22369,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputlo[0].data[HI] = curhi.data[HI];
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
 						poutputlo[0].data[HI] = curhi.data[HI];
+						prefetchwriteforward(poutputlo + 1);
 						++poutputlo;
 					}
 					curhi.data[HI] >>= 22;
@@ -21815,9 +22394,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 							reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, poutputhi,
 							reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, poutputlo);
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
+						prefetchforward(pinputlo + 1);
 						++pinputlo;
+						prefetchwriteforward(poutputlo + 1);
 						++poutputlo;
 					}
 					// register pressure performance issue on several platforms: first do the low half here
@@ -21832,8 +22415,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curlo3{curlo.data[HI] >> 11};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 						pinputhi[0].data[HI] = curlo.data[HI];
+						prefetchbackward(pinputhi - 1);
 						--pinputhi;
 						poutputhi[0].data[HI] = curlo.data[HI];
+						prefetchwritebackward(poutputhi - 1);
 						--poutputhi;
 					}
 					curlo.data[HI] >>= 22;
@@ -21857,8 +22442,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::uint_least32_t curhi2{curhi.data[HI] & (1u << 11) - 1u};
 					std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-						pinputlo[0].data[LO] = curhi.data[LO];
-						poutputlo[0].data[LO] = curhi.data[LO];
+						pinputlo[0].data[HI] = curhi.data[HI];
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						poutputlo[0].data[HI] = curhi.data[HI];
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 					}
 					curhi.data[HI] >>= 22;
 					++offsetscompanion[curhi0];
@@ -21882,8 +22471,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				T cur{input[i]};
+				prefetchbackward(input + i - 1);
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(pout) + i);
+					prefetchwritebackward(pout + i - 1);
 				}
 				std::uint_least32_t cur0{cur.data[LO] & (1u << 8) - 1u};
 				std::uint_least32_t cur1{cur.data[LO] >> 8};
@@ -21893,7 +22484,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				std::uint_least32_t cur4{cur.data[HI] & (1u << 8) - 1u};
 				std::uint_least32_t cur5{cur.data[HI] >> 8};
 				std::uint_least32_t cur6{cur.data[HI] >> 16};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i].data[HI] = cur.data[HI];
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[i].data[HI] = cur.data[HI];
+					prefetchwritebackward(pout + i - 1);
+				}
 				cur.data[HI] >>= 24;
 				++offsetscompanion[cur0];
 				cur1 &= (1u << 8) - 1u;
@@ -21917,8 +22511,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				T cur{input[i]};
+				prefetchbackward(input + i - 1);
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(pout) + i);
+					prefetchwritebackward(pout + i - 1);
 				}
 				std::uint_least32_t cur0{cur.data[LO] & (1u << 11) - 1u};
 				std::uint_least32_t cur1{cur.data[LO] >> 11};
@@ -21926,7 +22522,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				cur.data[LO] >>= 22;
 				std::uint_least32_t cur2{cur.data[HI] & (1u << 11) - 1u};
 				std::uint_least32_t cur3{cur.data[HI] >> 11};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i].data[HI] = cur.data[HI];
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[i].data[HI] = cur.data[HI];
+					prefetchwritebackward(pout + i - 1);
+				}
 				cur.data[HI] >>= 22;
 				++offsetscompanion[cur0];
 				cur1 &= (1u << 11) - 1u;
@@ -21947,10 +22546,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				T curhi{input[i]};
 				T curlo{input[i - 1]};
+				prefetchbackward(input + i - 2);
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 						reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t *>(pout) + i,
 						reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t *>(pout) + i - 1);
+					prefetchwritebackward(pout + i - 2);
 				}
 				// register pressure performance issue on several platforms: first do the high half here
 				std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -21977,7 +22578,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				curlo.data[LO] >>= 22;
 				std::uint_least32_t curlo2{curlo.data[HI] & (1u << 11) - 1u};
 				std::uint_least32_t curlo3{curlo.data[HI] >> 11};
-				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1].data[HI] = curlo.data[HI];
+				if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+					pout[i - 1].data[HI] = curlo.data[HI];
+					prefetchwritebackward(pout + i - 2);
+				}
 				curlo.data[HI] >>= 22;
 				++offsetscompanion[curlo0];
 				curlo1 &= (1u << 11) - 1u;
@@ -22038,6 +22642,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				T outa{psrchi[0]};
 				T outb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -22052,6 +22657,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				T outb{psrchi[-1]};
 				T outc{psrchi[-2]};
 				T outd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -22101,6 +22707,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				T outa{psrchi[0]};
 				T outb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -22115,6 +22722,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				T outb{psrchi[-1]};
 				T outc{psrchi[-2]};
 				T outd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -22163,6 +22771,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				do{// fill the array, two at a time
 					T outa{psrchi[0]};
 					T outb{psrchi[-1]};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI])};
 					std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
@@ -22177,6 +22786,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					T outb{psrchi[-1]};
 					T outc{psrchi[-2]};
 					T outd{psrchi[-3]};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 					std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
@@ -22239,6 +22849,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					T outa{psrclo[0]};
 					T outb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -22253,6 +22864,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					T outb{psrclo[1]};
 					T outc{psrclo[2]};
 					T outd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto[cura, curb, curc, curd]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -22284,8 +22896,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			T const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				T outlo{*psrclo++};
-				T outhi{*psrchi--};
+				T outlo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				T outhi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -22340,6 +22956,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					T outa{psrclo[0]};
 					T outb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -22354,6 +22971,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					T outb{psrclo[1]};
 					T outc{psrclo[2]};
 					T outd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto[cura, curb, curc, curd]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -22385,8 +23003,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			T const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				T outlo{*psrclo++};
-				T outhi{*psrchi--};
+				T outlo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				T outhi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto[curlo, curhi]{filtershifthi<isabsvalue, issignmode, isfltpmode>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -22440,6 +23062,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					while(0 <= --j){// fill the array, two at a time
 						T outa{psrclo[0]};
 						T outb{psrclo[1]};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI])};
 						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
@@ -22454,6 +23077,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						T outb{psrclo[1]};
 						T outc{psrclo[2]};
 						T outd{psrclo[3]};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outa.data[HI], outb.data[HI], outc.data[HI], outd.data[HI])};
 						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
@@ -22485,8 +23109,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				T const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					T outlo{*psrclo++};
-					T outhi{*psrchi--};
+					T outlo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					T outhi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(outlo.data[HI], outhi.data[HI])};
 					std::size_t offsetlo{offsets[curlo + offsetsbodylength<T>]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + offsetsbodylength<T> + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -22717,9 +23345,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T const *pinput{input + (count - i)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					do{
-						T cur{*pinput++};
+						T cur{*pinput};
+						prefetchforward(pinput + 1);
+						++pinput;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), output + i, buffer + i);
+							prefetchwritebackward(output + i - 1);
+							prefetchwritebackward(buffer + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 8) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 8};
@@ -22734,7 +23366,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t cur6{cur.data[HI] >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							output[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(output + i - 1);
 							buffer[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(buffer + i - 1);
 						}
 						cur.data[HI] >>= 24;
 						++offsets[cur0];
@@ -22753,9 +23387,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do{
-						T cur{*pinput++};
+						T cur{*pinput};
+						prefetchforward(pinput + 1);
+						++pinput;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), output + i, buffer + i);
+							prefetchwritebackward(output + i - 1);
+							prefetchwritebackward(buffer + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 11) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 11};
@@ -22768,7 +23406,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t cur3{cur.data[HI] >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							output[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(output + i - 1);
 							buffer[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(buffer + i - 1);
 						}
 						cur.data[HI] >>= 22;
 						++offsets[cur0];
@@ -22785,11 +23425,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curlo{pinput[0]};
 						T curhi{pinput[1]};
+						prefetchforward(pinput + 2);
 						pinput += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 								reinterpret_cast<std::uint_least64_t &>(curlo), output + i, buffer + i,
 								reinterpret_cast<std::uint_least64_t &>(curhi), output + i - 1, buffer + i - 1);
+							prefetchwritebackward(output + i - 2);
+							prefetchwritebackward(buffer + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the low half here
 						std::uint_least32_t curlo0{curlo.data[LO] & (1u << 11) - 1u};
@@ -22827,7 +23470,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							output[i - 1].data[HI] = curhi.data[HI];
+							prefetchwritebackward(output + i - 2);
 							buffer[i - 1].data[HI] = curhi.data[HI];
+							prefetchwritebackward(buffer + i - 2);
 						}
 						curhi.data[HI] >>= 22;
 						++offsets[curhi0];
@@ -22876,8 +23521,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						T cur{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(output) + i);
+							prefetchwritebackward(output + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 8) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 8};
@@ -22887,7 +23534,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t cur4{cur.data[HI] & (1u << 8) - 1u};
 						std::uint_least32_t cur5{cur.data[HI] >> 8};
 						std::uint_least32_t cur6{cur.data[HI] >> 16};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i].data[HI] = cur.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							output[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(output + i - 1);
+						}
 						cur.data[HI] >>= 24;
 						++offsets[cur0];
 						cur1 &= (1u << 8) - 1u;
@@ -22907,8 +23557,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						T cur{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(output) + i);
+							prefetchwritebackward(output + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 11) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 11};
@@ -22916,7 +23568,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						cur.data[LO] >>= 22;
 						std::uint_least32_t cur2{cur.data[HI] & (1u << 11) - 1u};
 						std::uint_least32_t cur3{cur.data[HI] >> 11};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i].data[HI] = cur.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							output[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(output + i - 1);
+						}
 						cur.data[HI] >>= 22;
 						++offsets[cur0];
 						cur1 &= (1u << 11) - 1u;
@@ -22933,10 +23588,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[i]};
 						T curlo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 								reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t *>(output) + i,
 								reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t *>(output) + i - 1);
+							prefetchwritebackward(output + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -22963,7 +23620,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						curlo.data[LO] >>= 22;
 						std::uint_least32_t curlo2{curlo.data[HI] & (1u << 11) - 1u};
 						std::uint_least32_t curlo3{curlo.data[HI] >> 11};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1].data[HI] = curlo.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							output[i - 1].data[HI] = curlo.data[HI];
+							prefetchwritebackward(output + i - 2);
+						}
 						curlo.data[HI] >>= 22;
 						++offsets[curlo0];
 						curlo1 &= (1u << 11) - 1u;
@@ -23296,7 +23956,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, pbufferhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
 						}
 						std::uint_least32_t curlo0{curlo.data[LO] & (1u << 8) - 1u};
@@ -23312,8 +23974,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curlo6{curlo.data[HI] >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[0].data[HI] = curlo.data[HI];
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
 							pbufferhi[0].data[HI] = curlo.data[HI];
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
 						}
 						curlo.data[HI] >>= 24;
@@ -23333,7 +23997,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, pbufferlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						std::uint_least32_t curhi0{curhi.data[LO] & (1u << 8) - 1u};
@@ -23349,8 +24015,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curhi6{curhi.data[HI] >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[0].data[HI] = curhi.data[HI];
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
 							pbufferlo[0].data[HI] = curhi.data[HI];
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						curhi.data[HI] >>= 24;
@@ -23375,7 +24043,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, pbufferhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
 						}
 						std::uint_least32_t curlo0{curlo.data[LO] & (1u << 11) - 1u};
@@ -23389,8 +24059,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curlo3{curlo.data[HI] >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[0].data[HI] = curlo.data[HI];
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
 							pbufferhi[0].data[HI] = curlo.data[HI];
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
 						}
 						curlo.data[HI] >>= 22;
@@ -23406,7 +24078,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, pbufferlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -23420,8 +24094,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[0].data[HI] = curhi.data[HI];
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
 							pbufferlo[0].data[HI] = curhi.data[HI];
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						curhi.data[HI] >>= 22;
@@ -23443,9 +24119,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 								reinterpret_cast<std::uint_least64_t &>(curlo), pinputhi, pbufferhi,
 								reinterpret_cast<std::uint_least64_t &>(curhi), pinputlo, pbufferlo);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -23460,8 +24140,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curlo3{curlo.data[HI] >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[0].data[HI] = curlo.data[HI];
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
 							pbufferhi[0].data[HI] = curlo.data[HI];
+							prefetchwritebackward(pbufferhi - 1);
 							--pbufferhi;
 						}
 						curlo.data[HI] >>= 22;
@@ -23486,8 +24168,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t curhi3{curhi.data[HI] >> 22};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[0].data[HI] = curhi.data[HI];
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
 							pbufferlo[0].data[HI] = curhi.data[HI];
+							prefetchwriteforward(pbufferlo + 1);
 							++pbufferlo;
 						}
 						curhi.data[HI] >>= 22;
@@ -23531,8 +24215,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						T cur{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(buffer) + i);
+							prefetchwritebackward(buffer + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 8) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 8};
@@ -23542,7 +24228,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						std::uint_least32_t cur4{cur.data[HI] & (1u << 8) - 1u};
 						std::uint_least32_t cur5{cur.data[HI] >> 8};
 						std::uint_least32_t cur6{cur.data[HI] >> 16};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i].data[HI] = cur.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							buffer[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(buffer + i - 1);
+						}
 						cur.data[HI] >>= 24;
 						++offsets[cur0];
 						cur1 &= (1u << 8) - 1u;
@@ -23562,8 +24251,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do{
 						T cur{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur), reinterpret_cast<std::uint_least64_t *>(buffer) + i);
+							prefetchwritebackward(buffer + i - 1);
 						}
 						std::uint_least32_t cur0{cur.data[LO] & (1u << 11) - 1u};
 						std::uint_least32_t cur1{cur.data[LO] >> 11};
@@ -23571,7 +24262,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						cur.data[LO] >>= 22;
 						std::uint_least32_t cur2{cur.data[HI] & (1u << 11) - 1u};
 						std::uint_least32_t cur3{cur.data[HI] >> 11};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i].data[HI] = cur.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							buffer[i].data[HI] = cur.data[HI];
+							prefetchwritebackward(buffer + i - 1);
+						}
 						cur.data[HI] >>= 22;
 						++offsets[cur0];
 						cur1 &= (1u << 11) - 1u;
@@ -23588,10 +24282,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[i]};
 						T curlo{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(
 								reinterpret_cast<std::uint_least64_t &>(curhi), reinterpret_cast<std::uint_least64_t *>(buffer) + i,
 								reinterpret_cast<std::uint_least64_t &>(curlo), reinterpret_cast<std::uint_least64_t *>(buffer) + i - 1);
+							prefetchwritebackward(buffer + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						std::uint_least32_t curhi0{curhi.data[LO] & (1u << 11) - 1u};
@@ -23618,7 +24314,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						curlo.data[LO] >>= 22;
 						std::uint_least32_t curlo2{curlo.data[HI] & (1u << 11) - 1u};
 						std::uint_least32_t curlo3{curlo.data[HI] >> 11};
-						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1].data[HI] = curlo.data[HI];
+						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+							buffer[i - 1].data[HI] = curlo.data[HI];
+							prefetchwritebackward(buffer + i - 2);
+						}
 						curlo.data[HI] >>= 22;
 						++offsets[curlo0];
 						curlo1 &= (1u << 11) - 1u;
@@ -23779,10 +24478,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				pdst += loc;
 				do{
-					V *p{*input++};
+					V *p{*input};
+					prefetchforward(input + 1);
+					++input;
 					auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					pdst[i] = p;
+					prefetchwritebackward(pdst + i - 1);
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -23817,10 +24520,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				pdst += loc;
 				do{
-					V *p{*input++};
+					V *p{*input};
+					prefetchforward(input + 1);
+					++input;
 					auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					pdst[i] = p;
+					prefetchwritebackward(pdst + i - 1);
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -23851,13 +24558,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[0]};
 					V *plo{input[1]};
+					prefetchforward(input + 2);
 					input += 2;
 					auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 					pout[i] = phi;
 					pdst[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
+					prefetchwritebackward(pout + i - 2);
 					pdst[i - 1] = plo;
+					prefetchwritebackward(pdst + i - 2);
 					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -23908,8 +24618,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *phi{pinputhi[0]};
 					// register pressure performance issue on several platforms: first do the low half here
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
+					*pinputhi = plo;
+					prefetchbackward(pinputhi - 1);
+					--pinputhi;
+					*poutputhi = plo;
+					prefetchwritebackward(poutputhi - 1);
+					--poutputhi;
 					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
@@ -23937,8 +24651,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curlo.data[HI])];
 					// register pressure performance issue on several platforms: do the high half here second
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
+					*pinputlo = phi;
+					prefetchforward(pinputlo + 1);
+					++pinputlo;
+					*poutputlo = phi;
+					prefetchwriteforward(poutputlo + 1);
+					++poutputlo;
 					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
@@ -23971,8 +24689,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *phi{pinputhi[0]};
 					// register pressure performance issue on several platforms: first do the low half here
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
+					*pinputhi = plo;
+					prefetchbackward(pinputhi - 1);
+					--pinputhi;
+					*poutputhi = plo;
+					prefetchwritebackward(poutputhi - 1);
+					--poutputhi;
 					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
@@ -23994,8 +24716,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsetscompanion[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curlo.data[HI])];
 					// register pressure performance issue on several platforms: do the high half here second
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
+					*pinputlo = phi;
+					prefetchforward(pinputlo + 1);
+					++pinputlo;
+					*poutputlo = phi;
+					prefetchwriteforward(poutputlo + 1);
+					++poutputlo;
 					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
@@ -24021,11 +24747,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *plo{pinputlo[0]};
 					V *phi{pinputhi[0]};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-					*pinputhi-- = plo;
-					*poutputhi-- = plo;
+					*pinputhi = plo;
+					prefetchbackward(pinputhi - 1);
+					--pinputhi;
+					*poutputhi = plo;
+					prefetchwritebackward(poutputhi - 1);
+					--poutputhi;
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-					*pinputlo++ = phi;
-					*poutputlo++ = phi;
+					*pinputlo = phi;
+					prefetchforward(pinputlo + 1);
+					++pinputlo;
+					*poutputlo = phi;
+					prefetchwriteforward(poutputlo + 1);
+					++poutputlo;
 					auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -24075,8 +24809,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				V *p{input[i]};
+				prefetchbackward(input + i - 1);
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				pout[i] = p;
+				prefetchwritebackward(pout + i - 1);
 				auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -24111,8 +24847,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			pout += loc;
 			do{
 				V *p{input[i]};
+				prefetchbackward(input + i - 1);
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				pout[i] = p;
+				prefetchwritebackward(pout + i - 1);
 				auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 					filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -24142,10 +24880,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			do{
 				V *phi{input[i]};
 				V *plo{input[i - 1]};
+				prefetchbackward(input + i - 2);
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				pout[i] = phi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				pout[i - 1] = plo;
+				prefetchwritebackward(pout + i - 2);
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 				if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -24235,6 +24975,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24253,6 +24994,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24318,6 +25060,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24336,6 +25079,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24400,6 +25144,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				do{// fill the array, two at a time
 					V *pa{psrchi[0]};
 					V *pb{psrchi[-1]};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24418,6 +25163,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					V *pb{psrchi[-1]};
 					V *pc{psrchi[-2]};
 					V *pd{psrchi[-3]};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24490,6 +25236,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24508,6 +25255,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pb{psrclo[1]};
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24553,8 +25301,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -24625,6 +25377,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24643,6 +25396,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pb{psrclo[1]};
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24688,8 +25442,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -24759,6 +25517,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					while(0 <= --j){// fill the array, two at a time
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24777,6 +25536,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						V *pb{psrclo[1]};
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -24822,8 +25582,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				V *const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *plo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					V *phi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -25084,10 +25848,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *const *pinput{input + (count - i)};
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 						do{
-							V *p{*pinput++};
+							V *p{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
+							prefetchwritebackward(output + i - 1);
 							buffer[i] = p;
+							prefetchwritebackward(buffer + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25116,10 +25884,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						do{
-							V *p{*pinput++};
+							V *p{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
+							prefetchwritebackward(output + i - 1);
 							buffer[i] = p;
+							prefetchwritebackward(buffer + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25144,13 +25916,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *plo{pinput[0]};
 							V *phi{pinput[1]};
+							prefetchforward(pinput + 2);
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
 							buffer[i] = plo;
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i - 1] = phi;
+							prefetchwritebackward(output + i - 2);
 							buffer[i - 1] = phi;
+							prefetchwritebackward(buffer + i - 2);
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -25221,8 +25996,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
+							prefetchbackward(input + i - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
+							prefetchwritebackward(output + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25253,8 +26030,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
+							prefetchbackward(input + i - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
+							prefetchwritebackward(output + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25280,10 +26059,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i - 1] = plo;
+							prefetchwritebackward(output + i - 2);
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -25680,8 +26461,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							*pinputhi-- = plo;
-							*pbufferhi-- = plo;
+							*pinputhi = plo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*pbufferhi = plo;
+							prefetchwritebackward(pbufferhi - 1);
+							--pbufferhi;
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
@@ -25709,8 +26494,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(curlo.data[HI])];
 							// register pressure performance issue on several platforms: do the high half here second
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							*pinputlo++ = phi;
-							*pbufferlo++ = phi;
+							*pinputlo = phi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*pbufferlo = phi;
+							prefetchwriteforward(pbufferlo + 1);
+							++pbufferlo;
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
@@ -25743,8 +26532,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							*pinputhi-- = plo;
-							*pbufferhi-- = plo;
+							*pinputhi = plo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*pbufferhi = plo;
+							prefetchwritebackward(pbufferhi - 1);
+							--pbufferhi;
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curlo));
@@ -25766,8 +26559,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(curlo.data[HI])];
 							// register pressure performance issue on several platforms: do the high half here second
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							*pinputlo++ = phi;
-							*pbufferlo++ = phi;
+							*pinputlo = phi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*pbufferlo = phi;
+							prefetchwriteforward(pbufferlo + 1);
+							++pbufferlo;
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(curhi));
@@ -25793,11 +26590,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							V *plo{pinputlo[0]};
 							V *phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-							*pinputhi-- = plo;
-							*pbufferhi-- = plo;
+							*pinputhi = plo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*pbufferhi = plo;
+							prefetchwritebackward(pbufferhi - 1);
+							--pbufferhi;
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-							*pinputlo++ = phi;
-							*pbufferlo++ = phi;
+							*pinputlo = phi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*pbufferlo = phi;
+							prefetchwriteforward(pbufferlo + 1);
+							++pbufferlo;
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -25868,8 +26673,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
+							prefetchbackward(input + i - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
+							prefetchwritebackward(buffer + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25900,8 +26707,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							V *p{input[i]};
+							prefetchbackward(input + i - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
+							prefetchwritebackward(buffer + i - 1);
 							auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, std::uint_least64_t>(reinterpret_cast<std::uint_least64_t &>(cur));
@@ -25927,10 +26736,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							V *phi{input[i]};
 							V *plo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							buffer[i - 1] = plo;
+							prefetchwritebackward(buffer + i - 2);
 							auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 							auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -26123,9 +26934,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
@@ -26136,7 +26951,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur6{cur >> 48};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 56;
 						++offsetscompanion[cur0];
@@ -26163,9 +26980,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 11) - 1u};
 						U cur1{cur >> 11};
@@ -26174,7 +26995,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur4{cur >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 55;
 						++offsetscompanion[cur0];
@@ -26199,11 +27022,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[0]};
 						T curlo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curhi, pout + i, pdst + i,
 								curlo, pout + i - 1, pdst + i - 1);
+							prefetchwritebackward(pout + i - 2);
+							prefetchwritebackward(pdst + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & (1u << 11) - 1u};
@@ -26235,7 +27061,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo4{curlo >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 1] = curlo;
+							prefetchwritebackward(pout + i - 2);
 							pdst[i - 1] = curlo;
+							prefetchwritebackward(pdst + i - 2);
 						}
 						curlo >>= 55;
 						++offsetscompanion[curlo0];
@@ -26263,7 +27091,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
@@ -26274,8 +27104,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo5{curlo >> 40};
 						U curlo6{curlo >> 48};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 56;
 						++offsetscompanion[curlo0];
@@ -26296,7 +27130,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -26307,8 +27143,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi5{curhi >> 40};
 						U curhi6{curhi >> 48};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 56;
 						++offsetscompanion[curhi0];
@@ -26334,7 +27174,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 11) - 1u};
@@ -26343,8 +27185,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo3{curlo >> 33};
 						U curlo4{curlo >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 55;
 						++offsetscompanion[curlo0];
@@ -26361,7 +27207,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 11) - 1u};
@@ -26370,8 +27218,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi3{curhi >> 33};
 						U curhi4{curhi >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 55;
 						++offsetscompanion[curhi0];
@@ -26394,9 +27246,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curlo, pinputhi, poutputhi,
 								curhi, pinputlo, poutputlo);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -26406,8 +27262,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo3{curlo >> 33};
 						U curlo4{curlo >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 55;
 						++offsetscompanion[curlo0];
@@ -26428,8 +27288,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi3{curhi >> 33};
 						U curhi4{curhi >> 44};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 55;
 						++offsetscompanion[curhi0];
@@ -26455,8 +27319,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
@@ -26465,7 +27331,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
 					U cur6{cur >> 48};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 56;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -26491,15 +27360,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 11) - 1u};
 					U cur1{cur >> 11};
 					U cur2{cur >> 22};
 					U cur3{cur >> 33};
 					U cur4{cur >> 44};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 55;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 11) - 1u;
@@ -26522,10 +27396,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, pout + i,
 							curlo, pout + i - 1);
+						prefetchwritebackward(pout + i - 2);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & (1u << 11) - 1u};
@@ -26552,7 +27428,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo2{curlo >> 22};
 					U curlo3{curlo >> 33};
 					U curlo4{curlo >> 44};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 1] = static_cast<T>(curlo);
+						prefetchwritebackward(pout + i - 2);
+					}
 					curlo >>= 55;
 					++offsetscompanion[curlo0];
 					curlo1 &= (1u << 11) - 1u;
@@ -26580,9 +27459,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
@@ -26592,7 +27475,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur5{cur >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 48;
 						++offsetscompanion[cur0];
@@ -26619,11 +27504,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[0]};
 						T curlo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curhi, pout + i, pdst + i,
 								curlo, pout + i - 1, pdst + i - 1);
+							prefetchwritebackward(pout + i - 2);
+							prefetchwritebackward(pdst + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -26659,7 +27547,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo5{curlo >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 1] = curlo;
+							prefetchwritebackward(pout + i - 2);
 							pdst[i - 1] = curlo;
+							prefetchwritebackward(pdst + i - 2);
 						}
 						curlo >>= 48;
 						++offsetscompanion[curlo0];
@@ -26689,7 +27579,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
@@ -26699,8 +27591,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo4{curlo >> 32};
 						U curlo5{curlo >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 48;
 						++offsetscompanion[curlo0];
@@ -26719,7 +27615,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -26729,8 +27627,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi4{curhi >> 32};
 						U curhi5{curhi >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 48;
 						++offsetscompanion[curhi0];
@@ -26755,9 +27657,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curlo, pinputhi, poutputhi,
 								curhi, pinputlo, poutputlo);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -26768,8 +27674,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo4{curlo >> 32};
 						U curlo5{curlo >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 48;
 						++offsetscompanion[curlo0];
@@ -26793,8 +27703,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi4{curhi >> 32};
 						U curhi5{curhi >> 40};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 48;
 						++offsetscompanion[curhi0];
@@ -26822,8 +27736,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
@@ -26831,7 +27747,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
 					U cur5{cur >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 48;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -26856,10 +27775,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, pout + i,
 							curlo, pout + i - 1);
+						prefetchwritebackward(pout + i - 2);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & (1u << 8) - 1u};
@@ -26890,7 +27811,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
 					U curlo5{curlo >> 40};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 1] = static_cast<T>(curlo);
+						prefetchwritebackward(pout + i - 2);
+					}
 					curlo >>= 48;
 					++offsetscompanion[curlo0];
 					curlo1 &= (1u << 8) - 1u;
@@ -26920,9 +27844,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
@@ -26931,7 +27859,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur4{cur >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 40;
 						++offsetscompanion[cur0];
@@ -26956,11 +27886,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[0]};
 						T curlo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curhi, pout + i, pdst + i,
 								curlo, pout + i - 1, pdst + i - 1);
+							prefetchwritebackward(pout + i - 2);
+							prefetchwritebackward(pdst + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -26992,7 +27925,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo4{curlo >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 1] = curlo;
+							prefetchwritebackward(pout + i - 2);
 							pdst[i - 1] = curlo;
+							prefetchwritebackward(pdst + i - 2);
 						}
 						curlo >>= 40;
 						++offsetscompanion[curlo0];
@@ -27020,7 +27955,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
@@ -27029,8 +27966,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo3{curlo >> 24};
 						U curlo4{curlo >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 40;
 						++offsetscompanion[curlo0];
@@ -27047,7 +27988,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -27056,8 +27999,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi3{curhi >> 24};
 						U curhi4{curhi >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 40;
 						++offsetscompanion[curhi0];
@@ -27080,9 +28027,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curlo, pinputhi, poutputhi,
 								curhi, pinputlo, poutputlo);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -27092,8 +28043,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo3{curlo >> 24};
 						U curlo4{curlo >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 40;
 						++offsetscompanion[curlo0];
@@ -27114,8 +28069,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi3{curhi >> 24};
 						U curhi4{curhi >> 32};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 40;
 						++offsetscompanion[curhi0];
@@ -27141,15 +28100,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
 					U cur4{cur >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 40;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -27172,10 +28136,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, pout + i,
 							curlo, pout + i - 1);
+						prefetchwritebackward(pout + i - 2);
 					}
 					// register pressure performance issue on several platforms: first do the high half here
 					U curhi0{curhi & (1u << 8) - 1u};
@@ -27202,7 +28168,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
 					U curlo4{curlo >> 32};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curlo);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 1] = static_cast<T>(curlo);
+						prefetchwritebackward(pout + i - 2);
+					}
 					curlo >>= 40;
 					++offsetscompanion[curlo0];
 					curlo1 &= (1u << 8) - 1u;
@@ -27230,9 +28199,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
@@ -27240,7 +28213,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur3{cur >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 32;
 						++offsetscompanion[cur0];
@@ -27263,11 +28238,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						T curhi{input[0]};
 						T curlo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curhi, pout + i, pdst + i,
 								curlo, pout + i - 1, pdst + i - 1);
+							prefetchwritebackward(pout + i - 2);
+							prefetchwritebackward(pdst + i - 2);
 						}
 						// register pressure performance issue on several platforms: first do the high half here
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -27295,7 +28273,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo3{curlo >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 1] = curlo;
+							prefetchwritebackward(pout + i - 2);
 							pdst[i - 1] = curlo;
+							prefetchwritebackward(pdst + i - 2);
 						}
 						curlo >>= 32;
 						++offsetscompanion[curlo0];
@@ -27321,7 +28301,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
@@ -27329,8 +28311,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo2{curlo >> 16};
 						U curlo3{curlo >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 32;
 						++offsetscompanion[curlo0];
@@ -27345,7 +28331,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
@@ -27353,8 +28341,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi2{curhi >> 16};
 						U curhi3{curhi >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 32;
 						++offsetscompanion[curhi0];
@@ -27375,9 +28367,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								curlo, pinputhi, poutputhi,
 								curhi, pinputlo, poutputlo);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						// register pressure performance issue on several platforms: first do the low half here
@@ -27386,8 +28382,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curlo2{curlo >> 16};
 						U curlo3{curlo >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 32;
 						++offsetscompanion[curlo0];
@@ -27405,8 +28405,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U curhi2{curhi >> 16};
 						U curhi3{curhi >> 24};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 32;
 						++offsetscompanion[curhi0];
@@ -27430,14 +28434,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
 					U cur2{cur >> 16};
 					U cur3{cur >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 32;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -27458,10 +28467,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U curhi{input[i]};
 					U curlo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							curhi, pout + i,
 							curlo, pout + i - 1);
+						prefetchwritebackward(pout + i - 2);
 					}
 					U curhi0{curhi & (1u << 8) - 1u};
 					U curhi1{curhi >> 8};
@@ -27473,7 +28484,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curlo1{curlo >> 8};
 					U curlo2{curlo >> 16};
 					U curlo3{curlo >> 24};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 1] = static_cast<T>(curhi);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 1] = static_cast<T>(curhi);
+						prefetchwritebackward(pout + i - 2);
+					}
 					curlo >>= 32;
 					++offsetscompanion[curhi0];
 					curhi1 &= (1u << 8) - 1u;
@@ -27508,16 +28522,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
 						U cur2{cur >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 24;
 						++offsetscompanion[cur0];
@@ -27536,15 +28556,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 11) - 1u};
 						U cur1{cur >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 22;
 						++offsetscompanion[cur0];
@@ -27564,12 +28590,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						T cura{input[0]};
 						T curb{input[1]};
 						T curc{input[2]};
+						prefetchforward(input + 3);
 						input += 3;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								cura, pout + i, pdst + i,
 								curb, pout + i - 1, pdst + i - 1,
 								curc, pout + i - 2, pdst + i - 2);
+							prefetchwritebackward(pout + i - 3);
+							prefetchwritebackward(pdst + i - 3);
 						}
 						U cur0a{cura & (1u << 11) - 1u};
 						U cur1a{cura >> 11};
@@ -27589,7 +28618,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1c{curc >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 2] = curc;
+							prefetchwritebackward(pout + i - 3);
 							pdst[i - 2] = curc;
+							prefetchwritebackward(pdst + i - 3);
 						}
 						curc >>= 22;
 						++offsetscompanion[cur0a];
@@ -27621,15 +28652,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
 						U curlo1{curlo >> 8};
 						U curlo2{curlo >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 24;
 						++offsetscompanion[curlo0];
@@ -27642,15 +28679,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
 						U curhi1{curhi >> 8};
 						U curhi2{curhi >> 16};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 24;
 						++offsetscompanion[curhi0];
@@ -27672,14 +28715,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 11) - 1u};
 						U curlo1{curlo >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 22;
 						++offsetscompanion[curlo0];
@@ -27690,14 +28739,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 11) - 1u};
 						U curhi1{curhi >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 22;
 						++offsetscompanion[curhi0];
@@ -27767,9 +28822,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								curd, pinputlo + 1, poutputlo + 1,
 								cure, pinputhi - 2, poutputhi - 2,
 								curf, pinputlo + 2, poutputlo + 2u);
+							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
+							prefetchwritebackward(poutputhi - 3);
 							poutputhi -= 3;
+							prefetchforward(pinputlo + 3);
 							pinputlo += 3;
+							prefetchwriteforward(poutputlo + 3);
 							poutputlo += 3;
 						}
 						U cur0d{curd & (1u << 11) - 1u};
@@ -27783,8 +28842,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1e{cure >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[-2] = cure;
+							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
 							poutputhi[-2] = cure;
+							prefetchwritebackward(poutputhi - 3);
 							poutputhi -= 3;
 						}
 						cure >>= 22;
@@ -27792,8 +28853,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1f{curf >> 11};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[2] = curf;
+							prefetchforward(pinputlo + 3);
 							pinputlo += 3;
 							poutputlo[2] = curf;
+							prefetchwriteforward(poutputlo + 3);
 							poutputlo += 3;
 						}
 						curf >>= 22;
@@ -27824,13 +28887,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
 					U cur2{cur >> 16};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 24;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -27848,12 +28916,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 11) - 1u};
 					U cur1{cur >> 11};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 22;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 11) - 1u;
@@ -27871,11 +28944,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i]};
 					U curb{input[i - 1]};
 					U curc{input[i - 2]};
+					prefetchbackward(input + i - 3);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, pout + i,
 							curb, pout + i - 1,
 							curc, pout + i - 2);
+						prefetchwritebackward(pout + i - 3);
 					}
 					U cur0a{cura & (1u << 11) - 1u};
 					U cur1a{cura >> 11};
@@ -27887,7 +28962,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 22;
 					U cur0c{curc & (1u << 11) - 1u};
 					U cur1c{curc >> 11};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 2] = static_cast<T>(curc);
+						prefetchwritebackward(pout + i - 3);
+					}
 					curc >>= 22;
 					++offsetscompanion[cur0a];
 					cur1a &= (1u << 11) - 1u;
@@ -27919,15 +28997,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						U cur1{cur >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 16;
 						++offsetscompanion[cur0];
@@ -27947,12 +29031,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						T cura{input[0]};
 						T curb{input[1]};
 						T curc{input[2]};
+						prefetchforward(input + 3);
 						input += 3;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
 								cura, pout + i, pdst + i,
 								curb, pout + i - 1, pdst + i - 1,
 								curc, pout + i - 2, pdst + i - 2);
+							prefetchwritebackward(pout + i - 3);
+							prefetchwritebackward(pdst + i - 3);
 						}
 						U cur0a{cura & (1u << 8) - 1u};
 						U cur1a{cura >> 8};
@@ -27972,7 +29059,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1c{curc >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 2] = curc;
+							prefetchwritebackward(pout + i - 3);
 							pdst[i - 2] = curc;
+							prefetchwritebackward(pdst + i - 3);
 						}
 						curc >>= 16;
 						++offsetscompanion[cur0a];
@@ -28004,14 +29093,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
 						U curlo1{curlo >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 16;
 						++offsetscompanion[curlo0];
@@ -28022,14 +29117,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
 						U curhi1{curhi >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 16;
 						++offsetscompanion[curhi0];
@@ -28099,9 +29200,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								curd, pinputlo + 1, poutputlo + 1,
 								cure, pinputhi - 2, poutputhi - 2,
 								curf, pinputlo + 2, poutputlo + 2u);
+							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
+							prefetchbackward(poutputhi - 3);
 							poutputhi -= 3;
+							prefetchforward(pinputlo + 3);
 							pinputlo += 3;
+							prefetchwriteforward(poutputlo + 3);
 							poutputlo += 3;
 						}
 						U cur0d{curd & (1u << 8) - 1u};
@@ -28115,8 +29220,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1e{cure >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[-2] = cure;
+							prefetchbackward(pinputhi - 3);
 							pinputhi -= 3;
 							poutputhi[-2] = cure;
+							prefetchbackward(poutputhi - 3);
 							poutputhi -= 3;
 						}
 						cure >>= 16;
@@ -28124,8 +29231,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur1f{curf >> 8};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[2] = curf;
+							prefetchforward(pinputlo + 3);
 							pinputlo += 3;
 							poutputlo[2] = curf;
+							prefetchwriteforward(poutputlo + 3);
 							poutputlo += 3;
 						}
 						curf >>= 16;
@@ -28156,12 +29265,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
 					U cur1{cur >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 16;
 					++offsetscompanion[cur0];
 					cur1 &= (1u << 8) - 1u;
@@ -28179,11 +29293,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U cura{input[i]};
 					U curb{input[i - 1]};
 					U curc{input[i - 2]};
+					prefetchbackward(input + i - 3);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, pout + i,
 							curb, pout + i - 1,
 							curc, pout + i - 2);
+						prefetchwritebackward(pout + i - 3);
 					}
 					U cur0a{cura & (1u << 8) - 1u};
 					U cur1a{cura >> 8};
@@ -28195,7 +29311,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curb >>= 16;
 					U cur0c{curc & (1u << 8) - 1u};
 					U cur1c{curc >> 8};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 2] = static_cast<T>(curc);
+						prefetchwritebackward(pout + i - 3);
+					}
 					curc >>= 16;
 					++offsetscompanion[cur0a];
 					cur1a &= (1u << 8) - 1u;
@@ -28227,14 +29346,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						T cur{*input++};
+						T cur{*input};
+						prefetchforward(input + 1);
+						++input;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i, pdst + i);
+							prefetchwritebackward(pout + i - 1);
+							prefetchwritebackward(pdst + i - 1);
 						}
 						U cur0{cur & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i] = cur;
+							prefetchwritebackward(pout + i - 1);
 							pdst[i] = cur;
+							prefetchwritebackward(pdst + i - 1);
 						}
 						cur >>= 8;
 						++offsetscompanion[cur0];
@@ -28253,6 +29378,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						T curb{input[1]};
 						T curc{input[2]};
 						T curd{input[3]};
+						prefetchforward(input + 4);
 						input += 4;
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(
@@ -28260,6 +29386,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								curb, pout + i - 1, pdst + i - 1,
 								curc, pout + i - 2, pdst + i - 2,
 								curd, pout + i - 3, pdst + i - 3);
+							prefetchwritebackward(pout + i - 4);
+							prefetchwritebackward(pdst + i - 4);
 						}
 						U cur0a{cura & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
@@ -28282,7 +29410,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur0d{curd & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pout[i - 3] = curd;
+							prefetchwritebackward(pout + i - 4);
 							pdst[i - 3] = curd;
+							prefetchwritebackward(pdst + i - 4);
 						}
 						curd >>= 8;
 						++offsetscompanion[cur0a];
@@ -28311,13 +29441,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: first do the low half here
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, poutputhi);
+							prefetchbackward(pinputhi - 1);
 							--pinputhi;
+							prefetchwritebackward(poutputhi - 1);
 							--poutputhi;
 						}
 						U curlo0{curlo & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputhi-- = curlo;
-							*poutputhi-- = curlo;
+							*pinputhi = curlo;
+							prefetchbackward(pinputhi - 1);
+							--pinputhi;
+							*poutputhi = curlo;
+							prefetchwritebackward(poutputhi - 1);
+							--poutputhi;
 						}
 						curlo >>= 8;
 						++offsetscompanion[curlo0];
@@ -28326,13 +29462,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						// register pressure performance issue on several platforms: do the high half here second
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, poutputlo);
+							prefetchforward(pinputlo + 1);
 							++pinputlo;
+							prefetchwriteforward(poutputlo + 1);
 							++poutputlo;
 						}
 						U curhi0{curhi & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-							*pinputlo++ = curhi;
-							*poutputlo++ = curhi;
+							*pinputlo = curhi;
+							prefetchforward(pinputlo + 1);
+							++pinputlo;
+							*poutputlo = curhi;
+							prefetchwriteforward(poutputlo + 1);
+							++poutputlo;
 						}
 						curhi >>= 8;
 						++offsetscompanion[curhi0];
@@ -28354,10 +29496,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								cura, pinputhi, poutputhi,
 								curb, pinputlo, poutputlo,
 								curc, pinputhi - 1, poutputhi - 1,
-								curd, pinputlo + 1, poutputlo + 1u);
+								curd, pinputlo + 1, poutputlo + 1);
+							prefetchbackward(pinputhi - 2);
 							pinputhi -= 2;
+							prefetchwritebackward(poutputhi - 2);
 							poutputhi -= 2;
+							prefetchforward(pinputlo + 2);
 							pinputlo += 2;
+							prefetchwriteforward(poutputlo + 2);
 							poutputlo += 2;
 						}
 						U cur0a{cura & (1u << 8) - 1u};
@@ -28375,16 +29521,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						U cur0c{curc & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputhi[-1] = curc;
+							prefetchbackward(pinputhi - 2);
 							pinputhi -= 2;
 							poutputhi[-1] = curc;
+							prefetchwritebackward(poutputhi - 2);
 							poutputhi -= 2;
 						}
 						curc >>= 8;
 						U cur0d{curd & (1u << 8) - 1u};
 						if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 							pinputlo[1] = curd;
+							prefetchforward(pinputlo + 2);
 							pinputlo += 2;
 							poutputlo[1] = curd;
+							prefetchwriteforward(poutputlo + 2);
 							poutputlo += 2;
 						}
 						curd >>= 8;
@@ -28412,11 +29562,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					U cur{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, pout + i);
+						prefetchwritebackward(pout + i - 1);
 					}
 					U cur0{cur & (1u << 8) - 1u};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cur);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i] = static_cast<T>(cur);
+						prefetchwritebackward(pout + i - 1);
+					}
 					cur >>= 8;
 					++offsetscompanion[cur0];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cur &= (1u << (8 - 1)) - 1u;
@@ -28433,12 +29588,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curb{input[i - 1]};
 					U curc{input[i - 2]};
 					U curd{input[i - 3]};
+					prefetchbackward(input + i - 4);
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, pout + i,
 							curb, pout + i - 1,
 							curc, pout + i - 2,
 							curd, pout + i - 3);
+						prefetchwritebackward(pout + i - 4);
 					}
 					U cur0a{cura & (1u << 8) - 1u};
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i] = static_cast<T>(cura);
@@ -28450,7 +29607,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 2] = static_cast<T>(curc);
 					curc >>= 8;
 					U cur0d{curd & (1u << 8) - 1u};
-					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) pout[i - 3] = static_cast<T>(curd);
+					if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+						pout[i - 3] = static_cast<T>(curd);
+						prefetchwritebackward(pout + i - 4);
+					}
 					curd >>= 8;
 					++offsetscompanion[cur0a];
 					if constexpr(isabsvalue && issignmode && isfltpmode) cura &= (1u << (8 - 1)) - 1u;
@@ -28512,6 +29672,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				U outa{psrchi[0]};
 				U outb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -28526,6 +29687,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U outb{psrchi[-1]};
 				U outc{psrchi[-2]};
 				U outd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
@@ -28580,6 +29742,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				do{// fill the array, two at a time
 					U outa{psrchi[0]};
 					U outb{psrchi[-1]};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 					std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
@@ -28594,6 +29757,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					U outb{psrchi[-1]};
 					U outc{psrchi[-2]};
 					U outd{psrchi[-3]};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 					std::size_t offseta{offsetscompanion[cura + offsetsbodylength<T>]--};// the next item will be placed one lower
@@ -28653,6 +29817,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					U outa{psrclo[0]};
 					U outb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -28667,6 +29832,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					U outb{psrclo[1]};
 					U outc{psrclo[2]};
 					U outd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto[cura, curb, curc, curd]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd, shifter)};
 					std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
@@ -28698,8 +29864,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			T const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				U outlo{*psrclo++};
-				U outhi{*psrchi--};
+				U outlo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				U outhi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto[curlo, curhi]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi, shifter)};
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -28759,6 +29929,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					while(0 <= --j){// fill the array, two at a time
 						U outa{psrclo[0]};
 						U outb{psrclo[1]};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
@@ -28773,6 +29944,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						U outb{psrclo[1]};
 						U outc{psrclo[2]};
 						U outd{psrclo[3]};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 						std::size_t offseta{offsets[cura + offsetsbodylength<T>]++};// the next item will be placed one higher
@@ -28804,8 +29976,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				T const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					U outlo{*psrclo++};
-					U outhi{*psrchi--};
+					U outlo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					U outhi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 					std::size_t offsetlo{offsets[curlo + offsetsbodylength<T>]++};// the next item will be placed one higher
 					std::size_t offsethi{offsets[curhi + offsetsbodylength<T> + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
@@ -29037,9 +30213,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29050,7 +30230,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur6{cur >> 48};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 56;
 							++offsets[cur0];
@@ -29073,9 +30255,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
@@ -29084,7 +30270,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur4{cur >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 55;
 							++offsets[cur0];
@@ -29105,11 +30293,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							T curlo{pinput[0]};
 							T curhi{pinput[1]};
+							prefetchforward(pinput + 2);
 							pinput += 2;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, output + i, buffer + i,
 									curhi, output + i - 1, buffer + i - 1);
+								prefetchwritebackward(output + i - 2);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the low half here
 							U curlo0{curlo & (1u << 11) - 1u};
@@ -29141,7 +30332,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi4{curhi >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 1] = curhi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = curhi;
+								prefetchwritebackward(buffer + i - 2);
 							}
 							curhi >>= 55;
 							++offsets[curhi0];
@@ -29190,8 +30383,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29200,7 +30395,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur4{cur >> 32};
 							U cur5{cur >> 40};
 							U cur6{cur >> 48};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 56;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -29222,15 +30420,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
 							U cur2{cur >> 22};
 							U cur3{cur >> 33};
 							U cur4{cur >> 44};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 55;
 							++offsets[cur0];
 							cur1 &= (1u << 11) - 1u;
@@ -29249,10 +30452,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, output + i,
 									curlo, output + i - 1);
+								prefetchwritebackward(output + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 11) - 1u};
@@ -29279,7 +30484,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 22};
 							U curlo3{curlo >> 33};
 							U curlo4{curlo >> 44};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(output + i - 2);
+							}
 							curlo >>= 55;
 							++offsets[curlo0];
 							curlo1 &= (1u << 11) - 1u;
@@ -29326,9 +30534,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29338,7 +30550,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur5{cur >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 48;
 							++offsets[cur0];
@@ -29361,11 +30575,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							T curlo{pinput[0]};
 							T curhi{pinput[1]};
+							prefetchforward(pinput + 2);
 							pinput += 2;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, output + i, buffer + i,
 									curhi, output + i - 1, buffer + i - 1);
+								prefetchwritebackward(output + i - 2);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the low half here
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -29401,7 +30618,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi5{curhi >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 1] = curhi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = curhi;
+								prefetchwritebackward(buffer + i - 2);
 							}
 							curhi >>= 48;
 							++offsets[curhi0];
@@ -29455,8 +30674,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29464,7 +30685,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur3{cur >> 24};
 							U cur4{cur >> 32};
 							U cur5{cur >> 40};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 48;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -29485,10 +30709,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, output + i,
 									curlo, output + i - 1);
+								prefetchwritebackward(output + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -29519,7 +30745,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
 							U curlo5{curlo >> 40};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(output + i - 2);
+							}
 							curlo >>= 48;
 							++offsets[curlo0];
 							curlo1 &= (1u << 8) - 1u;
@@ -29571,9 +30800,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29582,7 +30815,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur4{cur >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 40;
 							++offsets[cur0];
@@ -29603,11 +30838,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							T curlo{pinput[0]};
 							T curhi{pinput[1]};
+							prefetchforward(pinput + 2);
 							pinput += 2;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, output + i, buffer + i,
 									curhi, output + i - 1, buffer + i - 1);
+								prefetchwritebackward(output + i - 2);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the low half here
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -29639,7 +30877,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi4{curhi >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 1] = curhi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = curhi;
+								prefetchwritebackward(buffer + i - 2);
 							}
 							curhi >>= 40;
 							++offsets[curhi0];
@@ -29688,15 +30928,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
 							U cur3{cur >> 24};
 							U cur4{cur >> 32};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 40;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -29715,10 +30960,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, output + i,
 									curlo, output + i - 1);
+								prefetchwritebackward(output + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -29745,7 +30992,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(output + i - 2);
+							}
 							curlo >>= 40;
 							++offsets[curlo0];
 							curlo1 &= (1u << 8) - 1u;
@@ -29792,9 +31042,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -29802,7 +31056,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur3{cur >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 32;
 							++offsets[cur0];
@@ -29821,11 +31077,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							T curlo{pinput[0]};
 							T curhi{pinput[1]};
+							prefetchforward(pinput + 2);
 							pinput += 2;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, output + i, buffer + i,
 									curhi, output + i - 1, buffer + i - 1);
+								prefetchwritebackward(output + i - 2);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the low half here
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -29853,7 +31112,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi3{curhi >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 1] = curhi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = curhi;
+								prefetchwritebackward(buffer + i - 2);
 							}
 							curhi >>= 32;
 							++offsets[curhi0];
@@ -29897,14 +31158,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
 							U cur3{cur >> 24};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 32;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -29921,10 +31187,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, output + i,
 									curlo, output + i - 1);
+								prefetchwritebackward(output + i - 2);
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
 							U curhi1{curhi >> 8};
@@ -29936,7 +31204,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo1{curlo >> 8};
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(output + i - 2);
+							}
 							curlo >>= 32;
 							++offsets[curhi0];
 							curhi1 &= (1u << 8) - 1u;
@@ -29987,16 +31258,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 24;
 							++offsets[cur0];
@@ -30011,15 +31288,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 22;
 							++offsets[cur0];
@@ -30035,12 +31318,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							T cura{pinput[0]};
 							T curb{pinput[1]};
 							T curc{pinput[2]};
+							prefetchforward(pinput + 3);
 							pinput += 3;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, output + i, buffer + i,
 									curb, output + i - 1, buffer + i - 1,
 									curb, output + i - 2, buffer + i - 2);
+								prefetchwritebackward(output + i - 3);
+								prefetchwritebackward(buffer + i - 3);
 							}
 							U cur0a{cura & (1u << 11) - 1u};
 							U cur1a{cura >> 11};
@@ -30060,7 +31346,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1c{curc >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 2] = curc;
+								prefetchwritebackward(output + i - 3);
 								buffer[i - 2] = curc;
+								prefetchwritebackward(buffer + i - 3);
 							}
 							curc >>= 22;
 							++offsets[cur0a];
@@ -30137,13 +31425,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 24;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -30157,12 +31450,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 22;
 							++offsets[cur0];
 							cur1 &= (1u << 11) - 1u;
@@ -30181,11 +31479,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, output + i + 2,
 									curb, output + i + 1,
 									curc, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0a{cura & (1u << 11) - 1u};
 							U cur1a{cura >> 11};
@@ -30197,7 +31497,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb >>= 22;
 							U cur0c{curc & (1u << 11) - 1u};
 							U cur1c{curc >> 11};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(curc);
+								prefetchwritebackward(output + i - 1);
+							}
 							curc >>= 22;
 							++offsets[cur0a];
 							cur1a &= (1u << 11) - 1u;
@@ -30266,15 +31569,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 16;
 							++offsets[cur0];
@@ -30290,12 +31599,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							T cura{pinput[0]};
 							T curb{pinput[1]};
 							T curc{pinput[2]};
+							prefetchforward(pinput + 3);
 							pinput += 3;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, output + i, buffer + i,
 									curb, output + i - 1, buffer + i - 1,
 									curb, output + i - 2, buffer + i - 2);
+								prefetchwritebackward(output + i - 3);
+								prefetchwritebackward(buffer + i - 3);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							U cur1a{cura >> 8};
@@ -30315,7 +31627,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1c{curc >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i - 2] = curc;
+								prefetchwritebackward(output + i - 3);
 								buffer[i - 2] = curc;
+								prefetchwritebackward(buffer + i - 3);
 							}
 							curc >>= 16;
 							++offsets[cur0a];
@@ -30392,12 +31706,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 16;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -30416,11 +31735,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, output + i + 2,
 									curb, output + i + 1,
 									curc, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							U cur1a{cura >> 8};
@@ -30432,7 +31753,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb >>= 16;
 							U cur0c{curc & (1u << 8) - 1u};
 							U cur1c{curc >> 8};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curc);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(curc);
+								prefetchwritebackward(output + i - 1);
+							}
 							curc >>= 16;
 							++offsets[cur0a];
 							cur1a &= (1u << 8) - 1u;
@@ -30501,14 +31825,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do{
-							T cur{*pinput++};
+							T cur{*pinput};
+							prefetchforward(pinput + 1);
+							++pinput;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = cur;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = cur;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							cur >>= 8;
 							++offsets[cur0];
@@ -30528,6 +31858,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							T curb{pinput[1]};
 							T curc{pinput[2]};
 							T curd{pinput[3]};
+							prefetchforward(pinput + 4);
 							pinput += 4;
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
@@ -30535,6 +31866,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									curb, output + i + 2, buffer + i + 2,
 									curc, output + i + 1, buffer + i + 1,
 									curd, output + i, buffer + i);
+								prefetchwritebackward(output + i - 1);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
@@ -30557,7 +31890,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur0d{curd & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								output[i] = curd;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = curd;
+								prefetchwritebackward(buffer + i - 1);
 							}
 							curd >>= 8;
 							++offsets[cur0a];
@@ -30623,11 +31958,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(cur);
+								prefetchwritebackward(output + i - 1);
+							}
 							cur >>= 8;
 							++offsets[cur0];
 							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= (1u << (8 - 1)) - 1u;
@@ -30645,12 +31985,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curb{input[i + 2]};
 							U curc{input[i + 1]};
 							U curd{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, output + i + 3,
 									curb, output + i + 2,
 									curc, output + i + 1,
 									curd, output + i);
+								prefetchwritebackward(output + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 3] = static_cast<T>(cura);
@@ -30662,7 +32004,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i + 1] = static_cast<T>(curc);
 							curc >>= 8;
 							U cur0d{curd & (1u << 8) - 1u};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) output[i] = static_cast<T>(curd);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								output[i] = static_cast<T>(curd);
+								prefetchwritebackward(output + i - 1);
+							}
 							curd >>= 8;
 							++offsets[cur0a];
 							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= (1u << (8 - 1)) - 1u;
@@ -31010,7 +32355,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -31021,8 +32368,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo5{curlo >> 40};
 							U curlo6{curlo >> 48};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 56;
 							++offsets[curlo0];
@@ -31043,7 +32394,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31054,8 +32407,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi5{curhi >> 40};
 							U curhi6{curhi >> 48};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 56;
 							++offsets[curhi0];
@@ -31081,7 +32438,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 11) - 1u};
@@ -31090,8 +32449,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 33};
 							U curlo4{curlo >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 55;
 							++offsets[curlo0];
@@ -31108,7 +32471,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 11) - 1u};
@@ -31117,8 +32482,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi3{curhi >> 33};
 							U curhi4{curhi >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 55;
 							++offsets[curhi0];
@@ -31142,9 +32511,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, pinputhi, pbufferhi,
 									curhi, pinputlo, pbufferlo);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							// register pressure performance issue on several platforms: first do the low half here
@@ -31154,8 +32527,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 33};
 							U curlo4{curlo >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 55;
 							++offsets[curlo0];
@@ -31176,8 +32553,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi3{curhi >> 33};
 							U curhi4{curhi >> 44};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 55;
 							++offsets[curhi0];
@@ -31223,8 +32604,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -31233,7 +32616,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur4{cur >> 32};
 							U cur5{cur >> 40};
 							U cur6{cur >> 48};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 56;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -31255,15 +32641,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
 							U cur2{cur >> 22};
 							U cur3{cur >> 33};
 							U cur4{cur >> 44};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 55;
 							++offsets[cur0];
 							cur1 &= (1u << 11) - 1u;
@@ -31282,10 +32673,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, buffer + i,
 									curlo, buffer + i - 1);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 11) - 1u};
@@ -31312,7 +32705,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 22};
 							U curlo3{curlo >> 33};
 							U curlo4{curlo >> 44};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(buffer + i - 2);
+							}
 							curlo >>= 55;
 							++offsets[curlo0];
 							curlo1 &= (1u << 11) - 1u;
@@ -31376,7 +32772,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -31386,8 +32784,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo4{curlo >> 32};
 							U curlo5{curlo >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 48;
 							++offsets[curlo0];
@@ -31406,7 +32808,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31416,8 +32820,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi4{curhi >> 32};
 							U curhi5{curhi >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 48;
 							++offsets[curhi0];
@@ -31443,9 +32851,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, pinputhi, pbufferhi,
 									curhi, pinputlo, pbufferlo);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							// register pressure performance issue on several platforms: first do the low half here
@@ -31456,8 +32868,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo4{curlo >> 32};
 							U curlo5{curlo >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 48;
 							++offsets[curlo0];
@@ -31481,8 +32897,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi4{curhi >> 32};
 							U curhi5{curhi >> 40};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 48;
 							++offsets[curhi0];
@@ -31533,8 +32953,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
@@ -31542,7 +32964,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur3{cur >> 24};
 							U cur4{cur >> 32};
 							U cur5{cur >> 40};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 48;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -31563,10 +32988,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, buffer + i,
 									curlo, buffer + i - 1);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31597,7 +33024,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
 							U curlo5{curlo >> 40};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(buffer + i - 2);
+							}
 							curlo >>= 48;
 							++offsets[curlo0];
 							curlo1 &= (1u << 8) - 1u;
@@ -31666,7 +33096,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -31675,8 +33107,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 40;
 							++offsets[curlo0];
@@ -31693,7 +33129,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31702,8 +33140,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi3{curhi >> 24};
 							U curhi4{curhi >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 40;
 							++offsets[curhi0];
@@ -31727,9 +33169,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, pinputhi, pbufferhi,
 									curhi, pinputlo, pbufferlo);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							// register pressure performance issue on several platforms: first do the low half here
@@ -31739,8 +33185,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 40;
 							++offsets[curlo0];
@@ -31761,8 +33211,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi3{curhi >> 24};
 							U curhi4{curhi >> 32};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 40;
 							++offsets[curhi0];
@@ -31808,15 +33262,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
 							U cur3{cur >> 24};
 							U cur4{cur >> 32};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 2);
+							}
 							cur >>= 40;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -31835,10 +33294,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, buffer + i,
 									curlo, buffer + i - 1);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							// register pressure performance issue on several platforms: first do the high half here
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31865,7 +33326,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
 							U curlo4{curlo >> 32};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(buffer + i - 2);
+							}
 							curlo >>= 40;
 							++offsets[curlo0];
 							curlo1 &= (1u << 8) - 1u;
@@ -31929,7 +33393,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
@@ -31937,8 +33403,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 32;
 							++offsets[curlo0];
@@ -31953,7 +33423,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
@@ -31961,8 +33433,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi2{curhi >> 16};
 							U curhi3{curhi >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 32;
 							++offsets[curhi0];
@@ -31984,9 +33460,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curlo, pinputhi, pbufferhi,
 									curhi, pinputlo, pbufferlo);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							// register pressure performance issue on several platforms: first do the low half here
@@ -31995,8 +33475,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 32;
 							++offsets[curlo0];
@@ -32014,8 +33498,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curhi2{curhi >> 16};
 							U curhi3{curhi >> 24};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 32;
 							++offsets[curhi0];
@@ -32056,14 +33544,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
 							U cur3{cur >> 24};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 32;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -32080,10 +33573,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						do{
 							U curhi{input[i]};
 							U curlo{input[i - 1]};
+							prefetchbackward(input + i - 2);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curhi, buffer + i,
 									curlo, buffer + i - 1);
+								prefetchwritebackward(buffer + i - 2);
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
 							U curhi1{curhi >> 8};
@@ -32095,7 +33590,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curlo1{curlo >> 8};
 							U curlo2{curlo >> 16};
 							U curlo3{curlo >> 24};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i - 1] = static_cast<T>(curlo);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i - 1] = static_cast<T>(curlo);
+								prefetchwritebackward(buffer + i - 2);
+							}
 							curlo >>= 32;
 							++offsets[curhi0];
 							curhi1 &= (1u << 8) - 1u;
@@ -32167,15 +33665,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
 							U curlo1{curlo >> 8};
 							U curlo2{curlo >> 16};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 24;
 							++offsets[curlo0];
@@ -32188,15 +33692,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
 							U curhi1{curhi >> 8};
 							U curhi2{curhi >> 16};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 24;
 							++offsets[curhi0];
@@ -32214,14 +33724,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 11) - 1u};
 							U curlo1{curlo >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 22;
 							++offsets[curlo0];
@@ -32232,14 +33748,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 11) - 1u};
 							U curhi1{curhi >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 22;
 							++offsets[curhi0];
@@ -32260,7 +33782,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									cura, pinputhi, pbufferhi,
 									curb, pinputlo, pbufferlo,
 									curc, pinputhi - 1, pbufferhi - 1,
-									curd, pinputlo + 1, pbufferlo + 1u);
+									curd, pinputlo + 1, pbufferlo + 1);
 								pinputhi -= 2;
 								pbufferhi -= 2;
 								pinputlo += 2;
@@ -32414,7 +33936,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curd, pinputlo + 1, pbufferlo + 1,
 									cure, pinputhi - 2, pbufferhi - 2,
-									curf, pinputlo + 2, pbufferlo + 2u);
+									curf, pinputlo + 2, pbufferlo + 2);
+								prefetchbackward(pinputhi - 3);
+								prefetchwritebackward(pbufferhi - 3);
+								prefetchforward(pinputlo + 3);
+								prefetchwriteforward(pbufferlo + 3);
 							}
 							U cur0d{curd & (1u << 11) - 1u};
 							U cur1d{curd >> 11};
@@ -32427,8 +33953,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1e{cure >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputhi[-2] = cure;
+								prefetchbackward(pinputhi - 3);
 								pinputhi -= 3;
 								pbufferhi[-2] = cure;
+								prefetchwritebackward(pbufferhi - 3);
 								pbufferhi -= 3;
 							}
 							cure >>= 22;
@@ -32436,8 +33964,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1f{curf >> 11};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputlo[2] = curf;
+								prefetchforward(pinputlo + 3);
 								pinputlo += 3;
 								pbufferlo[2] = curf;
+								prefetchwriteforward(pbufferlo + 3);
 								pbufferlo += 3;
 							}
 							curf >>= 22;
@@ -32479,13 +34009,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
 							U cur2{cur >> 16};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 24;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -32499,12 +34034,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 11) - 1u};
 							U cur1{cur >> 11};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 22;
 							++offsets[cur0];
 							cur1 &= (1u << 11) - 1u;
@@ -32523,11 +34063,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, buffer + i + 2,
 									curb, buffer + i + 1,
 									curc, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 11) - 1u};
 							U cur1a{cura >> 11};
@@ -32539,7 +34081,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb >>= 22;
 							U cur0c{curc & (1u << 11) - 1u};
 							U cur1c{curc >> 11};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curc);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(curc);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							curc >>= 22;
 							++offsets[cur0a];
 							cur1a &= (1u << 11) - 1u;
@@ -32629,14 +34174,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
 							U curlo1{curlo >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 16;
 							++offsets[curlo0];
@@ -32647,14 +34198,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
 							U curhi1{curhi >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 16;
 							++offsets[curhi0];
@@ -32675,7 +34232,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									cura, pinputhi, pbufferhi,
 									curb, pinputlo, pbufferlo,
 									curc, pinputhi - 1, pbufferhi - 1,
-									curd, pinputlo + 1, pbufferlo + 1u);
+									curd, pinputlo + 1, pbufferlo + 1);
 								pinputhi -= 2;
 								pbufferhi -= 2;
 								pinputlo += 2;
@@ -32829,7 +34386,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									curd, pinputlo + 1, pbufferlo + 1,
 									cure, pinputhi - 2, pbufferhi - 2,
-									curf, pinputlo + 2, pbufferlo + 2u);
+									curf, pinputlo + 2, pbufferlo + 2);
+								prefetchbackward(pinputhi - 3);
+								prefetchwritebackward(pbufferhi - 3);
+								prefetchforward(pinputlo + 3);
+								prefetchwriteforward(pbufferlo + 3);
 							}
 							U cur0d{curd & (1u << 8) - 1u};
 							U cur1d{curd >> 8};
@@ -32842,8 +34403,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1e{cure >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputhi[-2] = cure;
+								prefetchbackward(pinputhi - 3);
 								pinputhi -= 3;
 								pbufferhi[-2] = cure;
+								prefetchwritebackward(pbufferhi - 3);
 								pbufferhi -= 3;
 							}
 							cure >>= 16;
@@ -32851,8 +34414,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur1f{curf >> 8};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputlo[2] = curf;
+								prefetchforward(pinputlo + 3);
 								pinputlo += 3;
 								pbufferlo[2] = curf;
+								prefetchwriteforward(pbufferlo + 3);
 								pbufferlo += 3;
 							}
 							curf >>= 16;
@@ -32894,12 +34459,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
 							U cur1{cur >> 8};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 16;
 							++offsets[cur0];
 							cur1 &= (1u << 8) - 1u;
@@ -32918,11 +34488,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cura{input[i + 2]};
 							U curb{input[i + 1]};
 							U curc{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, buffer + i + 2,
 									curb, buffer + i + 1,
 									curc, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							U cur1a{cura >> 8};
@@ -32934,7 +34506,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curb >>= 16;
 							U cur0c{curc & (1u << 8) - 1u};
 							U cur1c{curc >> 8};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curc);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(curc);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							curc >>= 16;
 							++offsets[cur0a];
 							cur1a &= (1u << 8) - 1u;
@@ -33021,13 +34596,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: first do the low half here
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo, pinputhi, pbufferhi);
+								prefetchbackward(pinputhi - 1);
 								--pinputhi;
+								prefetchwritebackward(pbufferhi - 1);
 								--pbufferhi;
 							}
 							U curlo0{curlo & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputhi-- = curlo;
-								*pbufferhi-- = curlo;
+								*pinputhi = curlo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = curlo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 							}
 							curlo >>= 8;
 							++offsets[curlo0];
@@ -33036,13 +34617,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							// register pressure performance issue on several platforms: do the high half here second
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi, pinputlo, pbufferlo);
+								prefetchforward(pinputlo + 1);
 								++pinputlo;
+								prefetchwriteforward(pbufferlo + 1);
 								++pbufferlo;
 							}
 							U curhi0{curhi & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
-								*pinputlo++ = curhi;
-								*pbufferlo++ = curhi;
+								*pinputlo = curhi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = curhi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 							}
 							curhi >>= 8;
 							++offsets[curhi0];
@@ -33095,10 +34682,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 									cura, pinputhi, pbufferhi,
 									curb, pinputlo, pbufferlo,
 									curc, pinputhi - 1, pbufferhi - 1,
-									curd, pinputlo + 1, pbufferlo + 1u);
+									curd, pinputlo + 1, pbufferlo + 1);
+								prefetchbackward(pinputhi - 2);
 								pinputhi -= 2;
+								prefetchwritebackward(pbufferhi - 2);
 								pbufferhi -= 2;
+								prefetchforward(pinputlo + 2);
 								pinputlo += 2;
+								prefetchwriteforward(pbufferlo + 2);
 								pbufferlo += 2;
 							}
 							U cur0a{cura & (1u << 8) - 1u};
@@ -33116,7 +34707,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur0c{curc & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputhi[-1] = curc;
+								prefetchbackward(pinputhi - 2);
 								pinputhi -= 2;
+								prefetchwritebackward(pbufferhi - 2);
 								pbufferhi[-1] = curc;
 								pbufferhi -= 2;
 							}
@@ -33124,8 +34717,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U cur0d{curd & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
 								pinputlo[1] = curd;
+								prefetchforward(pinputlo + 2);
 								pinputlo += 2;
 								pbufferlo[1] = curd;
+								prefetchwriteforward(pbufferlo + 2);
 								pbufferlo += 2;
 							}
 							curd >>= 8;
@@ -33160,11 +34755,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do{
 							U cur{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(cur, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0{cur & (1u << 8) - 1u};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(cur);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(cur);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							cur >>= 8;
 							++offsets[cur0];
 							if constexpr(isabsvalue && issignmode && isfltpmode) cur &= (1u << (8 - 1)) - 1u;
@@ -33182,12 +34782,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							U curb{input[i + 2]};
 							U curc{input[i + 1]};
 							U curd{input[i]};
+							prefetchbackward(input + i - 1);
 							if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 								filterinput<isabsvalue, issignmode, isfltpmode, T>(
 									cura, buffer + i + 3,
 									curb, buffer + i + 2,
 									curc, buffer + i + 1,
 									curd, buffer + i);
+								prefetchwritebackward(buffer + i - 1);
 							}
 							U cur0a{cura & (1u << 8) - 1u};
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 3] = static_cast<T>(cura);
@@ -33199,7 +34801,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i + 1] = static_cast<T>(curc);
 							curc >>= 8;
 							U cur0d{curd & (1u << 8) - 1u};
-							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)) buffer[i] = static_cast<T>(curd);
+							if constexpr(isabsvalue == isfltpmode && !(isabsvalue && !issignmode)){
+								buffer[i] = static_cast<T>(curd);
+								prefetchwritebackward(buffer + i - 1);
+							}
 							curd >>= 8;
 							++offsets[cur0a];
 							if constexpr(isabsvalue && issignmode && isfltpmode) cura &= (1u << (8 - 1)) - 1u;
@@ -33366,10 +34971,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -33406,10 +35015,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -33442,13 +35055,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[0]};
 						V *plo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
+						prefetchwritebackward(pout + i - 2);
 						pdst[i - 1] = plo;
+						prefetchwritebackward(pdst + i - 2);
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -33503,8 +35119,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -33534,8 +35154,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(7u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -33570,8 +35194,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -33595,8 +35223,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(5u << 11) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -33624,11 +35256,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -33682,8 +35322,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -33720,8 +35362,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -33753,10 +35397,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
+					prefetchwritebackward(pout + i - 2);
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -33813,10 +35459,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -33852,13 +35502,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[0]};
 						V *plo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
+						prefetchwritebackward(pout + i - 2);
 						pdst[i - 1] = plo;
+						prefetchwritebackward(pdst + i - 2);
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -33919,8 +35572,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -33947,8 +35604,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(6u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -33979,11 +35640,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34043,8 +35712,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34079,10 +35750,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
+					prefetchwritebackward(pout + i - 2);
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34145,10 +35818,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34181,13 +35858,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[0]};
 						V *plo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
+						prefetchwritebackward(pout + i - 2);
 						pdst[i - 1] = plo;
+						prefetchwritebackward(pdst + i - 2);
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34242,8 +35922,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -34267,8 +35951,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(5u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -34296,11 +35984,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34354,8 +36050,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34387,10 +36085,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
+					prefetchwritebackward(pout + i - 2);
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34447,10 +36147,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34480,13 +36184,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *phi{input[0]};
 						V *plo{input[1]};
+						prefetchforward(input + 2);
 						input += 2;
 						auto imhi{indirectinput1<indirection1, isindexed2, true, T, V>(phi, varparameters...)};
 						pout[i] = phi;
 						pdst[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, true, T, V>(plo, varparameters...)};
 						pout[i - 1] = plo;
+						prefetchwritebackward(pout + i - 2);
 						pdst[i - 1] = plo;
+						prefetchwritebackward(pdst + i - 2);
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imhi, varparameters...)};
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34535,8 +36242,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -34557,8 +36268,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(4u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -34583,11 +36298,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *plo{pinputlo[0]};
 						V *phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34633,8 +36356,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34663,10 +36388,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					V *phi{input[i]};
 					V *plo{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					pout[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					pout[i - 1] = plo;
+					prefetchwritebackward(pout + i - 2);
 					U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 					U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -34715,10 +36442,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -34743,6 +36474,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pa{input[0]};
 						V *pb{input[1]};
 						V *pc{input[2]};
+						prefetchforward(input + 3);
 						input += 3;
 						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
@@ -34752,7 +36484,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pdst[i - 1] = pb;
 						auto imc{indirectinput1<indirection1, isindexed2, true, T, V>(pc, varparameters...)};
 						pout[i - 2] = pc;
+						prefetchwritebackward(pout + i - 3);
 						pdst[i - 2] = pc;
+						prefetchwritebackward(pdst + i - 3);
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imc, varparameters...)};
@@ -34796,8 +36530,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -34815,8 +36553,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(3u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -34843,8 +36585,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -34859,8 +36605,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -34931,13 +36681,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poutputlo[1] = pd;
 						auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 						pinputhi[-2] = pe;
+						prefetchbackward(pinputhi - 3);
 						pinputhi -= 3;
 						poutputhi[-2] = pe;
+						prefetchbackward(poutputhi - 3);
 						poutputhi -= 3;
 						auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 						pinputlo[2] = pf;
+						prefetchforward(pinputlo + 3);
 						pinputlo += 3;
 						poutputlo[2] = pf;
+						prefetchwriteforward(poutputlo + 3);
 						poutputlo += 3;
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
@@ -34982,8 +36736,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35008,8 +36764,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35033,12 +36791,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *pa{input[i]};
 					V *pb{input[i - 1]};
 					V *pc{input[i - 2]};
+					prefetchbackward(input + i - 3);
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 					pout[i - 1] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 					pout[i - 2] = pc;
+					prefetchwritebackward(pout + i - 3);
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -35084,10 +36844,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35112,6 +36876,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pa{input[0]};
 						V *pb{input[1]};
 						V *pc{input[2]};
+						prefetchforward(input + 3);
 						input += 3;
 						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
@@ -35121,7 +36886,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pdst[i - 1] = pb;
 						auto imc{indirectinput1<indirection1, isindexed2, true, T, V>(pc, varparameters...)};
 						pout[i - 2] = pc;
+						prefetchwritebackward(pout + i - 3);
 						pdst[i - 2] = pc;
+						prefetchwritebackward(pdst + i - 3);
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imc, varparameters...)};
@@ -35165,8 +36932,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -35181,8 +36952,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -35253,13 +37028,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poutputlo[1] = pd;
 						auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 						pinputhi[-2] = pe;
+						prefetchbackward(pinputhi - 3);
 						pinputhi -= 3;
 						poutputhi[-2] = pe;
+						prefetchwritebackward(poutputhi - 3);
 						poutputhi -= 3;
 						auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 						pinputlo[2] = pf;
+						prefetchforward(pinputlo + 3);
 						pinputlo += 3;
 						poutputlo[2] = pf;
+						prefetchwriteforward(poutputlo + 3);
 						poutputlo += 3;
 						U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 						U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
@@ -35304,8 +37083,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35329,12 +37110,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *pa{input[i]};
 					V *pb{input[i - 1]};
 					V *pc{input[i - 2]};
+					prefetchbackward(input + i - 3);
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 					pout[i - 1] = pb;
 					auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 					pout[i - 2] = pc;
+					prefetchwritebackward(pout + i - 3);
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -35380,10 +37163,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout += loc;
 					pdst += loc;
 					do{
-						V *p{*input++};
+						V *p{*input};
+						prefetchforward(input + 1);
+						++input;
 						auto im{indirectinput1<indirection1, isindexed2, true, T, V>(p, varparameters...)};
 						pout[i] = p;
+						prefetchwritebackward(pout + i - 1);
 						pdst[i] = p;
+						prefetchwritebackward(pdst + i - 1);
 						U cur{indirectinput2<indirection1, indirection2, isindexed2, true, T>(im, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35406,6 +37193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pb{input[1]};
 						V *pc{input[2]};
 						V *pd{input[3]};
+						prefetchforward(input + 4);
 						input += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, true, T, V>(pa, varparameters...)};
 						pout[i] = pa;
@@ -35418,7 +37206,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pdst[i - 2] = pc;
 						auto imd{indirectinput1<indirection1, isindexed2, true, T, V>(pd, varparameters...)};
 						pout[i - 3] = pd;
+						prefetchwritebackward(pout + i - 4);
 						pdst[i - 3] = pd;
+						prefetchwritebackward(pdst + i - 4);
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, true, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imb, varparameters...)};
 						U curc{indirectinput2<indirection1, indirection2, isindexed2, true, T>(imc, varparameters...)};
@@ -35459,8 +37249,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-						*pinputhi-- = plo;
-						*poutputhi-- = plo;
+						*pinputhi = plo;
+						prefetchbackward(pinputhi - 1);
+						--pinputhi;
+						*poutputhi = plo;
+						prefetchwritebackward(poutputhi - 1);
+						--poutputhi;
 						U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -35472,8 +37266,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(1u << 8) + static_cast<std::size_t>(curlo)];
 						// register pressure performance issue on several platforms: do the high half here second
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-						*pinputlo++ = phi;
-						*poutputlo++ = phi;
+						*pinputlo = phi;
+						prefetchforward(pinputlo + 1);
+						++pinputlo;
+						*poutputlo = phi;
+						prefetchwriteforward(poutputlo + 1);
+						++poutputlo;
 						U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 						if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 							filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -35502,13 +37300,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						poutputlo[0] = pb;
 						auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 						pinputhi[-1] = pc;
+						prefetchbackward(pinputhi - 2);
 						pinputhi -= 2;
 						poutputhi[-1] = pc;
+						prefetchwritebackward(poutputhi - 2);
 						poutputhi -= 2;
 						auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 						pinputlo[1] = pd;
+						prefetchforward(pinputlo + 2);
 						pinputlo += 2;
 						poutputlo[1] = pd;
+						prefetchwriteforward(poutputlo + 2);
 						poutputlo += 2;
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
@@ -35549,8 +37351,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout += loc;
 				do{
 					V *p{input[i]};
+					prefetchbackward(input + i - 1);
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					pout[i] = p;
+					prefetchwritebackward(pout + i - 1);
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -35572,6 +37376,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					V *pb{input[i - 1]};
 					V *pc{input[i - 2]};
 					V *pd{input[i - 3]};
+					prefetchbackward(input + i - 4);
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					pout[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35580,6 +37385,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pout[i - 2] = pc;
 					auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 					pout[i - 3] = pd;
+					prefetchwritebackward(pout + i - 4);
 					U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 					U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 					U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -35654,6 +37460,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{// fill the array, two at a time
 				V *pa{psrchi[0]};
 				V *pb{psrchi[-1]};
+				prefetchbackward(psrchi - 2);
 				psrchi -= 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35672,6 +37479,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrchi[-1]};
 				V *pc{psrchi[-2]};
 				V *pd{psrchi[-3]};
+				prefetchbackward(psrchi - 4);
 				psrchi -= 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35742,6 +37550,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				do{// fill the array, two at a time
 					V *pa{psrchi[0]};
 					V *pb{psrchi[-1]};
+					prefetchbackward(psrchi - 2);
 					psrchi -= 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35760,6 +37569,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					V *pb{psrchi[-1]};
 					V *pc{psrchi[-2]};
 					V *pd{psrchi[-3]};
+					prefetchbackward(psrchi - 4);
 					psrchi -= 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35826,6 +37636,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				while(0 <= --j){// fill the array, two at a time
 					V *pa{psrclo[0]};
 					V *pb{psrclo[1]};
+					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35844,6 +37655,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					V *pb{psrclo[1]};
 					V *pc{psrclo[2]};
 					V *pd{psrclo[3]};
+					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35889,8 +37701,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}else{// !ismultithreadcapable
 			V *const *psrchi{psrclo + count};
 			do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *plo{*psrclo};
+				prefetchforward(psrclo + 1);
+				++psrclo;
+				V *phi{*psrchi};
+				prefetchbackward(psrchi - 1);
+				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -35966,6 +37782,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					while(0 <= --j){// fill the array, two at a time
 						V *pa{psrclo[0]};
 						V *pb{psrclo[1]};
+						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -35984,6 +37801,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						V *pb{psrclo[1]};
 						V *pc{psrclo[2]};
 						V *pd{psrclo[3]};
+						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -36029,8 +37847,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 			}else{// !ismultithreadcapable
 				V *const *psrchi{psrclo + count};
 				do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *plo{*psrclo};
+					prefetchforward(psrclo + 1);
+					++psrclo;
+					V *phi{*psrchi};
+					prefetchbackward(psrchi - 1);
+					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -36290,10 +38112,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36326,10 +38152,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36358,13 +38188,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
+								prefetchforward(pinput + 2);
 								pinput += 2;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = phi;
+								prefetchwritebackward(buffer + i - 2);
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -36441,8 +38274,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36475,8 +38310,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36504,10 +38341,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
+								prefetchwritebackward(output + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -36585,10 +38424,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36620,13 +38463,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
+								prefetchforward(pinput + 2);
 								pinput += 2;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = phi;
+								prefetchwritebackward(buffer + i - 2);
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -36712,8 +38558,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36744,10 +38592,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
+								prefetchwritebackward(output + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -36834,10 +38684,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36866,13 +38720,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
+								prefetchforward(pinput + 2);
 								pinput += 2;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = phi;
+								prefetchwritebackward(buffer + i - 2);
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -36949,8 +38806,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -36978,10 +38837,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
+								prefetchwritebackward(output + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -37059,10 +38920,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37088,13 +38953,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *plo{pinput[0]};
 								V *phi{pinput[1]};
+								prefetchforward(pinput + 2);
 								pinput += 2;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i] = plo;
 								buffer[i] = plo;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i - 1] = phi;
+								prefetchwritebackward(output + i - 2);
 								buffer[i - 1] = phi;
+								prefetchwritebackward(buffer + i - 2);
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -37160,8 +39028,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37186,10 +39056,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								output[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								output[i - 1] = plo;
+								prefetchwritebackward(output + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -37256,10 +39128,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37280,10 +39156,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37309,6 +39189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{pinput[0]};
 								V *pb{pinput[1]};
 								V *pc{pinput[2]};
+								prefetchforward(pinput + 3);
 								pinput += 3;
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
@@ -37318,7 +39199,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								buffer[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = pc;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -37406,8 +39289,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37428,8 +39313,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37454,12 +39341,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
+								prefetchwritebackward(output + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -37546,10 +39435,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37575,6 +39468,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{pinput[0]};
 								V *pb{pinput[1]};
 								V *pc{pinput[2]};
+								prefetchforward(pinput + 3);
 								pinput += 3;
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
@@ -37584,7 +39478,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								buffer[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = pc;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -37672,8 +39568,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37698,12 +39596,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 2] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								output[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								output[i] = pc;
+								prefetchwritebackward(output + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -37790,10 +39690,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							do{
-								V *p{*pinput++};
+								V *p{*pinput};
+								prefetchforward(pinput + 1);
+								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37817,6 +39721,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{pinput[1]};
 								V *pc{pinput[2]};
 								V *pd{pinput[3]};
+								prefetchforward(pinput + 4);
 								pinput += 4;
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
@@ -37829,7 +39734,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								buffer[i + 1] = pc;
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								output[i] = pd;
+								prefetchwritebackward(output + i - 1);
 								buffer[i] = pd;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -37906,8 +39813,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								output[i] = p;
+								prefetchwritebackward(output + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -37930,6 +39839,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{input[i + 2]};
 								V *pc{input[i + 1]};
 								V *pd{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								output[i + 3] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -37938,6 +39848,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								output[i + 1] = pc;
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								output[i] = pd;
+								prefetchwritebackward(output + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -38332,8 +40243,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -38364,8 +40279,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(7u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -38399,8 +40318,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -38425,8 +40348,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 11) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -38454,11 +40381,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -38535,8 +40470,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -38569,8 +40506,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -38598,10 +40537,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
+								prefetchwritebackward(buffer + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -38695,8 +40636,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -38723,8 +40668,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(6u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -38755,11 +40704,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -38845,8 +40802,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -38877,10 +40836,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
+								prefetchwritebackward(buffer + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -38983,8 +40944,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -39008,8 +40973,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -39037,11 +41006,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -39115,8 +41092,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -39144,10 +41123,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
+								prefetchwritebackward(buffer + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -39241,8 +41222,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -39263,8 +41248,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(4u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -39289,11 +41278,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *plo{pinputlo[0]};
 								V *phi{pinputhi[0]};
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -39359,8 +41356,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -39385,10 +41384,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							do{
 								V *phi{input[i]};
 								V *plo{input[i - 1]};
+								prefetchbackward(input + i - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								buffer[i] = phi;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 								buffer[i - 1] = plo;
+								prefetchwritebackward(buffer + i - 2);
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
@@ -39475,8 +41476,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -39494,8 +41499,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(3u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -39518,8 +41527,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -39534,8 +41547,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -39699,13 +41716,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo[1] = pd;
 								auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 								pinputhi[-2] = pe;
+								prefetchbackward(pinputhi - 3);
 								pinputhi -= 3;
 								pbufferhi[-2] = pe;
+								prefetchwritebackward(pbufferhi - 3);
 								pbufferhi -= 3;
 								auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 								pinputlo[2] = pf;
+								prefetchforward(pinputlo + 3);
 								pinputlo += 3;
 								pbufferlo[2] = pf;
+								prefetchwriteforward(pbufferlo + 3);
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
@@ -39763,8 +41784,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -39785,8 +41808,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -39811,12 +41836,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 2] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								buffer[i] = pc;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -39923,8 +41950,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -39939,8 +41970,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -40104,13 +42139,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo[1] = pd;
 								auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 								pinputhi[-2] = pe;
+								prefetchbackward(pinputhi - 3);
 								pinputhi -= 3;
 								pbufferhi[-2] = pe;
+								prefetchwritebackward(pbufferhi - 3);
 								pbufferhi -= 3;
 								auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
 								pinputlo[2] = pf;
+								prefetchforward(pinputlo + 3);
 								pinputlo += 3;
 								pbufferlo[2] = pf;
+								prefetchwriteforward(pbufferlo + 3);
 								pbufferlo += 3;
 								U curd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
 								U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
@@ -40168,8 +42207,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -40194,12 +42235,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pa{input[i + 2]};
 								V *pb{input[i + 1]};
 								V *pc{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 2] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								buffer[i + 1] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								buffer[i] = pc;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -40303,8 +42346,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *phi{pinputhi[0]};
 								// register pressure performance issue on several platforms: first do the low half here
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
-								*pinputhi-- = plo;
-								*pbufferhi-- = plo;
+								*pinputhi = plo;
+								prefetchbackward(pinputhi - 1);
+								--pinputhi;
+								*pbufferhi = plo;
+								prefetchwritebackward(pbufferhi - 1);
+								--pbufferhi;
 								U curlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curlo);
@@ -40316,8 +42363,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(1u << 8) + static_cast<std::size_t>(curlo)];
 								// register pressure performance issue on several platforms: do the high half here second
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
-								*pinputlo++ = phi;
-								*pbufferlo++ = phi;
+								*pinputlo = phi;
+								prefetchforward(pinputlo + 1);
+								++pinputlo;
+								*pbufferlo = phi;
+								prefetchwriteforward(pbufferlo + 1);
+								++pbufferlo;
 								U curhi{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imhi, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(curhi);
@@ -40371,13 +42422,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								pbufferlo[0] = pb;
 								auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
 								pinputhi[-1] = pc;
+								prefetchbackward(pinputhi - 2);
 								pinputhi -= 2;
 								pbufferhi[-1] = pc;
+								prefetchwritebackward(pbufferhi - 2);
 								pbufferhi -= 2;
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
+								prefetchforward(pinputlo + 2);
 								pinputlo += 2;
 								pbufferlo[1] = pd;
+								prefetchwriteforward(pbufferlo + 2);
 								pbufferlo += 2;
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
@@ -40429,8 +42484,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							if constexpr(ismultithreadcapable) if(usemultithread) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							do{
 								V *p{input[i]};
+								prefetchbackward(input + i - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								buffer[i] = p;
+								prefetchwritebackward(buffer + i - 1);
 								U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 								if constexpr(isabsvalue != isfltpmode || isabsvalue && !issignmode){
 									filterinput<isabsvalue, issignmode, isfltpmode, T>(cur);
@@ -40453,6 +42510,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								V *pb{input[i + 2]};
 								V *pc{input[i + 1]};
 								V *pd{input[i]};
+								prefetchbackward(input + i - 1);
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								buffer[i + 3] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -40461,6 +42519,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								buffer[i + 1] = pc;
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								buffer[i] = pd;
+								prefetchwritebackward(buffer + i - 1);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -40647,13 +42706,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			U cura{input[i]};
 			U curb{input[i - 1]};
+			prefetchbackward(input + i - 2);
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(
 					cura, pout + i,
 					curb, pout + i - 1);
+				prefetchwritebackward(pout + i - 2);
 			}else{
 				pout[i] = static_cast<T>(cura);
 				pout[i - 1] = static_cast<T>(curb);
+				prefetchwritebackward(pout + i - 2);
 				if constexpr(isabsvalue && isfltpmode){// one-register filters only
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 				}
@@ -40688,6 +42750,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			U curf{input[i - 5]};
 			U curg{input[i - 6]};
 			U curh{input[i - 7]};
+			prefetchbackward(input + i - 8);
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
 				// register pressure performance issue on several platforms: do the low half here second
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(
@@ -40695,6 +42758,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					curf, pout + i - 5,
 					curg, pout + i - 6,
 					curh, pout + i - 7);
+				prefetchwritebackward(pout + i - 8);
 				++offsetscompanion[cure];
 				++offsetscompanion[curf];
 				++offsetscompanion[curg];
@@ -40708,6 +42772,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout[i - 5] = static_cast<T>(curf);
 				pout[i - 6] = static_cast<T>(curg);
 				pout[i - 7] = static_cast<T>(curh);
+				prefetchwritebackward(pout + i - 8);
 				if constexpr(isabsvalue && isfltpmode){// one-register filters only
 					filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb, curc, curd, cure, curf, curg, curh);
 				}
@@ -40751,6 +42816,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			U cura{input[i]};
 			U curb{input[i - 1]};
+			prefetchbackward(input + i - 2);
 			if constexpr(isabsvalue != isfltpmode || (isabsvalue && isfltpmode)){
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 			}
@@ -40779,6 +42845,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			U curf{input[i - 5]};
 			U curg{input[i - 6]};
 			U curh{input[i - 7]};
+			prefetchbackward(input + i - 8);
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
 				// register pressure performance issue on several platforms: do the low half here second
 				filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
@@ -40829,6 +42896,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{// fill the array, two at a time
 			U outa{psrchi[0]};
 			U outb{psrchi[-1]};
+			prefetchbackward(psrchi - 2);
 			psrchi -= 2;
 			auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 			std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
@@ -40849,6 +42917,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			U outb{psrchi[-1]};
 			U outc{psrchi[-2]};
 			U outd{psrchi[-3]};
+			prefetchbackward(psrchi - 4);
 			psrchi -= 4;
 			auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 			std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
@@ -40918,8 +42987,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
 				length = static_cast<U>(*t) + static_cast<U>(*u);
 				filler += static_cast<unsigned>(isdescsort * 2 - 1);
-				t += isdescsort * 2 - 1;
-				u += isdescsort * 2 - 1;
+				if constexpr(isdescsort){
+					prefetchforward(t + 1);
+					++t;
+					prefetchforward(u + 1);
+					++u;
+				}else{
+					prefetchbackward(t - 1);
+					--t;
+					prefetchbackward(u - 1);
+					--u;
+				}
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// note: both regular absolute modes are not relevant here
@@ -40940,8 +43018,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::fill(std::execution::par_unseq, pfill, pfilloldeven, static_cast<T>(filler));
 					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
 					filler += 0x80u + isdescsort * 2u - 1u;// offset the value of filler for the next loop
-					t += isdescsort * 4 - 2;// step forward twice
-					u += isdescsort * 4 - 2;
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchforward(t + 2);
+						t += 2;
+						prefetchforward(u + 2);
+						u += 2;
+					}else{
+						prefetchbackward(t - 2);
+						t -= 2;
+						prefetchbackward(u - 2);
+						u -= 2;
+					}
 				}while(--j);
 				T *pfillold{pfill};
 				pfill -= length;
@@ -40959,8 +43047,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
 					length = static_cast<U>(*t) + static_cast<U>(*u);
 					filler += static_cast<unsigned>(isdescsort * 2 - 1);
-					t += isdescsort * 2 - 1;
-					u += isdescsort * 2 - 1;
+					if constexpr(isdescsort){
+						prefetchforward(t + 1);
+						++t;
+						prefetchforward(u + 1);
+						++u;
+					}else{
+						prefetchbackward(t - 1);
+						--t;
+						prefetchbackward(u - 1);
+						--u;
+					}
 				}while(--j);
 			}
 		}
@@ -40993,6 +43090,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			while(0 <= --j){// fill the array, two at a time
 				U outa{psrclo[0]};
 				U outb{psrclo[1]};
+				prefetchforward(psrclo + 2);
 				psrclo += 2;
 				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
@@ -41013,6 +43111,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U outb{psrclo[1]};
 				U outc{psrclo[2]};
 				U outd{psrclo[3]};
+				prefetchforward(psrclo + 4);
 				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
@@ -41058,8 +43157,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else{// !ismultithreadcapable
 		T const *psrchi{psrclo + count};
 		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-			U outlo{*psrclo++};
-			U outhi{*psrchi--};
+			U outlo{*psrclo};
+			prefetchforward(psrclo + 1);
+			++psrclo;
+			U outhi{*psrchi};
+			prefetchbackward(psrchi - 1);
+			--psrchi;
 			auto[curlo, curhi]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outlo, outhi)};
 			std::size_t offsetlo, offsethi;// this is only allowed for the single-part version, containing just one sorting pass
 			if constexpr(isrevorder){
@@ -41129,8 +43232,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 					length = static_cast<U>(*t) + static_cast<U>(*u);
 					filler += 1u - isdescsort * 2u;
-					t += 1 - isdescsort * 2;
-					u += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+						prefetchbackward(u - 1);
+						--u;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+						prefetchforward(u + 1);
+						++u;
+					}
 				}while(--j);
 			}else{// unsigned or signed absolute
 				// note: both regular absolute modes are not relevant here
@@ -41151,8 +43263,18 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						std::fill(std::execution::par_unseq, pfilloldeven, pfill, static_cast<T>(filler));
 						length = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 						filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
-						t += 2 - isdescsort * 4;// step forward twice
-						u += 2 - isdescsort * 4;
+						// step forward twice
+						if constexpr(isdescsort){
+							prefetchbackward(t - 2);
+							t -= 2;
+							prefetchbackward(u - 2);
+							u -= 2;
+						}else{
+							prefetchforward(t + 2);
+							t += 2;
+							prefetchforward(u + 2);
+							u += 2;
+						}
 					}while(--j);
 					T *pfillold{pfill};
 					pfill += length;
@@ -41170,8 +43292,17 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 						length = static_cast<U>(*t) + static_cast<U>(*u);
 						filler += 1u - isdescsort * 2u;
-						t += 1 - isdescsort * 2;
-						u += 1 - isdescsort * 2;
+						if constexpr(isdescsort){
+							prefetchbackward(t - 1);
+							--t;
+							prefetchbackward(u - 1);
+							--u;
+						}else{
+							prefetchforward(t + 1);
+							++t;
+							prefetchforward(u + 1);
+							++u;
+						}
 					}while(--j);
 				}
 			}
@@ -41192,7 +43323,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 				length = *t;
 				filler += 1u - isdescsort * 2u;
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 			}while(--j);
 			T *pfilloldmid{pfill};
 			pfill += length;
@@ -41207,7 +43344,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 				length = *t;
 				filler += 1 - isdescsort * 2;
-				t += 1 - isdescsort * 2;
+				if constexpr(isdescsort){
+					prefetchbackward(t - 1);
+					--t;
+				}else{
+					prefetchforward(t + 1);
+					++t;
+				}
 			}while(--j);
 		}else{// unsigned or signed absolute
 			// note: both regular absolute modes are not relevant here
@@ -41227,7 +43370,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::fill(std::execution::par_unseq, pfilloldeven, pfill, static_cast<T>(filler));
 					length = t[3 - isdescsort * 6];// odd
 					filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
-					t += 2 - isdescsort * 4;// step forward twice
+					// step forward twice
+					if constexpr(isdescsort){
+						prefetchbackward(t - 2);
+						t -= 2;
+					}else{
+						prefetchforward(t + 2);
+						t += 2;
+					}
 				}while(--j);
 				T *pfillold{pfill};
 				pfill += length;
@@ -41244,7 +43394,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 					length = *t;
 					filler += 1u - isdescsort * 2u;
-					t += 1 - isdescsort * 2;
+					if constexpr(isdescsort){
+						prefetchbackward(t - 1);
+						--t;
+					}else{
+						prefetchforward(t + 1);
+						++t;
+					}
 				}while(--j);
 			}
 		}
@@ -41499,15 +43655,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue || isfltpmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i,
 							curb, output + i - 1);
+						prefetchwritebackward(output + i - 2);
 						++offsets[cura];
 					}else{
 						output[i] = static_cast<T>(cura);
 						++offsets[cura];
 						output[i - 1] = static_cast<T>(curb);
+						prefetchwritebackward(output + i - 2);
 					}
 					++offsets[curb];
 					i -= 2;
@@ -41547,6 +43706,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curf{input[i + 2]};
 					U curg{input[i + 1]};
 					U curh{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode){// two-register filters only
 						// register pressure performance issue on several platforms: do the low half here second
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
@@ -41554,6 +43714,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curf, output + i + 2,
 							curg, output + i + 1,
 							curh, output + i);
+						prefetchwritebackward(output + i - 1);
 						++offsets[cure];
 						++offsets[curf];
 						++offsets[curg];
@@ -41567,6 +43728,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curf, output + i + 2,
 							curg, output + i + 1,
 							curh, output + i);
+						prefetchwritebackward(output + i - 1);
 						++offsets[cura];
 						++offsets[curb];
 						++offsets[curc];
@@ -41590,6 +43752,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						output[i + 1] = static_cast<T>(curg);
 						++offsets[curg];
 						output[i] = static_cast<T>(curh);
+						prefetchwritebackward(output + i - 1);
 					}
 					++offsets[curh];
 					i -= 8;
@@ -41794,15 +43957,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue || isfltpmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, output + i,
 							curb, output + i - 1);
+						prefetchwritebackward(output + i - 2);
 						++offsets[cura];
 					}else{
 						output[i] = static_cast<T>(cura);
 						++offsets[cura];
 						output[i - 1] = static_cast<T>(curb);
+						prefetchwritebackward(output + i - 2);
 					}
 					++offsets[curb];
 					i -= 2;
@@ -41838,6 +44004,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curf{input[i + 2]};
 					U curg{input[i + 1]};
 					U curh{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode){// two-register filters only
 						// register pressure performance issue on several platforms: do the low half here second
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
@@ -42165,15 +44332,18 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue || isfltpmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
 							cura, buffer + i,
 							curb, buffer + i - 1);
+						prefetchwritebackward(buffer + i - 2);
 						++offsets[cura];
 					}else{
 						buffer[i] = static_cast<T>(cura);
 						++offsets[cura];
 						buffer[i - 1] = static_cast<T>(curb);
+						prefetchwritebackward(buffer + i - 2);
 					}
 					++offsets[curb];
 					i -= 2;
@@ -42213,6 +44383,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curf{input[i + 2]};
 					U curg{input[i + 1]};
 					U curh{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode){// two-register filters only
 						// register pressure performance issue on several platforms: do the low half here second
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(
@@ -42220,6 +44391,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curf, buffer + i + 2,
 							curg, buffer + i + 1,
 							curh, buffer + i);
+						prefetchwritebackward(buffer + i - 1);
 						++offsets[cure];
 						++offsets[curf];
 						++offsets[curg];
@@ -42233,6 +44405,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							curf, buffer + i + 2,
 							curg, buffer + i + 1,
 							curh, buffer + i);
+						prefetchwritebackward(buffer + i - 1);
 						++offsets[cura];
 						++offsets[curb];
 						++offsets[curc];
@@ -42256,6 +44429,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						buffer[i + 1] = static_cast<T>(curg);
 						++offsets[curg];
 						buffer[i] = static_cast<T>(curh);
+						prefetchwritebackward(buffer + i - 1);
 					}
 					++offsets[curh];
 					i -= 8;
@@ -42458,6 +44632,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				do{
 					U cura{input[i]};
 					U curb{input[i - 1]};
+					prefetchbackward(input + i - 2);
 					if constexpr(isabsvalue || isfltpmode){
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cura, curb);
 					}
@@ -42496,6 +44671,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					U curf{input[i + 2]};
 					U curg{input[i + 1]};
 					U curh{input[i]};
+					prefetchbackward(input + i - 1);
 					if constexpr(isabsvalue != isfltpmode){// two-register filters only
 						// register pressure performance issue on several platforms: do the low half here second
 						filterinput<isabsvalue, issignmode, isfltpmode, T>(cure, curf, curg, curh);
@@ -42603,10 +44779,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		do{
 			V *pa{input[i]};
 			V *pb{input[i - 1]};
+			prefetchbackward(input + i - 2);
 			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			pout[i] = pa;
 			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 			pout[i - 1] = pb;
+			prefetchwritebackward(pout + i - 2);
 			U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 			U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 			if constexpr(isabsvalue || isfltpmode){
@@ -42650,6 +44828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			V *pf{input[i - 5]};
 			V *pg{input[i - 6]};
 			V *ph{input[i - 7]};
+			prefetchbackward(input + i - 8);
 			if constexpr(isabsvalue != isfltpmode){// two-register filters only
 				auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 				pout[i - 4] = pe;
@@ -42659,6 +44838,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout[i - 6] = pg;
 				auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 				pout[i - 7] = ph;
+				prefetchwritebackward(pout + i - 8);
 				U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
 				U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 				U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
@@ -42686,6 +44866,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				pout[i - 6] = pg;
 				auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 				pout[i - 7] = ph;
+				prefetchwritebackward(pout + i - 8);
 				U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 				U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 				U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -42733,6 +44914,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		do{// fill the array, two at a time
 			V *pa{psrchi[0]};
 			V *pb{psrchi[-1]};
+			prefetchbackward(psrchi - 2);
 			psrchi -= 2;
 			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -42757,6 +44939,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			V *pb{psrchi[-1]};
 			V *pc{psrchi[-2]};
 			V *pd{psrchi[-3]};
+			prefetchbackward(psrchi - 4);
 			psrchi -= 4;
 			auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 			auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -42809,11 +44992,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			while(0 <= --j){// fill the array, two at a time
 				V *pa{psrclo[0]};
 				V *pb{psrclo[1]};
+				prefetchforward(psrclo + 2);
+				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
-				psrclo += 2;
 				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb)};
 				std::size_t offseta, offsetb;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(isrevorder){
@@ -42833,6 +45017,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				V *pb{psrclo[1]};
 				V *pc{psrclo[2]};
 				V *pd{psrclo[3]};
+				prefetchforward(psrclo + 4);
+				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				auto imc{indirectinput1<indirection1, isindexed2, false, T, V>(pc, varparameters...)};
@@ -42841,7 +45027,6 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				U outb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 				U outc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
 				U outd{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imd, varparameters...)};
-				psrclo += 4;
 				auto[cura, curb, curc, curd]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outa, outb, outc, outd)};
 				std::size_t offseta, offsetb, offsetc, offsetd;// this is only allowed for the single-part version, containing just one sorting pass
 				if constexpr(isrevorder){
@@ -42892,8 +45077,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}else{// !ismultithreadcapable
 		V *const *psrchi{psrclo + count};
 		do{// fill the array, two at a time: one low-to-middle, one high-to-middle
-			V *plo{*psrclo++};
-			V *phi{*psrchi--};
+			V *plo{*psrclo};
+			prefetchforward(psrclo + 1);
+			++psrclo;
+			V *phi{*psrchi};
+			prefetchbackward(psrchi - 1);
+			--psrchi;
 			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 			U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -43121,10 +45310,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *pa{input[i]};
 						V *pb{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						output[i] = pa;
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						output[i - 1] = pb;
+						prefetchwritebackward(output + i - 2);
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
@@ -43180,6 +45371,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pf{input[i + 2]};
 						V *pg{input[i + 1]};
 						V *ph{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
 							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							output[i + 3] = pe;
@@ -43189,6 +45381,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							output[i + 1] = pg;
 							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							output[i] = ph;
+							prefetchwritebackward(output + i - 1);
 							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
 							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
@@ -43216,6 +45409,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							output[i + 1] = pg;
 							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							output[i] = ph;
+							prefetchwritebackward(output + i - 1);
 							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -43562,10 +45756,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					do{
 						V *pa{input[i]};
 						V *pb{input[i - 1]};
+						prefetchbackward(input + i - 2);
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						buffer[i] = pa;
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 						buffer[i - 1] = pb;
+						prefetchwritebackward(buffer + i - 2);
 						U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 						U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 						if constexpr(isabsvalue || isfltpmode){
@@ -43621,6 +45817,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						V *pf{input[i + 2]};
 						V *pg{input[i + 1]};
 						V *ph{input[i]};
+						prefetchbackward(input + i - 1);
 						if constexpr(isabsvalue != isfltpmode){// two-register filters only
 							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							buffer[i + 3] = pe;
@@ -43630,6 +45827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							buffer[i + 1] = pg;
 							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							buffer[i] = ph;
+							prefetchwritebackward(buffer + i - 1);
 							U cure{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ime, varparameters...)};
 							U curf{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imf, varparameters...)};
 							U curg{indirectinput2<indirection1, indirection2, isindexed2, false, T>(img, varparameters...)};
@@ -43657,6 +45855,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							buffer[i + 1] = pg;
 							auto imh{indirectinput1<indirection1, isindexed2, false, T, V>(ph, varparameters...)};
 							buffer[i] = ph;
+							prefetchwritebackward(buffer + i - 1);
 							U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 							U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 							U curc{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imc, varparameters...)};
@@ -46771,6 +48970,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 					previouscomp = complo;
 #endif
+					prefetchbackward(pdatalo - 1);
 					--pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
@@ -46780,12 +48980,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 					previouscomp = comphi;
 #endif
+					prefetchbackward(pdatahi - 1);
 					--pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
 					comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 				}
-				*pout-- = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwritebackward(pout - 1);
+				--pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -46817,8 +49020,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				curlo &= static_cast<M>(notmask);
 				complo &= static_cast<M>(notmask);
 
+				prefetchbackward(reinterpret_cast<W *>(platestlo) - 1);
 				U latestlo{*reinterpret_cast<W *>(platestlo)};
-				*pout-- = static_cast<W>(outlo);
+				*pout = static_cast<W>(outlo);
+				prefetchwritebackward(pout - 1);
+				--pout;
 				curhi &= static_cast<M>(mask);
 
 				auto complatestlo{convertinput<isabsvalue, issignmode, isfltpmode, W>(latestlo)};// convert the value for integer comparison
@@ -46949,6 +49155,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? previouscur < curlo : curlo < previouscur));
 					previouscur = curlo;
 #endif
+					prefetchbackward(pdatalo - 1);
 					--pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
@@ -46957,11 +49164,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? previouscur < curhi : curhi < previouscur));
 					previouscur = curhi;
 #endif
+					prefetchbackward(pdatahi - 1);
 					--pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
 				}
-				*pout-- = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwritebackward(pout - 1);
+				--pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -46992,8 +49202,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				outlo |= outhi;
 				curlo &= static_cast<M>(notmask);
 
+				prefetchbackward(reinterpret_cast<W *>(platestlo) - 1);
 				U latestlo{*reinterpret_cast<W *>(platestlo)};
-				*pout-- = static_cast<W>(outlo);
+				*pout = static_cast<W>(outlo);
+				prefetchwritebackward(pout - 1);
+				--pout;
 
 				U latesthi{latestlo};
 				curhi &= static_cast<M>(mask);
@@ -47137,6 +49350,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 					previouscomp = comphi;
 #endif
+					prefetchforward(pdatahi + 1);
 					++pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
@@ -47146,12 +49360,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 					previouscomp = complo;
 #endif
+					prefetchforward(pdatalo + 1);
 					++pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
 					complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 				}
-				*pout++ = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwriteforward(pout + 1);
+				++pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -47180,9 +49397,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				outhi |= outlo;
 
 				platesthi |= platestlo;
-				*pout++ = static_cast<W>(outhi);
+				*pout = static_cast<W>(outhi);
+				prefetchwriteforward(pout + 1);
+				++pout;
 				curhi &= static_cast<M>(notmask);
 
+				prefetchforward(reinterpret_cast<W *>(platesthi) + 1);
 				U latesthi{*reinterpret_cast<W *>(platesthi)};
 				comphi &= static_cast<M>(notmask);
 				curlo &= static_cast<M>(mask);
@@ -47228,6 +49448,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? curhi < previouscur : previouscur < curhi));
 					previouscur = curhi;
 #endif
+					prefetchforward(pdatahi + 1);
 					++pdatahi;
 					out = curhi;
 					curhi = *pdatahi;
@@ -47236,11 +49457,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					assert(!(!isdescsort? curlo < previouscur : previouscur < curlo));
 					previouscur = curlo;
 #endif
+					prefetchforward(pdatalo + 1);
 					++pdatalo;
 					out = curlo;
 					curlo = *pdatalo;
 				}
-				*pout++ = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwriteforward(pout + 1);
+				++pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -47269,8 +49493,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				outhi |= outlo;
 
 				platesthi |= platestlo;
-				*pout++ = static_cast<W>(outhi);
+				*pout = static_cast<W>(outhi);
+				prefetchwriteforward(pout + 1);
+				++pout;
 
+				prefetchforward(reinterpret_cast<W *>(platesthi) + 1);
 				U latesthi{*reinterpret_cast<W *>(platesthi)};
 				curhi &= static_cast<M>(notmask);
 				curlo &= static_cast<M>(mask);
@@ -47694,6 +49921,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
+				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
 				cur1 = *pdata1;
@@ -47703,6 +49931,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
+				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
 				cur2 = *pdata2;
@@ -47713,12 +49942,15 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 				previouscomp = comp0;
 #endif
+				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
 				cur0 = *pdata0;
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
-			*pout-- = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}while(--thirdcount);
 		// after one third it's possble that one of the three parts has exhausted its items, check for that here
 		do{// the only modification here is this part
@@ -47729,6 +49961,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
+				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
 				if(pdata1stop < pdata1){
@@ -47744,6 +49977,7 @@ handle0filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
+				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
 				if(pdata2stop < pdata2){
@@ -47762,13 +49996,16 @@ handle0finalfiltered:// architecture: jump label reuse (from the else branch, in
 				assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 				previouscomp = comp0;
 #endif
+				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
 				if(pdata0stop >= pdata0) goto lastloopfiltered;
 				cur0 = *pdata0;
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
-			*pout-- = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}while(--finalcount);
 		if(1u & count){// odd counts will be handled here
 			// the only modification here is this part
@@ -47823,6 +50060,7 @@ lastloopfiltered:
 					assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 					previouscomp = comp1;
 #endif
+					prefetchbackward(pdata1 - 1);
 					--pdata1;
 					out = cur1;
 					cur1 = *pdata1;
@@ -47832,12 +50070,15 @@ lastloopfiltered:
 					assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 					previouscomp = comp2;
 #endif
+					prefetchbackward(pdata2 - 1);
 					--pdata2;
 					out = cur2;
 					cur2 = *pdata2;
 					comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 				}
-				*pout-- = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwritebackward(pout - 1);
+				--pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -47869,8 +50110,11 @@ lastloopfiltered:
 				cur1 &= static_cast<M>(notmask);
 				comp1 &= static_cast<M>(notmask);
 
+				prefetchbackward(reinterpret_cast<W *>(platest1) - 1);
 				U latest1{*reinterpret_cast<W *>(platest1)};
-				*pout-- = static_cast<W>(out1);
+				*pout = static_cast<W>(out1);
+				prefetchwritebackward(pout - 1);
+				--pout;
 				cur2 &= static_cast<M>(mask);
 
 				auto complatest1{convertinput<isabsvalue, issignmode, isfltpmode, W>(latest1)};// convert the value for integer comparison
@@ -47998,6 +50242,7 @@ exitfiltered:
 				assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 				previouscur = cur1;
 #endif
+				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
 				cur1 = *pdata1;
@@ -48006,6 +50251,7 @@ exitfiltered:
 				assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 				previouscur = cur2;
 #endif
+				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
 				cur2 = *pdata2;
@@ -48015,11 +50261,14 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? previouscur < cur0 : cur0 < previouscur));
 				previouscur = cur0;
 #endif
+				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
 				cur0 = *pdata0;
 			}
-			*pout-- = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}while(--thirdcount);
 		// after one third it's possble that one of the three parts has exhausted its items, check for that here
 		U out;
@@ -48031,6 +50280,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 				previouscur = cur1;
 #endif
+				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = cur1;
 				if(pdata1stop < pdata1){
@@ -48045,6 +50295,7 @@ handle0unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 				previouscur = cur2;
 #endif
+				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = cur2;
 				if(pdata2stop < pdata2){
@@ -48062,12 +50313,15 @@ handle0finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				assert(!(!isdescsort? previouscur < cur0 : cur0 < previouscur));
 				previouscur = cur0;
 #endif
+				prefetchbackward(pdata0 - 1);
 				--pdata0;
 				out = cur0;
 				if(pdata0stop >= pdata0) goto lastloopunfiltered;
 				cur0 = *pdata0;
 			}
-			*pout-- = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}while(--finalcount);
 		if(1u & count){// odd counts will be handled here
 			// the only modification here is this part
@@ -48114,6 +50368,7 @@ lastloopunfiltered:
 					assert(!(!isdescsort? previouscur < cur1 : cur1 < previouscur));
 					previouscur = cur1;
 #endif
+					prefetchbackward(pdata1 - 1);
 					--pdata1;
 					out = cur1;
 					cur1 = *pdata1;
@@ -48122,11 +50377,14 @@ lastloopunfiltered:
 					assert(!(!isdescsort? previouscur < cur2 : cur2 < previouscur));
 					previouscur = cur2;
 #endif
+					prefetchbackward(pdata2 - 1);
 					--pdata2;
 					out = cur2;
 					cur2 = *pdata2;
 				}
-				*pout-- = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwritebackward(pout - 1);
+				--pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -48157,8 +50415,11 @@ lastloopunfiltered:
 				out1 |= out2;
 				cur1 &= static_cast<M>(notmask);
 
+				prefetchbackward(reinterpret_cast<W *>(platest1) - 1);
 				U latest1{*reinterpret_cast<W *>(platest1)};
-				*pout-- = static_cast<W>(out1);
+				*pout = static_cast<W>(out1);
+				prefetchwritebackward(pout - 1);
+				--pout;
 
 				U latest2{latest1};
 				cur2 &= static_cast<M>(mask);
@@ -48306,6 +50567,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
+				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
 				cur1 = *pdata1;
@@ -48315,6 +50577,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
+				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
 				cur0 = *pdata0;
@@ -48325,12 +50588,15 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 				previouscomp = comp2;
 #endif
+				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
 				cur2 = *pdata2;
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
-			*pout++ = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}while(--thirdcount);
 		// after one third it's possble that one of the three parts has exhausted its items, check for that here
 		do{// the only modification here is this part
@@ -48341,6 +50607,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
+				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
 				if(pdata1stop > pdata1){
@@ -48355,6 +50622,7 @@ handle2filtered:// architecture: jump label reuse (from the else branch, includi
 				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
+				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
 				if(pdata0stop > pdata0){
@@ -48371,13 +50639,16 @@ handle2finalfiltered:// architecture: jump label reuse (from the else branch, in
 				assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 				previouscomp = comp2;
 #endif
+				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
 				if(pdata2stop <= pdata2) goto lastloopfiltered;
 				cur2 = *pdata2;
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
-			*pout++ = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}while(--finalcount);
 		// finalise using all three parts
 		if(!isdescsort? comp2 < comp1 : comp1 < comp2){
@@ -48394,6 +50665,7 @@ lastloopfiltered:
 					assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 					previouscomp = comp1;
 #endif
+					prefetchforward(pdata1 + 1);
 					++pdata1;
 					out = cur1;
 					cur1 = *pdata1;
@@ -48403,12 +50675,15 @@ lastloopfiltered:
 					assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 					previouscomp = comp0;
 #endif
+					prefetchforward(pdata0 + 1);
 					++pdata0;
 					out = cur0;
 					cur0 = *pdata0;
 					comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 				}
-				*pout++ = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwriteforward(pout + 1);
+				++pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -48437,9 +50712,12 @@ lastloopfiltered:
 				out1 |= out0;
 
 				platest1 |= platest0;
-				*pout++ = static_cast<W>(out1);
+				*pout = static_cast<W>(out1);
+				prefetchwriteforward(pout + 1);
+				++pout;
 				cur1 &= static_cast<M>(notmask);
 
+				prefetchforward(reinterpret_cast<W *>(platest1) + 1);
 				U latest1{*reinterpret_cast<W *>(platest1)};
 				comp1 &= static_cast<M>(notmask);
 				cur0 &= static_cast<M>(mask);
@@ -48486,6 +50764,7 @@ exitfiltered:
 				assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 				previouscur = cur1;
 #endif
+				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
 				cur1 = *pdata1;
@@ -48494,6 +50773,7 @@ exitfiltered:
 				assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 				previouscur = cur0;
 #endif
+				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
 				cur0 = *pdata0;
@@ -48503,11 +50783,14 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? cur2 < previouscur : previouscur < cur2));
 				previouscur = cur2;
 #endif
+				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
 				cur2 = *pdata2;
 			}
-			*pout++ = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}while(--thirdcount);
 		// after one third it's possble that one of the three parts has exhausted its items, check for that here
 		U out;
@@ -48519,6 +50802,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 				previouscur = cur1;
 #endif
+				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = cur1;
 				if(pdata1stop > pdata1){
@@ -48532,6 +50816,7 @@ handle2unfiltered:// architecture: jump label reuse (from the else branch, inclu
 				assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 				previouscur = cur0;
 #endif
+				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = cur0;
 				if(pdata0stop > pdata0){
@@ -48547,12 +50832,15 @@ handle2finalunfiltered:// architecture: jump label reuse (from the else branch, 
 				assert(!(!isdescsort? cur2 < previouscur : previouscur < cur2));
 				previouscur = cur2;
 #endif
+				prefetchforward(pdata2 + 1);
 				++pdata2;
 				out = cur2;
 				if(pdata2stop <= pdata2) goto lastloopunfiltered;
 				cur2 = *pdata2;
 			}
-			*pout++ = static_cast<W>(out);
+			*pout = static_cast<W>(out);
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}while(--finalcount);
 		// finalise using all three parts
 		if(!isdescsort? cur2 < cur1 : cur1 < cur2){
@@ -48568,6 +50856,7 @@ lastloopunfiltered:
 					assert(!(!isdescsort? cur1 < previouscur : previouscur < cur1));
 					previouscur = cur1;
 #endif
+					prefetchforward(pdata1 + 1);
 					++pdata1;
 					out = cur1;
 					cur1 = *pdata1;
@@ -48576,11 +50865,14 @@ lastloopunfiltered:
 					assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 					previouscur = cur0;
 #endif
+					prefetchforward(pdata0 + 1);
 					++pdata0;
 					out = cur0;
 					cur0 = *pdata0;
 				}
-				*pout++ = static_cast<W>(out);
+				*pout = static_cast<W>(out);
+				prefetchwriteforward(pout + 1);
+				++pout;
 			}else{// architecture: flatten the branch, at a higher register pressure cost
 				std::intptr_t mask;
 				if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -48609,8 +50901,11 @@ lastloopunfiltered:
 				out1 |= out0;
 
 				platest1 |= platest0;
-				*pout++ = static_cast<W>(out1);
+				*pout = static_cast<W>(out1);
+				prefetchwriteforward(pout + 1);
+				++pout;
 
+				prefetchforward(reinterpret_cast<W *>(platest1) + 1);
 				U latest1{*reinterpret_cast<W *>(platest1)};
 				cur1 &= static_cast<M>(notmask);
 				cur0 &= static_cast<M>(mask);
@@ -48636,7 +50931,7 @@ exitunfiltered:
 		else assert(!(!isdescsort? cur0 < previouscur : previouscur < cur0));
 #endif
 	}
-	*pout++ = static_cast<W>(cur0);
+	*pout = static_cast<W>(cur0);
 }
 
 // Up to 6-way multithreading functions without indirection
@@ -49797,6 +52092,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? previouscomp < complo : complo < previouscomp));
 				previouscomp = complo;
 #endif
+				prefetchbackward(pdatalo - 1);
 				--pdatalo;
 				out = plo;
 				plo = *pdatalo;
@@ -49808,6 +52104,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? previouscomp < comphi : comphi < previouscomp));
 				previouscomp = comphi;
 #endif
+				prefetchbackward(pdatahi - 1);
 				--pdatahi;
 				out = phi;
 				phi = *pdatahi;
@@ -49815,7 +52112,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
 				comphi = convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi);// convert the value for integer comparison
 			}
-			*pout-- = out;
+			*pout = out;
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
 			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -49847,8 +52146,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			plo &= notmask;
 			complo &= static_cast<M>(notmask);
 
+			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platestlo) - 1);
 			std::intptr_t latestlo{*reinterpret_cast<std::intptr_t const *>(platestlo)};
-			*pout-- = outlo;
+			*pout = outlo;
+			prefetchwritebackward(pout - 1);
+			--pout;
 			phi &= mask;
 
 			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latestlo), varparameters...)};
@@ -50018,6 +52320,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? comphi < previouscomp : previouscomp < comphi));
 				previouscomp = comphi;
 #endif
+				prefetchforward(pdatahi + 1);
 				++pdatahi;
 				out = phi;
 				phi = *pdatahi;
@@ -50029,6 +52332,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				assert(!(!isdescsort? complo < previouscomp : previouscomp < complo));
 				previouscomp = complo;
 #endif
+				prefetchforward(pdatalo + 1);
 				++pdatalo;
 				out = plo;
 				plo = *pdatalo;
@@ -50036,7 +52340,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
 				complo = convertinput<isabsvalue, issignmode, isfltpmode, W>(curlo);// convert the value for integer comparison
 			}
-			*pout++ = out;
+			*pout = out;
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
 			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -50068,9 +52374,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			phi &= notmask;
 			plo &= mask;
 
+			prefetchforward(reinterpret_cast<std::intptr_t const *>(platesthi) + 1);
 			std::intptr_t latesthi{*reinterpret_cast<std::intptr_t const *>(platesthi)};
 			comphi &= static_cast<M>(notmask);
-			*pout++ = outhi;
+			*pout = outhi;
+			prefetchwriteforward(pout + 1);
+			++pout;
 
 			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latesthi), varparameters...)};
 			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
@@ -50486,6 +52795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 			previouscomp = comp1;
 #endif
+			prefetchbackward(pdata1 - 1);
 			--pdata1;
 			out = p1;
 			p1 = *pdata1;
@@ -50497,6 +52807,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 			previouscomp = comp2;
 #endif
+			prefetchbackward(pdata2 - 1);
 			--pdata2;
 			out = p2;
 			p2 = *pdata2;
@@ -50509,6 +52820,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 			previouscomp = comp0;
 #endif
+			prefetchbackward(pdata0 - 1);
 			--pdata0;
 			out = p0;
 			p0 = *pdata0;
@@ -50516,7 +52828,9 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
-		*pout-- = out;
+		*pout = out;
+		prefetchwritebackward(pout - 1);
+		--pout;
 	}while(--thirdcount);
 	// after one third it's possble that one of the three parts has exhausted its items, check for that here
 	do{// the only modification here is this part
@@ -50527,6 +52841,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 			previouscomp = comp1;
 #endif
+			prefetchbackward(pdata1 - 1);
 			--pdata1;
 			out = p1;
 			if(pdata1stop < pdata1){
@@ -50544,6 +52859,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 			previouscomp = comp2;
 #endif
+			prefetchbackward(pdata2 - 1);
 			--pdata2;
 			out = p2;
 			if(pdata2stop < pdata2){
@@ -50564,6 +52880,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			assert(!(!isdescsort? previouscomp < comp0 : comp0 < previouscomp));
 			previouscomp = comp0;
 #endif
+			prefetchbackward(pdata0 - 1);
 			--pdata0;
 			out = p0;
 			if(pdata0stop >= pdata0) goto lastloop;
@@ -50572,7 +52889,9 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 			comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 		}
-		*pout-- = out;
+		*pout = out;
+		prefetchwritebackward(pout - 1);
+		--pout;
 	}while(--finalcount);
 	if(1u & count){// odd counts will be handled here
 		// the only modification here is this part
@@ -50633,6 +52952,7 @@ lastloop:
 				assert(!(!isdescsort? previouscomp < comp1 : comp1 < previouscomp));
 				previouscomp = comp1;
 #endif
+				prefetchbackward(pdata1 - 1);
 				--pdata1;
 				out = p1;
 				p1 = *pdata1;
@@ -50644,6 +52964,7 @@ lastloop:
 				assert(!(!isdescsort? previouscomp < comp2 : comp2 < previouscomp));
 				previouscomp = comp2;
 #endif
+				prefetchbackward(pdata2 - 1);
 				--pdata2;
 				out = p2;
 				p2 = *pdata2;
@@ -50651,7 +52972,9 @@ lastloop:
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 				comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 			}
-			*pout-- = out;
+			*pout = out;
+			prefetchwritebackward(pout - 1);
+			--pout;
 		}else{// architecture: flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
 			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -50683,8 +53006,11 @@ lastloop:
 			p1 &= notmask;
 			comp1 &= static_cast<M>(notmask);
 
+			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platest1) - 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
-			*pout-- = out1;
+			*pout = out1;
+			prefetchwritebackward(pout - 1);
+			--pout;
 			p2 &= mask;
 
 			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
@@ -50859,6 +53185,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 			previouscomp = comp1;
 #endif
+			prefetchforward(pdata1 + 1);
 			++pdata1;
 			out = p1;
 			p1 = *pdata1;
@@ -50870,6 +53197,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 			previouscomp = comp0;
 #endif
+			prefetchforward(pdata0 + 1);
 			++pdata0;
 			out = p0;
 			p0 = *pdata0;
@@ -50882,6 +53210,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 			previouscomp = comp2;
 #endif
+			prefetchforward(pdata2 + 1);
 			++pdata2;
 			out = p2;
 			p2 = *pdata2;
@@ -50889,7 +53218,9 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
-		*pout++ = out;
+		*pout = out;
+		prefetchwriteforward(pout + 1);
+		++pout;
 	}while(--thirdcount);
 	// after one third it's possble that one of the three parts has exhausted its items, check for that here
 	do{// the only modification here is this part
@@ -50900,6 +53231,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 			previouscomp = comp1;
 #endif
+			prefetchforward(pdata1 + 1);
 			++pdata1;
 			out = p1;
 			if(pdata1stop > pdata1){
@@ -50916,6 +53248,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 			previouscomp = comp0;
 #endif
+			prefetchforward(pdata0 + 1);
 			++pdata0;
 			out = p0;
 			if(pdata0stop > pdata0){
@@ -50934,6 +53267,7 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			assert(!(!isdescsort? comp2 < previouscomp : previouscomp < comp2));
 			previouscomp = comp2;
 #endif
+			prefetchforward(pdata2 + 1);
 			++pdata2;
 			out = p2;
 			if(pdata2stop <= pdata2) goto lastloop;
@@ -50942,7 +53276,9 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
 			comp2 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2);// convert the value for integer comparison
 		}
-		*pout++ = out;
+		*pout = out;
+		prefetchwriteforward(pout + 1);
+		++pout;
 	}while(--finalcount);
 	// finalise using all three parts
 	if(!isdescsort? comp2 < comp1 : comp1 < comp2){
@@ -50959,6 +53295,7 @@ lastloop:
 				assert(!(!isdescsort? comp1 < previouscomp : previouscomp < comp1));
 				previouscomp = comp1;
 #endif
+				prefetchforward(pdata1 + 1);
 				++pdata1;
 				out = p1;
 				p1 = *pdata1;
@@ -50970,6 +53307,7 @@ lastloop:
 				assert(!(!isdescsort? comp0 < previouscomp : previouscomp < comp0));
 				previouscomp = comp0;
 #endif
+				prefetchforward(pdata0 + 1);
 				++pdata0;
 				out = p0;
 				p0 = *pdata0;
@@ -50977,7 +53315,9 @@ lastloop:
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
 				comp0 = convertinput<isabsvalue, issignmode, isfltpmode, W>(cur0);// convert the value for integer comparison
 			}
-			*pout++ = out;
+			*pout = out;
+			prefetchwriteforward(pout + 1);
+			++pout;
 		}else{// flatten the branch, at a higher register pressure cost
 			std::intptr_t mask;
 			if constexpr(!isabsvalue && issignmode && !isfltpmode){// signed comparison optimisation
@@ -51009,9 +53349,12 @@ lastloop:
 			p1 &= notmask;
 			p0 &= mask;
 
+			prefetchforward(reinterpret_cast<std::intptr_t const *>(platest1) + 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
 			comp1 &= static_cast<M>(notmask);
-			*pout++ = out1;
+			*pout = out1;
+			prefetchwriteforward(pout + 1);
+			++pout;
 
 			auto im{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(latest1), varparameters...)};
 			auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im, varparameters...)};
