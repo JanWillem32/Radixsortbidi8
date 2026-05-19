@@ -11113,131 +11113,199 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(offsets);
 	assert(offsetscompanion);
 
-	// isdescsort is frequently optimised away in this part, e.g.: isdescsort * 2 - 1 generates 1 or -1
 	static_assert(!isabsvalue || !issignmode, "this function variant is not entirely intended for usage on the top part in absolute signed modes");
+	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	// determining the starting point depends on several factors here
 	static std::size_t constexpr stride{(static_cast<std::size_t>(1u) << setradix) - (isabsvalue && issignmode) * ((static_cast<std::size_t>(1u) << (setradix - 1u)) - !isfltpmode)};// shrink the offsets size if possible
-	X *t{(isrevorder? offsetscompanion : offsets)// low-to-high or high-to-low
-		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
-		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
-		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
-	X *u{(isrevorder? offsets : offsetscompanion)// low-to-high or high-to-low
-		+ (!isabsvalue && issignmode) * ((stride >> 1) - isdescsort)
-		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
-		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
-	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
-	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
-	*t = 0u;// the first offset always starts at zero
-	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
-		t += 1 - isdescsort * 2;
-		u += 1 - isdescsort * 2;
-		unsigned j{(1u << (setradix - 1u)) - 1u};
-		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
-		do{
-			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
-			*t = static_cast<X>(offset);
-			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-			if constexpr(isdescsort){
-				prefetchbackward(t - 1);
-				--t;
-				prefetchbackward(u - 1);
-				--u;
-			}else{
-				prefetchforward(t + 1);
-				++t;
-				prefetchforward(u + 1);
-				++u;
-			}
-			offset += difference;
-			addcarryofless(b, static_cast<U>(count), difference);
-		}while(--j);
-		U differencemid{static_cast<U>(t[(isdescsort * 2 - 1) << setradix]) + static_cast<U>(u[(isdescsort * 2 - 1) << setradix])};
-		t[(isdescsort * 2 - 1) << setradix] = static_cast<X>(offset);
-		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-		t += ((1 << setradix) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
-		u += ((1 << setradix) - 1) * (isdescsort * 2 - 1);
-		j = (1u << (setradix - 1u)) - 2u;
-		offset += differencemid;
-		addcarryofless(b, static_cast<U>(count), differencemid);
-		do{
-			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
-			*t = static_cast<X>(offset);
-			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-			if constexpr(isdescsort){
-				prefetchbackward(t - 1);
-				--t;
-				prefetchbackward(u - 1);
-				--u;
-			}else{
-				prefetchforward(t + 1);
-				++t;
-				prefetchforward(u + 1);
-				++u;
-			}
-			offset -= difference * static_cast<U>(isdescsort * 2 - 1);
-			addcarryofless(b, static_cast<U>(count), difference);
-		}while(--j);
-	}else{// unsigned or signed absolute
-		// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
-		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
-			t += isdescsort * 2 - 1;// step back
-			u += isdescsort * 2 - 1;
-			unsigned j{(1u << (setradix - 1u)) - 1u};// double the number of items per loop
-			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
-			do{
-				U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
-				*t = static_cast<X>(offset);
-				u[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd, high half
-				offset += difference;
-				addcarryofless(b, static_cast<U>(count), difference);
-				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
-				t[3 - isdescsort * 6] = static_cast<X>(offset);
-				*u = static_cast<X>(offset - 1u);// even, high half
-				// step forward twice
-				if constexpr(isdescsort){
-					prefetchbackward(t - 2);
-					t -= 2;
-					prefetchbackward(u - 2);
-					u -= 2;
-				}else{
-					prefetchforward(t + 2);
-					t += 2;
-					prefetchforward(u + 2);
-					u += 2;
-				}
-				offset += difference;
-				addcarryofless(b, static_cast<U>(count), difference);
-			}while(--j);
-		}else{// all other modes
-			t += 1 - isdescsort * 2;
-			u += 1 - isdescsort * 2;
-			unsigned j{(static_cast<std::size_t>(1u) << setradix) - 2u};
+	if constexpr(isdescsort){
+		X *t{(isrevorder? offsetscompanion : offsets)// high-to-low
+			+ (!isabsvalue && issignmode) * ((stride >> 1) - 1u)
+			+ (isabsvalue || !issignmode) * (stride - 1u)
+			- (isabsvalue && !issignmode && isfltpmode)};
+		X *u{(isrevorder? offsets : offsetscompanion)// high-to-low
+			+ (!isabsvalue && issignmode) * ((stride >> 1) - 1u)
+			+ (isabsvalue || !issignmode) * (stride - 1u)
+			- (isabsvalue && !issignmode && isfltpmode)};
+		U offset{static_cast<U>(*t) + static_cast<U>(*u)};
+		*t = 0u;// the first offset always starts at zero
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			--t;
+			--u;
+			unsigned j{(1u << (setradix - 1u)) - 1u};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
 				*t = static_cast<X>(offset);
-				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
-				if constexpr(isdescsort){
+				u[1] = static_cast<X>(offset - 1u);
+				prefetchbackward(t - 1);
+				--t;
+				prefetchbackward(u - 1);
+				--u;
+				offset += difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+			}while(--j);
+			U differencemid{static_cast<U>(t[1 << setradix]) + static_cast<U>(u[1 << setradix])};
+			t[1 << setradix] = static_cast<X>(offset);
+			u[1] = static_cast<X>(offset - 1u);
+			t += (1 << setradix) - 1;// offset to the start/end of the range
+			u += (1 << setradix) - 1;
+			j = (1u << (setradix - 1u)) - 2u;
+			offset += differencemid;
+			addcarryofless(b, static_cast<U>(count), differencemid);
+			do{
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+				*t = static_cast<X>(offset);
+				u[1] = static_cast<X>(offset - 1u);
+				prefetchbackward(t - 1);
+				--t;
+				prefetchbackward(u - 1);
+				--u;
+				offset += difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+			}while(--j);
+		}else{// unsigned or signed absolute
+			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
+				++t;// step back
+				++u;
+				unsigned j{(1u << (setradix - 1u)) - 1u};// double the number of items per loop
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				do{
+					U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
+					*t = static_cast<X>(offset);
+					u[-1] = static_cast<X>(offset - 1u);// odd
+					offset += difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+					difference = static_cast<U>(t[-3]) + static_cast<U>(u[-3]);// odd
+					t[-3] = static_cast<X>(offset);
+					*u = static_cast<X>(offset - 1u);// even
+					// step forward twice
+					prefetchbackward(t - 2);
+					t -= 2;
+					prefetchbackward(u - 2);
+					u -= 2;
+					offset += difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+				}while(--j);
+			}else{// all other modes
+				--t;
+				--u;
+				unsigned j{(1u << setradix) - 2u};
+				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
+				do{
+					U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+					*t = static_cast<X>(offset);
+					u[1] = static_cast<X>(offset - 1u);
 					prefetchbackward(t - 1);
 					--t;
 					prefetchbackward(u - 1);
 					--u;
-				}else{
-					prefetchforward(t + 1);
-					++t;
-					prefetchforward(u + 1);
-					++u;
-				}
-				offset += difference;
+					offset += difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+				}while(--j);
+			}
+		}
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(*u));
+		*t = static_cast<X>(offset);
+		*u = static_cast<X>(count);// the last offset always starts at the end
+		// again, adjust for the special mode
+		u[1 - (isabsvalue && !issignmode && isfltpmode) * 2] = static_cast<X>(offset - 1u);
+	}else{// !isdescsort
+		X *t{(isrevorder? offsetscompanion : offsets) + (stride - 1u)// high-to-low
+			- (!isabsvalue && issignmode) * (stride >> 1)
+			- (isabsvalue && !issignmode && isfltpmode)};
+		X *u{(isrevorder? offsets : offsetscompanion) + (stride - 1u)// high-to-low
+			- (!isabsvalue && issignmode) * (stride >> 1)
+			- (isabsvalue && !issignmode && isfltpmode)};
+		U initdifference{static_cast<U>(*u) + static_cast<U>(*t)};
+		*u = static_cast<X>(count);// the last offset always starts at the end
+		U offset;
+		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
+			--u;
+			--t;
+			unsigned j{(1u << (setradix - 1u)) - 1u};
+			offset = static_cast<U>(count) - initdifference;
+			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
+			do{
+				U difference{static_cast<U>(*u) + static_cast<U>(*t)};
+				*u = static_cast<X>(offset);
+				t[1] = static_cast<X>(offset + 1u);
+				prefetchbackward(u - 1);
+				--u;
+				prefetchbackward(t - 1);
+				--t;
+				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
+			U differencemid{static_cast<U>(t[(1) << setradix]) + static_cast<U>(u[(1) << setradix])};
+			u[1 << setradix] = static_cast<X>(offset);
+			t[1] = static_cast<X>(offset + 1u);
+			u += ((1 << setradix) - 1);// offset to the start/end of the range
+			t += ((1 << setradix) - 1);
+			j = (1u << (setradix - 1u)) - 2u;
+			offset -= differencemid;
+			addcarryofless(b, static_cast<U>(count), differencemid);
+			do{
+				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
+				*u = static_cast<X>(offset);
+				t[1] = static_cast<X>(offset + 1u);
+				prefetchbackward(u - 1);
+				--u;
+				prefetchbackward(t - 1);
+				--t;
+				offset -= difference;
+				addcarryofless(b, static_cast<U>(count), difference);
+			}while(--j);
+		}else{// unsigned or signed absolute
+			if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
+				// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
+				++u;// step back
+				++t;
+				unsigned j{(1u << (setradix - 1u)) - 1u};// double the number of items per loop
+				offset = static_cast<U>(count) - initdifference;
+				b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
+				do{
+					U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
+					*u = static_cast<X>(offset);// even
+					t[-1] = static_cast<X>(offset + 1u);// odd
+					offset -= difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+					difference = static_cast<U>(u[-3]) + static_cast<U>(t[-3]);// odd
+					u[-3] = static_cast<X>(offset);// odd
+					*t = static_cast<X>(offset + 1u);// even
+					// step forward twice
+					prefetchbackward(u - 2);
+					u -= 2;
+					prefetchbackward(t - 2);
+					t -= 2;
+					offset -= difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+				}while(--j);
+			}else{// all other modes
+				--u;
+				--t;
+				unsigned j{(1u << setradix) - 2u};
+				offset = static_cast<U>(count) - initdifference;
+				b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
+				do{
+					U difference{static_cast<U>(*u) + static_cast<U>(*t)};
+					*u = static_cast<X>(offset);
+					t[1] = static_cast<X>(offset + 1u);
+					prefetchbackward(u - 1);
+					--u;
+					prefetchbackward(t - 1);
+					--t;
+					offset -= difference;
+					addcarryofless(b, static_cast<U>(count), difference);
+				}while(--j);
+			}
 		}
+		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(*u));
+		*u = static_cast<X>(offset);
+		*t = 0u;// the first offset always starts at zero
+		// again, adjust for the special mode
+		t[1 - (isabsvalue && !issignmode && isfltpmode) * 2] = static_cast<X>(offset + 1u);
 	}
-	addcarryofless(b, static_cast<U>(count), static_cast<U>(*t) + static_cast<U>(*u));
-	*t = static_cast<X>(offset);
-	*u = static_cast<X>(count);// high half, the last offset always starts at the end
-	// again, adjust for the special mode
-	u[((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1u);// high half
 	return{b};
 }
 
@@ -11266,7 +11334,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U initdifference{static_cast<U>(*u) + static_cast<U>(*t)};
-	*u = static_cast<X>(count);// high half, the last offset always starts at the end
+	*u = static_cast<X>(count);// the last offset always starts at the end
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		u += isdescsort * 2 - 1;
 		t += isdescsort * 2 - 1;
@@ -11275,8 +11343,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			U difference{static_cast<U>(*u) + static_cast<U>(*t)};
-			*u = static_cast<X>(offset);// high half
-			t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// low half
+			*u = static_cast<X>(offset);
+			t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);
 			if constexpr(isdescsort){
 				prefetchforward(u + 1);
 				++u;
@@ -11291,7 +11359,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			offset -= difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
-		t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// low half
+		t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);
 	}else{// unsigned or signed absolute
 		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -11302,13 +11370,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
-				*u = static_cast<X>(offset);// even, high half
-				t[isdescsort * 2 - 1] = static_cast<X>(offset + 1u);// odd, low half
+				*u = static_cast<X>(offset);// even
+				t[isdescsort * 2 - 1] = static_cast<X>(offset + 1u);// odd
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 				difference = static_cast<U>(u[isdescsort * 6 - 3]) + static_cast<U>(t[isdescsort * 6 - 3]);// odd
-				u[isdescsort * 6 - 3] = static_cast<X>(offset);// odd, high half
-				*t = static_cast<X>(offset + 1u);// even, low half
+				u[isdescsort * 6 - 3] = static_cast<X>(offset);// odd
+				*t = static_cast<X>(offset + 1u);// even
 				// step forward twice
 				if constexpr(isdescsort){
 					prefetchforward(u + 2);
@@ -11325,11 +11393,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			U difference{static_cast<U>(*u) + static_cast<U>(*t)};// even
-			*u = static_cast<X>(offset);// even, high half
-			t[isdescsort * 2 - 1] = static_cast<X>(offset + 1u);// odd, low half
+			*u = static_cast<X>(offset);// even
+			t[isdescsort * 2 - 1] = static_cast<X>(offset + 1u);// odd
 			offset -= difference;
 			addcarryofless(b, static_cast<U>(count), difference);
-			*t = static_cast<X>(offset + 1u);// even, low half
+			*t = static_cast<X>(offset + 1u);// even
 		}else{// all other modes
 			u += isdescsort * 2 - 1;
 			t += isdescsort * 2 - 1;
@@ -11340,8 +11408,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < initdifference;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*u) + static_cast<U>(*t)};
-				*u = static_cast<X>(offset);// even, high half
-				t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// odd, low half
+				*u = static_cast<X>(offset);// even
+				t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// odd
 				if constexpr(isdescsort){
 					prefetchforward(u + 1);
 					++u;
@@ -11356,7 +11424,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				offset -= difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// odd, low half
+			t[1 - isdescsort * 2] = static_cast<X>(offset + 1u);// odd
 		}
 	}
 	return{b};
@@ -11532,7 +11600,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (isdescsort && (isabsvalue || !issignmode)) * (stride - 1u)
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U offset{static_cast<U>(*t) + static_cast<U>(*u)};
-	*t = 0u;// low half, the first offset always starts at zero
+	*t = 0u;// the first offset always starts at zero
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 		t += 1 - isdescsort * 2;
@@ -11541,8 +11609,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 		do{
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};
-			*t = static_cast<X>(offset);// low half
-			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
+			*t = static_cast<X>(offset);
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 			if constexpr(isdescsort){
 				prefetchbackward(t - 1);
 				--t;
@@ -11557,7 +11625,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
 		}while(--j);
-		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// high half
+		u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 	}else{// unsigned or signed absolute
 		if constexpr(isabsvalue && !issignmode && isfltpmode){// starts at one removed from the initial index
 			// custom loop for the special mode: absolute floating-point, but negative inputs will sort just below their positive counterparts
@@ -11567,13 +11635,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
-				*t = static_cast<X>(offset);// even, low half
-				u[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd, high half
+				*t = static_cast<X>(offset);// even
+				u[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 				difference = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
-				t[3 - isdescsort * 6] = static_cast<X>(offset);// odd, low half
-				*u = static_cast<X>(offset - 1u);// even, high half
+				t[3 - isdescsort * 6] = static_cast<X>(offset);// odd
+				*u = static_cast<X>(offset - 1u);// even
 				// step forward twice
 				if constexpr(isdescsort){
 					prefetchbackward(t - 2);
@@ -11590,11 +11658,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			U difference{static_cast<U>(*t) + static_cast<U>(*u)};// even
-			*t = static_cast<X>(offset);// even, low half
-			u[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd, high half
+			*t = static_cast<X>(offset);// even
+			u[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd
 			offset += difference;
 			addcarryofless(b, static_cast<U>(count), difference);
-			*u = static_cast<X>(offset - 1u);// even, high half
+			*u = static_cast<X>(offset - 1u);// even
 		}else{// all other modes
 			t += 1 - isdescsort * 2;
 			u += 1 - isdescsort * 2;
@@ -11604,8 +11672,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{static_cast<U>(*t) + static_cast<U>(*u)};
-				*t = static_cast<X>(offset);// even, low half
-				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// odd, high half
+				*t = static_cast<X>(offset);// even
+				u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// odd
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -11620,7 +11688,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
-			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// odd, high half
+			u[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);// odd
 		}
 	}
 	return{b};
@@ -11852,14 +11920,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	unsigned b;// return value, indicates if a carry-out has occurred and all inputs are valued the same
 	U offset{*t};
 	if constexpr(isrevorder){
-		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = 0u;// high half, the first offset always starts at zero
+		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = 0u;// the first offset always starts at zero
 		if constexpr(!isabsvalue && issignmode){// handle the sign bit, virtually offset the top part by half the range here
 			t += 1 - isdescsort * 2;
 			unsigned j{(1u << (setradix - 1u)) - 1u};
 			b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 			do{
 				U difference{*t};
-				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
+				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
@@ -11872,7 +11940,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 			U differencemid{t[(isdescsort * 2 - 1) << setradix]};
-			t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + ((isdescsort * 2 - 1) << setradix)] = static_cast<X>(offset);// high half
+			t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + ((isdescsort * 2 - 1) << setradix)] = static_cast<X>(offset);
 			t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 			t += ((1 << setradix) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = (1u << (setradix - 1u)) - 2u;
@@ -11880,7 +11948,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			addcarryofless(b, static_cast<U>(count), differencemid);
 			do{
 				U difference{*t};
-				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
+				t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);
 				t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
@@ -11889,7 +11957,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					prefetchforward(t + 1);
 					++t;
 				}
-				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
+				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
@@ -11900,12 +11968,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};// even
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);
 					t[1 - isdescsort * 2] = static_cast<X>(offset - 1u);// odd
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + 3u - isdescsort * 6u] = static_cast<X>(offset);// high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + 3u - isdescsort * 6u] = static_cast<X>(offset);
 					*t = static_cast<X>(offset - 1u);// even
 					// step forward twice
 					if constexpr(isdescsort){
@@ -11920,11 +11988,11 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}else{// all other modes
 				t += 1 - isdescsort * 2;
-				unsigned j{(static_cast<std::size_t>(1u) << setradix) - 2u};
+				unsigned j{(1u << setradix) - 2u};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(static_cast<X>(offset));// high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(static_cast<X>(offset));
 					t[isdescsort * 2 - 1] = static_cast<X>(offset - 1u);
 					if constexpr(isdescsort){
 						prefetchbackward(t - 1);
@@ -11939,7 +12007,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		addcarryofless(b, static_cast<U>(count), *t);
-		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);// high half
+		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset);
 		*t = static_cast<X>(count);// the last offset always starts at the end
 		// again, adjust for the special mode
 		t[((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2 - 1] = static_cast<X>(offset - 1u);
@@ -11952,7 +12020,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
+				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -11965,7 +12033,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}while(--j);
 			U differencemid{t[(isdescsort * 2 - 1) << setradix]};
 			t[(isdescsort * 2 - 1) << setradix] = static_cast<X>(offset);
-			t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
+			t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
 			t += ((1 << setradix) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
 			j = (1u << (setradix - 1u)) - 2u;
 			offset += differencemid;
@@ -11973,7 +12041,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			do{
 				U difference{*t};
 				*t = static_cast<X>(offset);
-				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
+				t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
 				if constexpr(isdescsort){
 					prefetchbackward(t - 1);
 					--t;
@@ -11981,7 +12049,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					prefetchforward(t + 1);
 					++t;
 				}
-				offset -= difference * static_cast<U>(isdescsort * 2 - 1);
+				offset += difference;
 				addcarryofless(b, static_cast<U>(count), difference);
 			}while(--j);
 		}else{// unsigned or signed absolute
@@ -11993,12 +12061,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				do{
 					U difference{*t};// even
 					*t = static_cast<X>(offset);
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + 1u - isdescsort * 2u] = static_cast<X>(offset - 1u);// odd, high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + 1u - isdescsort * 2u] = static_cast<X>(offset - 1u);// odd
 					offset += difference;
 					addcarryofless(b, static_cast<U>(count), difference);
 					difference = t[3 - isdescsort * 6];// odd
 					t[3 - isdescsort * 6] = static_cast<X>(offset);
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset - 1u);// even, high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(offset - 1u);// even
 					// step forward twice
 					if constexpr(isdescsort){
 						prefetchbackward(t - 2);
@@ -12012,12 +12080,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}while(--j);
 			}else{// all other modes
 				t += 1 - isdescsort * 2;
-				unsigned j{(static_cast<std::size_t>(1u) << setradix) - 2u};
+				unsigned j{(1u << setradix) - 2u};
 				b = count < offset;// carry-out can only happen once per cycle here, so optimise that
 				do{
 					U difference{*t};
 					*t = static_cast<X>(offset);
-					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);// high half
+					t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + isdescsort * 2u - 1u] = static_cast<X>(offset - 1u);
 					if constexpr(isdescsort){
 						prefetchbackward(t - 1);
 						--t;
@@ -12032,9 +12100,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 		addcarryofless(b, static_cast<U>(count), static_cast<U>(*t));
 		*t = static_cast<X>(offset);
-		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(count);// high half, the last offset always starts at the end
+		t[offsetslength<isabsvalue, issignmode, isfltpmode, T>] = static_cast<X>(count);// the last offset always starts at the end
 		// again, adjust for the special mode
-		t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + ((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2u - 1u] = static_cast<X>(offset - 1u);// high half
+		t[offsetslength<isabsvalue, issignmode, isfltpmode, T> + ((isabsvalue && !issignmode && isfltpmode) != isdescsort) * 2u - 1u] = static_cast<X>(offset - 1u);
 	}
 	return{b};
 }
