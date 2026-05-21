@@ -31,6 +31,7 @@
 		<ConfigurationType>Application</ConfigurationType>
 		<PlatformToolset>v145</PlatformToolset>
 		<EnableUnitySupport>true</EnableUnitySupport>
+		<MSVCPreviewEnabled>true</MSVCPreviewEnabled>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
 		<UseDebugLibraries>true</UseDebugLibraries>
@@ -79,6 +80,9 @@
 		<Link>
 			<SubSystem>Windows</SubSystem>
 		</Link>
+		<Manifest>
+			<EnableSegmentHeap>true</EnableSegmentHeap>
+		</Manifest>
 		<ResourceCompile>
 			<NullTerminateStrings>true</NullTerminateStrings>
 		</ResourceCompile>
