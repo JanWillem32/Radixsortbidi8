@@ -766,6 +766,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 				j >>= 4;// rounded down in the main thread
 			}
 			filllambda(j, pFIin);// handle the last part in the main thread
+			pFIin += 7 * j;
 		}
 		// handle the remaining items in the main thread
 		if(std::size_t rem{static_cast<std::size_t>(RSBD8_TEST_BATCH_SIZE) % (4 * 7)}){
