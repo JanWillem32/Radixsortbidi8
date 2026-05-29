@@ -22,8 +22,8 @@
 // the RSBD8_TEST_BATCH_SIZE array is iterated from high to low for the test batches
 // 1 MiB down to 1 B, plus a test of 0 B, 22 small tests, note that time stamp readings from the very smallest tests will be relatively noisy and unreliable
 //static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{0uz, 1uz, 2uz, 4uz, 8uz, 16uz, 32uz, 64uz, 128uz, 256uz, 512uz, 1024uz, 2uz * 1024, 4uz * 1024, 8uz * 1024, 16uz * 1024, 32uz * 1024, 64uz * 1024, 128uz * 1024, 256uz * 1024, 512uz * 1024, 1024uz * 1024};
-// 296 KiB to 176 KiB, 16 tests, useful for determining the single- to dual-threading limits for various types
-//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{176uz * 1024, 184uz * 1024, 192uz * 1024, 200uz * 1024, 208uz * 1024, 216uz * 1024, 224uz * 1024, 232uz * 1024, 240uz * 1024, 248uz * 1024, 256uz * 1024, 264uz * 1024, 272uz * 1024, 280uz * 1024, 288uz * 1024, 296uz * 1024};
+// 400 KiB to 176 KiB, 29 tests, useful for determining the single- to dual-threading limits for various types
+//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{176uz * 1024, 184uz * 1024, 192uz * 1024, 200uz * 1024, 208uz * 1024, 216uz * 1024, 224uz * 1024, 232uz * 1024, 240uz * 1024, 248uz * 1024, 256uz * 1024, 264uz * 1024, 272uz * 1024, 280uz * 1024, 288uz * 1024, 296uz * 1024, 304uz * 1024, 312uz * 1024, 320uz * 1024, 328uz * 1024, 336uz * 1024, 344uz * 1024, 352uz * 1024, 360uz * 1024, 368uz * 1024, 376uz * 1024, 384uz * 1024, 392uz * 1024, 400uz * 1024};
 // 8 GiB, one default, large test
 static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024};
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
