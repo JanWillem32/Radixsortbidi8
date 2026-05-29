@@ -19,6 +19,12 @@
 // 0xFFFFFFFFuz, the 32-bit unsigned integer limit (allocates 4 GiB)
 // 4294967311uz, the first prime number past the 32-bit unsigned integer limit, (allocates 4 GiB + 2 MiB with regular large pages enabled)
 // source data pre-allocation will be done automatically with the largest value in the array
+// the RSBD8_TEST_BATCH_SIZE array is iterated from high to low for the test batches
+// 1 MiB down to 1 B, plus a test of 0 B, 22 small tests, note that time stamp readings from the very smallest tests will be relatively noisy and unreliable
+//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{0uz, 1uz, 2uz, 4uz, 8uz, 16uz, 32uz, 64uz, 128uz, 256uz, 512uz, 1024uz, 2uz * 1024, 4uz * 1024, 8uz * 1024, 16uz * 1024, 32uz * 1024, 64uz * 1024, 128uz * 1024, 256uz * 1024, 512uz * 1024, 1024uz * 1024};
+// 296 KiB to 176 KiB, 16 tests, useful for determining the single- to dual-threading limits for various types
+//static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{176uz * 1024, 184uz * 1024, 192uz * 1024, 200uz * 1024, 208uz * 1024, 216uz * 1024, 224uz * 1024, 232uz * 1024, 240uz * 1024, 248uz * 1024, 256uz * 1024, 264uz * 1024, 272uz * 1024, 280uz * 1024, 288uz * 1024, 296uz * 1024};
+// 8 GiB, one default, large test
 static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024};
 // the entire benchmarks for the external std::sort() and std::stable_sort() functions can be disabled
 #ifdef _DEBUG// skip in debug builds by default to save a lot of time on these slow functions, and don't waste resources on unnecessary tests
@@ -29,7 +35,7 @@ static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024};
 // the entire benchmarks for unsigned kinds of the radix sort can be disabled to further reduce the test time
 //#define RSBD8_DISABLE_BENCHMARK_UNSIGNED
 // the entire benchmarks for signed kinds of the radix sort can be disabled to further reduce the test time
-#define RSBD8_DISABLE_BENCHMARK_SIGNED
+//#define RSBD8_DISABLE_BENCHMARK_SIGNED
 // the entire benchmarks for floating-point kinds of the radix sort can be disabled to further reduce the test time
 //#define RSBD8_DISABLE_BENCHMARK_FLOATING
 // the entire benchmarks for all direct array sorting versions of the radix sort can be disabled to further reduce the test time
@@ -784,6 +790,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 				j >>= 4;// rounded down in the main thread
 			}
 			filllambda(j, pFIin);// handle the last part in the main thread
+			pFIin += 7 * j;
 		}
 		// handle the remaining items in the main thread
 		if(std::size_t rem{batchmaximum % (4 * 7)}){
@@ -847,11 +854,10 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 	std::ptrdiff_t testloopcount{_countof(RSBD8_TEST_BATCH_SIZE) - 1};
 repeattest:
 	std::size_t currentbatchsize{RSBD8_TEST_BATCH_SIZE[testloopcount]};
-		WritePaddedu64(szTicksRu64Text, currentbatchsize);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"running a test batch of\n");
-		OutputDebugStringW(szTicksRu64Text);
+	WritePaddedu64(szTicksRu64Text, currentbatchsize);
+	*reinterpret_cast<std::uint64_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint64_t>(L'\n') << 32 | static_cast<std::uint64_t>(L'B') << 16 | static_cast<std::uint64_t>(L' ');// the last wchar_t is correctly set to zero here
+	OutputDebugStringW(L"running a test batch of\n");
+	OutputDebugStringW(szTicksRu64Text);
 
 #ifndef RSBD8_DISABLE_BENCHMARK_DIRECT
 #ifndef RSBD8_DISABLE_BENCHMARK_UNSIGNED
@@ -884,7 +890,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
@@ -926,7 +932,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
@@ -970,7 +976,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1012,7 +1018,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1056,7 +1062,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(out)};
 		auto lo{*piter++};
@@ -1101,7 +1107,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *>(out)};
 		auto lo{*piter++};
@@ -1149,7 +1155,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1191,7 +1197,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1235,7 +1241,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1277,7 +1283,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, false> const *>(out)};
 		auto curlo{*piter++};
@@ -1321,7 +1327,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
 		auto lo{*piter++};
@@ -1366,7 +1372,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(16 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 16 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *>(out)};
 		auto lo{*piter++};
@@ -1472,7 +1478,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto curlo{*piter++};
@@ -1514,7 +1520,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto curlo{*piter++};
@@ -1616,7 +1622,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int64_t const *>(out)};
 		auto curlo{*piter++};
@@ -1658,7 +1664,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int64_t const *>(out)};
 		auto curlo{*piter++};
@@ -1674,34 +1680,6 @@ repeattest:
 #endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::sort(std::execution::par_unseq, reinterpret_cast<double *>(out), reinterpret_cast<double *>(out) + currentbatchsize / 8);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"double std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -1760,7 +1738,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto lo{*piter++};
@@ -1805,7 +1783,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(8 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 8 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *>(out)};
 		auto lo{*piter++};
@@ -1910,7 +1888,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto curlo{*piter++};
@@ -1952,7 +1930,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto curlo{*piter++};
@@ -2054,7 +2032,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int32_t const *>(out)};
 		auto curlo{*piter++};
@@ -2096,7 +2074,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int32_t const *>(out)};
 		auto curlo{*piter++};
@@ -2112,34 +2090,6 @@ repeattest:
 #endif// not RSBD8_DISABLE_BENCHMARK_SIGNED
 #ifndef RSBD8_DISABLE_BENCHMARK_FLOATING
 #ifndef RSBD8_DISABLE_BENCHMARK_EXTERNAL
-	{
-		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
-
-		std::memcpy(out, in, currentbatchsize);// copy, and warm up some of the caches
-
-		// start measuring
-		{
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		std::uint64_t u64start{__rdtsc()};
-
-		std::sort(std::execution::par_unseq, reinterpret_cast<float *>(out), reinterpret_cast<float *>(out) + currentbatchsize / 4);
-
-		// stop measuring
-		std::uint64_t u64stop;
-		{
-			unsigned int uAux;// unused
-			u64stop = __rdtscp(&uAux);
-			int cpuInfo[4];// unused
-			__cpuid(cpuInfo, 0);// only used for serializing execution
-		}
-		WritePaddedu64(szTicksRu64Text, u64stop - u64start - u64init);
-		*reinterpret_cast<std::uint32_t UNALIGNED *>(szTicksRu64Text + 20) = static_cast<std::uint32_t>(L'\n');// the last wchar_t is correctly set to zero here
-		// output debug strings to the system
-		OutputDebugStringW(L"float std::sort() test\n");
-		OutputDebugStringW(szTicksRu64Text);
-	}
 	{
 		Sleep(125);// prevent context switching during the benchmark, allow some time to possibly zero the memory given back by VirtualFree()
 
@@ -2198,7 +2148,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto lo{*piter++};
@@ -2243,7 +2193,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(4 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 4 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *>(out)};
 		auto lo{*piter++};
@@ -2348,7 +2298,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto curlo{*piter++};
@@ -2390,7 +2340,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto curlo{*piter++};
@@ -2492,7 +2442,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int16_t const *>(out)};
 		auto curlo{*piter++};
@@ -2534,7 +2484,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int16_t const *>(out)};
 		auto curlo{*piter++};
@@ -2578,7 +2528,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto lo{*piter++};
@@ -2623,7 +2573,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(2 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize / 2 - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *>(out)};
 		auto lo{*piter++};
@@ -2728,7 +2678,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto curlo{*piter++};
@@ -2770,7 +2720,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto curlo{*piter++};
@@ -2872,7 +2822,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int8_t const *>(out)};
 		auto curlo{*piter++};
@@ -2914,7 +2864,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::int8_t const *>(out)};
 		auto curlo{*piter++};
@@ -2958,7 +2908,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto lo{*piter++};
@@ -3003,7 +2953,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(1 * 2 <= currentbatchsize){// verify if sorted
 		std::size_t k{currentbatchsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *>(out)};
 		auto lo{*piter++};
@@ -3030,9 +2980,10 @@ repeattest:
 		rsbd8::helper::longdoubletest128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3058,7 +3009,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, false, false>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, false, false> const *const *>(out)};
@@ -3084,9 +3035,10 @@ repeattest:
 		rsbd8::helper::longdoubletest128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3112,7 +3064,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::longdoubletest128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::longdoubletest128<false, true, true> const *const *>(out)};
@@ -3139,9 +3091,10 @@ repeattest:
 		rsbd8::helper::test128<false, false, false> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, false, false> const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, false, false>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3167,7 +3120,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, false, false> const *const *>(out)};
@@ -3193,9 +3146,10 @@ repeattest:
 		rsbd8::helper::test128<false, true, true> const **pDest{reinterpret_cast<rsbd8::helper::test128<false, true, true> const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3221,7 +3175,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(rsbd8::helper::test128<false, true, true>), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<rsbd8::helper::test128<false, true, true> const *const *>(out)};
@@ -3249,9 +3203,10 @@ repeattest:
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3285,9 +3240,10 @@ repeattest:
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3313,7 +3269,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint64_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
@@ -3340,9 +3296,10 @@ repeattest:
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3376,9 +3333,10 @@ repeattest:
 		std::uint64_t const **pDest{reinterpret_cast<std::uint64_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3404,7 +3362,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint64_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint64_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint64_t const *const *>(out)};
@@ -3431,9 +3389,10 @@ repeattest:
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3467,9 +3426,10 @@ repeattest:
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3495,7 +3455,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint32_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
@@ -3522,9 +3482,10 @@ repeattest:
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3558,9 +3519,10 @@ repeattest:
 		std::uint32_t const **pDest{reinterpret_cast<std::uint32_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3586,7 +3548,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint32_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint32_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint32_t const *const *>(out)};
@@ -3613,9 +3575,10 @@ repeattest:
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3649,9 +3612,10 @@ repeattest:
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3677,7 +3641,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint16_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
@@ -3703,9 +3667,10 @@ repeattest:
 		std::uint16_t const **pDest{reinterpret_cast<std::uint16_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3731,7 +3696,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint16_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint16_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint16_t const *const *>(out)};
@@ -3758,9 +3723,10 @@ repeattest:
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3794,9 +3760,10 @@ repeattest:
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3822,7 +3789,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint8_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
@@ -3848,9 +3815,10 @@ repeattest:
 		std::uint8_t const **pDest{reinterpret_cast<std::uint8_t const **>(out)};
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t i{testsize};
-		do{
+		while(i){
 			*pDest++ = pSource++;
-		}while(--i);
+			--i;
+		}
 
 		// start measuring
 		{
@@ -3876,7 +3844,7 @@ repeattest:
 		OutputDebugStringW(szTicksRu64Text);
 	}while(!succeeded);
 #ifdef _DEBUG
-	{// verify if sorted
+	if(std::max(sizeof(std::uint8_t), sizeof(void *)) * 2 <= currentbatchsize){// verify if sorted
 		std::size_t testsize{currentbatchsize / std::max(sizeof(std::uint8_t), sizeof(void *))};
 		std::size_t k{testsize - 1};// -1 for the intial bounds
 		auto piter{reinterpret_cast<std::uint8_t const *const *>(out)};
