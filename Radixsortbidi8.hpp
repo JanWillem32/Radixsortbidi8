@@ -37050,7 +37050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++pslicehandle;
 				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
 			}while(--j);
-		} 
+		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
