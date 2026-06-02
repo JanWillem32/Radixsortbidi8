@@ -14560,7 +14560,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -14569,59 +14569,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
+	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1u, allowedthreads, count, input, output, buffer);
-		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1u, allowedthreads, count, input, output);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
-			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -14749,7 +14711,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -14772,11 +14734,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -14787,13 +14747,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice + 1u, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice + 1u, allowedthreads, count, input, output));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
@@ -14803,11 +14767,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T *pbuffer{buffer};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 				// architecture: limit to one at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -14858,11 +14818,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 <= --i);
 #else// 64-bit and larger systems
 				// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -14991,11 +14947,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T *poutput{output};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 				// architecture: limit to one at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -15040,11 +14992,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 <= --i);
 #else// 64-bit and larger systems
 				// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -15158,13 +15106,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -15255,61 +15212,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1u, allowedthreads, count, input, buffer);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -15434,7 +15355,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -15457,11 +15378,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -15472,12 +15391,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice + 1u, allowedthreads, count, input, buffer));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			if constexpr(isrevorder){
@@ -15488,12 +15411,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer;
 					pbufferhi = buffer + count;
 				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-					std::size_t loc{};
-					if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+					std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 					pinputlo = input + loc;
 					pinputhi = input + (count - loc);
 					pbufferlo = buffer + loc;
@@ -15756,11 +15674,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				T *pbuffer{buffer};
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -15805,11 +15719,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}while(0 <= --i);
 #else// 64-bit and larger systems
 				// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -15924,13 +15834,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -18086,7 +18005,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -18096,65 +18015,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
+		[[likely]]
 #endif
-				{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, buffer, varparameters...);
-		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
-			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -18299,7 +18180,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -18331,11 +18212,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -18346,24 +18225,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(isrevorder){
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 					// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
@@ -18459,11 +18338,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 #else// 64-bit and larger systems
 					// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
@@ -18663,11 +18538,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// not in reverse order
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 					// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -18758,11 +18629,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 #else// 64-bit and larger systems
 					// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -18951,13 +18818,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -19057,68 +18933,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, buffer, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -19260,7 +19100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -19292,11 +19132,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -19307,12 +19145,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, buffer, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				if constexpr(isrevorder){
@@ -19323,12 +19165,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -19717,11 +19554,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 					// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -19812,11 +19645,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 #else// 64-bit and larger systems
 					// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -20005,13 +19834,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 #endif
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -20995,7 +20833,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -21004,59 +20842,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
+	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1u, allowedthreads, count, input, output, buffer);
-		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1u, allowedthreads, count, input, output);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
-			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -21188,7 +20988,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -21211,11 +21011,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -21226,24 +21024,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice + 1u, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice + 1u, allowedthreads, count, input, output));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 				// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				T const *pinput{input + count};
 				T *poutput{output}, *pbuffer{buffer};
 				do
@@ -21406,11 +21204,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// architecture: do not limit as much when there's a reasonable amount of registers
 				T const *pinput{input};
 				T *poutput{output};
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -21547,13 +21341,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -21641,61 +21444,25 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1u, allowedthreads, count, input, buffer);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -21824,7 +21591,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -21847,11 +21614,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -21862,12 +21627,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice + 1u, allowedthreads, count, input, buffer));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
@@ -21879,12 +21648,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer;
 					pbufferhi = buffer + count;
 				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-					std::size_t loc{};
-					if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+					std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 					pinputlo = input + loc;
 					pinputhi = input + (count - loc);
 					pbufferlo = buffer + loc;
@@ -22052,11 +21816,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				// architecture: do not limit as much when there's a reasonable amount of registers
 				T *pinput{input};
 				T *pbuffer{buffer};
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -22193,13 +21953,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -23583,7 +23352,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -23593,65 +23362,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, buffer, varparameters...);
-		else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
-			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -23794,7 +23525,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -23826,11 +23557,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -23841,24 +23570,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(isrevorder){
 					static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 					// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
@@ -24111,11 +23840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// not in reverse order
 					static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 					// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -24357,13 +24082,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -24462,68 +24196,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, buffer, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -24663,7 +24361,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -24695,12 +24393,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-						usemultithread = 1u;
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -24711,12 +24406,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, buffer, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				if constexpr(isrevorder){
@@ -24727,12 +24426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -24983,11 +24677,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 					// architecture: do not limit as much when there's a reasonable amount of registers
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -25229,13 +24919,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -26545,7 +26244,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -26554,59 +26253,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
+	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1u, allowedthreads, count, input, output, buffer);
-		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1u, allowedthreads, count, input, output);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
-			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -26738,7 +26399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -26761,11 +26422,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -26776,22 +26435,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice + 1u, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice + 1u, allowedthreads, count, input, output));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 				T const *pinput{input + (count - i)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					do
@@ -26980,11 +26639,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else{// not in reverse order
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27024,11 +26679,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(7u << 8) + static_cast<std::size_t>(cur.data[HI])];
 					}while(0 <= --i);
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27062,11 +26713,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(cur.data[HI])];
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27147,13 +26794,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -27241,61 +26897,25 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1u, allowedthreads, count, input, buffer);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -27424,7 +27044,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -27447,11 +27067,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -27462,12 +27080,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice + 1u, allowedthreads, count, input, buffer));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
@@ -27479,12 +27101,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					pbufferlo = buffer;
 					pbufferhi = buffer + count;
 				}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-					std::size_t loc{};
-					if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+					std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 					pinputlo = input + loc;
 					pinputhi = input + (count - loc);
 					pbufferlo = buffer + loc;
@@ -27765,11 +27382,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else{// not in reverse order
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27809,11 +27422,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(7u << 8) + static_cast<std::size_t>(cur.data[HI])];
 					}while(0 <= --i);
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27847,11 +27456,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(cur.data[HI])];
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -27932,13 +27537,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -29831,7 +29445,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -29839,65 +29453,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, buffer, varparameters...);
-		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
-			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -30038,7 +29614,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -30070,11 +29646,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -30085,22 +29659,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(isrevorder){
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 					V *const *pinput{input + (count - i)};
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
@@ -30432,11 +30006,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -30526,11 +30096,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(cur.data[HI])];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -30608,11 +30174,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(cur.data[HI])];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -30761,13 +30323,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -30866,68 +30437,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, buffer, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -31067,7 +30602,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -31099,11 +30634,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -31114,12 +30647,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, buffer, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				if constexpr(isrevorder){
@@ -31130,12 +30667,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -31569,11 +31101,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// not in reverse order
 					std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -31663,11 +31191,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(cur.data[HI])];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -31745,11 +31269,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 11) + (1u << 10) + static_cast<std::size_t>(cur.data[HI])];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -31898,13 +31418,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -35352,7 +34881,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -35361,59 +34890,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
+	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(allowedthreads - 1u, allowedthreads, count, input, output, buffer);
-		else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(allowedthreads - 1u, allowedthreads, count, input, output);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(assignedslice, allowedthreads, count, input, output, buffer);
-			else localoffsets = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(assignedslice, allowedthreads, count, input, output);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -35541,7 +35032,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -35564,11 +35055,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -35579,24 +35068,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice, allowedthreads, count, input, output, buffer));
-							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice, allowedthreads, count, input, output));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>, assignedslice + 1u, allowedthreads, count, input, output, buffer));
+							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>, assignedslice + 1u, allowedthreads, count, input, output));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -35642,11 +35131,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -35686,11 +35171,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -35786,11 +35267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 64-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -35831,11 +35308,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -35870,11 +35343,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -35961,11 +35430,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(56u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36008,11 +35473,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36117,11 +35578,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 56-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36159,11 +35616,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36259,11 +35712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(48u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36303,11 +35752,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36403,11 +35848,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 48-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36442,11 +35883,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36533,11 +35970,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(40u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36574,11 +36007,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36665,11 +36094,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 40-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36701,11 +36126,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -36781,11 +36202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(32u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36819,11 +36236,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36854,11 +36267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -36972,11 +36381,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 32-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -37005,11 +36410,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -37035,11 +36436,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						i -= 2;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37136,11 +36533,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(24u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37171,11 +36564,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37289,11 +36678,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 24-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -37319,11 +36704,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						i -= 2;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37420,11 +36801,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else if constexpr(16u == typebitsize<T>){
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37452,11 +36829,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 						T const *pinput{input + (count - i)};
 						i -= 3;
 						while(0 <= i)
@@ -37565,11 +36938,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 16-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -37592,11 +36961,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 						i -= 3;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37681,13 +37046,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -37779,61 +37153,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(allowedthreads - 1u, allowedthreads, count, input, buffer);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(assignedslice, allowedthreads, count, input, buffer)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -37958,7 +37296,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -37981,11 +37319,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -37996,12 +37332,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice, allowedthreads, count, input, buffer));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>, assignedslice + 1u, allowedthreads, count, input, buffer));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
@@ -38014,12 +37354,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -38290,11 +37625,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 64-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -38335,11 +37666,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -38374,11 +37701,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -38471,12 +37794,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -38675,11 +37993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 56-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -38717,11 +38031,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -38823,12 +38133,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -39012,11 +38317,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 48-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39051,11 +38352,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39148,12 +38445,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferlo = buffer;
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -39322,11 +38614,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 40-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39358,11 +38646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39447,12 +38731,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count)};
 						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
@@ -39819,11 +39098,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 32-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39852,11 +39127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -39882,11 +39153,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						i -= 2;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -39992,12 +39259,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count)};
 						initialcount = count - loc + 1u;
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
@@ -40301,11 +39563,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 24-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -40331,11 +39589,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 						i -= 2;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -40439,12 +39693,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						pbufferhi = buffer + count;
 					}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 						// architecture: limit to one at a time when there's few registers
-						std::size_t loc{};
-						if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 4>(assignedslice, allowedthreads, count);
+						std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 4>(assignedslice, allowedthreads, count)};
 						pinputlo = input + loc;
 						pinputhi = input + (count - loc);
 						pbufferlo = buffer + loc;
@@ -40621,11 +39870,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}else{// 16-bit, not in reverse order
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -40648,11 +39893,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
-						if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-							[[likely]]
-#endif
-							i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 						i -= 3;
 						while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -40737,13 +39978,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -44908,7 +44158,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -44918,65 +44168,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-					else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, buffer, varparameters...);
-		else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, output, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets;
-			if constexpr(isrevorder) localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(assignedslice, allowedthreads, count, input, output, buffer, varparameters...);
-			else localoffsets = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(assignedslice, allowedthreads, count, input, output, varparameters...);
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -45112,7 +44324,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -45144,11 +44356,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -45159,24 +44369,24 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice, allowedthreads, count, input, output, buffer, varparameters...));
-								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+								else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortcopynoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(64u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -45275,11 +44485,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -45366,11 +44572,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -45539,11 +44741,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 64-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45637,11 +44835,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45723,11 +44917,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45889,11 +45079,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(56u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -45986,11 +45172,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -46174,11 +45356,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 56-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46266,11 +45444,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46447,11 +45621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(48u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -46538,11 +45708,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -46711,11 +45877,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 48-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46797,11 +45959,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46963,11 +46121,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(40u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -47048,11 +46202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -47202,11 +46352,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 40-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47282,11 +46428,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47429,11 +46571,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(32u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -47508,11 +46646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -47581,11 +46715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
@@ -47765,11 +46895,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 32-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47839,11 +46965,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47907,11 +47029,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -48080,11 +47198,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(24u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -48153,11 +47267,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
@@ -48337,11 +47447,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 24-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -48405,11 +47511,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -48578,11 +47680,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(16u == typebitsize<T>){
 					if constexpr(isrevorder){
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -48645,11 +47743,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 							V *const *pinput{input + (count - i)};
 							i -= 3;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
@@ -48824,11 +47918,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}else{// 16-bit, not in reverse order
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -48886,11 +47976,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -49050,13 +48136,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -49156,68 +48251,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(allowedthreads - 1u, allowedthreads, count, input, buffer, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -49350,7 +48409,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -49382,11 +48441,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -49397,12 +48454,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, buffer, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortnoallocmultimtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				if constexpr(64u == typebitsize<T>){
@@ -49414,12 +48475,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferlo = buffer;
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
 							pbufferlo = buffer + loc;
@@ -49879,11 +48935,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 64-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -49977,11 +49029,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(7u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -50063,11 +49111,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -50235,12 +49279,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferlo = buffer;
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
 							pbufferlo = buffer + loc;
@@ -50568,11 +49607,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 56-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -50660,11 +49695,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(6u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -50847,12 +49878,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferlo = buffer;
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
 							pbufferlo = buffer + loc;
@@ -51150,11 +50176,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 48-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -51236,11 +50258,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(5u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -51408,12 +50426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferlo = buffer;
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<2>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<2>(assignedslice, allowedthreads, count)};
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
 							pbufferlo = buffer + loc;
@@ -51683,11 +50696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 40-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -51763,11 +50772,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(4u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -51919,12 +50924,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 							// architecture: limit to one at a time when there's few registers
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count)};
 							initialcount = count - loc + 1u;
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
@@ -52476,11 +51476,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 32-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -52550,11 +51546,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(3u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -52618,11 +51610,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -52800,12 +51788,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 							// architecture: limit to one at a time when there's few registers
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 6>(assignedslice, allowedthreads, count)};
 							initialcount = count - loc + 1u;
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
@@ -53246,11 +52229,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 24-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -53314,11 +52293,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<3>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
 							i -= 2;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -53494,12 +52469,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							pbufferhi = buffer + count;
 						}else{// if mulitithreaded, the half count will be rounded up in the companion thread
 							// architecture: limit to one at a time when there's few registers
-							std::size_t loc{};
-							if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								loc = initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 4>(assignedslice, allowedthreads, count);
+							std::size_t loc{initmtsliceswapsmain<(defaultgprfilesize < gprfilesize::large)? 2 : 4>(assignedslice, allowedthreads, count)};
 							pinputlo = input + loc;
 							pinputhi = input + (count - loc);
 							pbufferlo = buffer + loc;
@@ -53767,11 +52737,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// 16-bit, not in reverse order
 						std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 						if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<1>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
 								std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -53829,11 +52795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(1u << 8) + static_cast<std::size_t>(cur)];
 							}while(0 <= --i);
 						}else{// architecture: do not limit as much when there's a reasonable amount of registers
-							if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-								[[likely]]
-#endif
-								i = initmtslicemain<4>(assignedslice, allowedthreads, count);
+							if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
 							i -= 3;
 							if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 								// no need to mask out the bits for handling the remainder term after the two loops
@@ -53992,13 +52954,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 				}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -54907,61 +53878,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, output)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1u, allowedthreads, count, input, output);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, output)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -55029,61 +53964,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1u, allowedthreads, count, input);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -55150,7 +54049,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -55177,11 +54076,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -55192,21 +54089,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, output));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice + 1u, allowedthreads, count, input, output));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -55238,11 +54135,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 				i -= 7;
 				while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -55370,13 +54263,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -55487,7 +54389,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -55514,11 +54416,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -55529,21 +54429,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice + 1u, allowedthreads, count, input));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, output, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -55575,11 +54475,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 				i -= 7;
 				while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -55652,13 +54548,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -55704,61 +54609,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, buffer)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1u, allowedthreads, count, input, buffer);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input, buffer)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -55826,59 +54695,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	// do not pass a nullptr here
 	assert(input);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	// generate the histograms for each part, all in one go
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(allowedthreads - 1u, allowedthreads, count, input);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(assignedslice, allowedthreads, count, input)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -55945,7 +54778,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -55972,11 +54805,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -55987,21 +54818,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input, buffer));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice + 1u, allowedthreads, count, input, buffer));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -56033,11 +54864,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 				i -= 7;
 				while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -56165,13 +54992,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -56280,7 +55116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsets;// a sizeable amount of indices, but it's worth it, note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsets;// note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -56307,11 +55143,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(T))));// simple safety limit on the maximum thread count
 				assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+				assignedslice = allowedthreads;
 				try{
-					asynchandle = std::async(std::launch::async, radixsortnoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, std::ref(atomiclightbarrier));
-					assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-					usemultithread = 1u;
-					if(--assignedslice)
+					if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
@@ -56322,21 +55156,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice, allowedthreads, count, input));
-						}while(--assignedslice);// slice 0 is handled by the current thread
+							initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>, assignedslice + 1u, allowedthreads, count, input));
+						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
+					asynchandle = std::async(std::launch::async, radixsortnoallocsinglesimplemtc<isdescsort, isabsvalue, issignmode, isfltpmode, T, X>, allowedthreads, count, input, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier));
+					--assignedslice;
+					usemultithread = 1u;
 				}catch(...){// std::async and std::vector::reserve may fail gracefully here
 					assert(false);
 				}
+				++assignedslice;
 			}
 			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -56360,11 +55194,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}else{// architecture: do not limit as much when there's a reasonable amount of registers
-				if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+				if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 				i -= 7;
 				while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -56437,13 +55267,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// combine the data from several threads
-				auto const &slicedata{slicehandle.get()};
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				j >>= usemultithread;
+				auto pslicehandle{initasynchandlesvector.data()};
+				do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					{// combine the data from several threads
+					auto const &slicedata{pslicehandle->get()};
+					++pslicehandle;
+					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				}while(--j);
 			}
 		}
 
@@ -57034,68 +55873,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, output, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, output, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1u, allowedthreads, count, input, output, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, output, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -57202,7 +56005,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -57238,11 +56041,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -57253,21 +56054,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, output, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortcopynoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, output, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -57294,7 +56095,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								poutput[j] = pa;
 								auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 								poutput[j - 1] = pb;
-								prefetchwritebackward(poutput + i - 2);
+								prefetchwritebackward(poutput + j - 2);
 								U cura{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
 								U curb{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imb, varparameters...)};
 								prefetchcurrent<indirection1>(pnhi);
@@ -57341,11 +56142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[cur];
 					}
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 					i -= 7;
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
@@ -57559,13 +56356,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[cur];
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
@@ -57649,68 +56455,32 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
+	assert(pslicehandle);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;// a sizeable amount of indices, but it's worth it
+	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	{// generate the histograms for each part, all in one go
-		std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>> initasynchandlesvector;
-		unsigned i{};
-		unsigned assignedslice{allowedthreads - 2u};
-		if(3u < allowedthreads)
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion	{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+		[[likely]]
 #endif
-			{
-			i = (allowedthreads >> 1) - 1u;// rounded up in the main thread, rounded down in the companion thread
-			try{
-				initasynchandlesvector.reserve(i);
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{
-					initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-					--assignedslice;
-				}while(--i);
-			}catch(...){// std::async and std::vector::reserve may fail gracefully here
-				assert(false);
-			}
-		}
-		// handle one slice here
-		offsetscompanion = radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(allowedthreads - 1u, allowedthreads, count, input, buffer, varparameters...);
-		if(i)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
-			[[unlikely]]
-#endif
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// simpler solution than in the main thread, but this case will be a lot rarer to happen anyway
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> localoffsets{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(assignedslice, allowedthreads, count, input, buffer, varparameters...)};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), localoffsets.begin(), offsetscompanion.begin(), std::plus<X>{});
-			--assignedslice;
-		}while(--i);
-		for(auto &slicehandle : initasynchandlesvector)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			{// combine the data from several threads
-			auto const &slicedata{slicehandle.get()};
-			std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		}
+		{// combine the data from several threads
+		auto const &slicedata{pslicehandle->get()};
+		++pslicehandle;
+		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
 	}
 
 	X *offsets;
@@ -57817,7 +56587,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;// a sizeable amount of indices, but it's worth it
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -57853,11 +56623,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(ismultithreadcapable){
 					allowedthreads = static_cast<unsigned>(std::min(static_cast<std::size_t>(allowedthreads), (count + 1u) / std::max(static_cast<std::size_t>(16u), prefetchmaxstride / sizeof(V *))));// simple safety limit on the maximum thread count
 					assert(1u < allowedthreads);// the functions that determine the thread count should prevent this from happening, but just in case
+					assignedslice = allowedthreads;
 					try{
-						asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, std::ref(atomiclightbarrier), varparameters...);
-						assignedslice = (allowedthreads + 1u) >> 1;// the halves of the thread count are rounded up in the main thread, and rounded down in the companion thread
-						usemultithread = 1u;
-						if(--assignedslice)
+						if(assignedslice -= 2u)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
@@ -57868,21 +56636,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice, allowedthreads, count, input, buffer, varparameters...));
-							}while(--assignedslice);// slice 0 is handled by the current thread
+								initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, buffer, varparameters...));
+							}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 						}
+						asynchandle = std::async(std::launch::async, radixsortnoallocsinglemtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X, vararguments...>, allowedthreads, count, input, buffer, initasynchandlesvector.data() + ((allowedthreads - 1u) >> 1), std::ref(atomiclightbarrier), varparameters...);
+						--assignedslice;
+						usemultithread = 1u;
 					}catch(...){// std::async and std::vector::reserve may fail gracefully here
 						assert(false);
 					}
+					++assignedslice;
 				}
 				std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
 				std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<2>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
 						std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -57956,11 +56724,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[cur];
 					}
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
-					if constexpr(ismultithreadcapable) if(usemultithread)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						i = initmtslicemain<8>(assignedslice, allowedthreads, count);
+					if constexpr(ismultithreadcapable) i = initmtslicemain<8>(assignedslice, allowedthreads, count);
 					i -= 7;
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						// no need to mask out the bits for handling the remainder term after the two loops
@@ -58174,13 +56938,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[cur];
 					}
 				}
-				if constexpr(ismultithreadcapable) for(auto &slicehandle : initasynchandlesvector)
+				if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
+				[[likely]]
 #endif
-					{// combine the data from several threads
-					auto const &slicedata{slicehandle.get()};
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+					j >>= usemultithread;
+					auto pslicehandle{initasynchandlesvector.data()};
+					do
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						{// combine the data from several threads
+						auto const &slicedata{pslicehandle->get()};
+						++pslicehandle;
+						std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					}while(--j);
 				}
 			}
 
