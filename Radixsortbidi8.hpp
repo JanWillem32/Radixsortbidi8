@@ -14569,7 +14569,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
@@ -15106,12 +15106,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -15217,7 +15216,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
@@ -15833,12 +15832,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -18013,7 +18011,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -18816,12 +18814,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -18937,7 +18934,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -19831,12 +19828,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -20838,7 +20834,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
@@ -21337,12 +21333,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -21445,7 +21440,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
@@ -21948,12 +21943,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -23356,7 +23350,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -24076,12 +24070,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -24196,7 +24189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -24912,12 +24905,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -26245,7 +26237,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
@@ -26786,12 +26778,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -26894,7 +26885,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
@@ -27528,12 +27519,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -29443,7 +29433,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -30313,12 +30303,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -30433,7 +30422,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -31407,12 +31396,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -34878,7 +34866,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
@@ -37034,12 +37022,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37146,7 +37133,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
@@ -39965,12 +39952,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -44154,7 +44140,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(output);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -48122,12 +48108,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -48243,7 +48228,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -52939,12 +52924,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -53868,7 +53852,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, output)};
@@ -53954,7 +53938,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
@@ -54247,12 +54231,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54531,12 +54514,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54597,7 +54579,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, buffer)};
@@ -54681,7 +54663,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(1u < allowedthreads);
 	// do not pass a nullptr here
 	assert(input);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
@@ -54974,12 +54956,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -55248,12 +55229,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-			j >>= usemultithread;
 			auto pslicehandle{initasynchandlesvector.data()};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -55860,7 +55840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(output);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -56336,12 +56316,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -56441,7 +56420,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 	assert(buffer);
-	assert(pslicehandle);
+	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
@@ -56917,12 +56896,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{allowedthreads - 1u - assignedslice})
+			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
 				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-				j >>= usemultithread;
 				auto pslicehandle{initasynchandlesvector.data()};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
