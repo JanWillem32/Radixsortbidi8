@@ -12869,7 +12869,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
-	static std::size_t intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
+	static std::size_t constexpr intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
 	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
 	return{std::max(intermediatefiltered, std::max(static_cast<std::size_t>(16u), prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
 }
