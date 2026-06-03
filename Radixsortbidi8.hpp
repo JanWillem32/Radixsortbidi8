@@ -12829,29 +12829,29 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 		21303.184393483358464258097210348200983900207055244,// 120
 		16268.55316000000// 128, allow 4-way multithreading to fall through
 	};
-	// for unfiltered 8-bit it's 512 B, and for quarter-precision floating-point it's 256 B
-	// for unfiltered 16-bit it's 768 B, and for half-precision floating-point it's 576 B
-	// for unfiltered 32-bit it's 224 KiB, and for float it's 196 KiB
+	// for unfiltered 8-bit it's 64 B, and for quarter-precision floating-point it's 32 B
+	// for unfiltered 16-bit it's 192 B, and for half-precision floating-point it's 144 B
+	// for unfiltered 32-bit it's 112 KiB, and for float it's 98 KiB
 	// for unfiltered 64-bit it's 6 KiB, and for double it's 5.625 KiB
 	// for unfiltered 80-bit it's 1.25 KiB, and for 80-bit floating-point it's 1.1875 KiB
 	// for unfiltered 128-bit it's 6.752 MiB, and for quadruple-precision floating-point it's 6.541 MiB
 	static double constexpr lookupindirect[]{
-		// extensible, 8- and 16-bit targets were measured directly after a few test runs, the others follow the basic interpolation function: 256 * (8 / x + 1)
-		512.,// 8
-		384.,// 16
-		341.33333333333333,// 24
-		57344.,// 32
-		307.2,// 40
-		298.66666666666667,// 48
-		292.57142857142857,// 56
+		// extensible, 8- and 16-bit targets were measured directly after a few test runs, the others follow the basic interpolation function: 32 * (x / 8 + 1)
+		64.,// 8
+		96.,// 16
+		128.,// 24
+		28672.,// 32
+		192.,// 40
+		224.,// 48
+		256.,// 56
 		768.,// 64
-		284.44444444444444,// 72
+		320.,// 72
 		128.,// 80
-		279.27272727272727,// 88
-		277.33333333333333,// 96
-		275.69230769230769,// 104
-		274.28571428571429,// 112
-		273.06666666666667,// 120
+		384.,// 88
+		416.,// 96
+		448.,// 104
+		480.,// 112
+		512.,// 120
 		442467.01920307562356431858216819404361690142166286// 128, allow 6-way multithreading to fall through
 	};
 	static double constexpr base{// interpolated power scaling using regression (by means of a lookup table)
@@ -12869,7 +12869,9 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// very inefficient rounding on a truncation cast, as the std namespace rounding typecast functions do not grant constexpr
 	static double constexpr intermediate{base + static_cast<double>(PTRDIFF_MIN) + ((-static_cast<double>(PTRDIFF_MIN) > base)? -.5 : .5)};
 	// signed typecast on the intermediate, to avoid the issues in the standard with unsigned typecasts from floating-point
-	return{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
+	static std::size_t intermediatefiltered{static_cast<std::size_t>(static_cast<std::ptrdiff_t>(std::min(intermediate, static_cast<double>(PTRDIFF_MAX)))) - static_cast<std::size_t>(PTRDIFF_MIN)};
+	// with very low counts, do not allow multithreading unless the prefetch stride can be guaranteed
+	return{std::max(intermediatefiltered, std::max(static_cast<std::size_t>(16u), prefetchmaxstride / (isindirect? sizeof(void *) : sizeof(T))))};
 }
 
 // function to establish the initial treshold for 4-way multithreading
