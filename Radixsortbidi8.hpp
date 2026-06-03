@@ -12803,12 +12803,11 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	// for unfiltered 8-bit it's 182 or 116.259 KiB, and for quarter-precision floating-point it's 58.129 KiB
 	// for unfiltered 16-bit it's 205.626 KiB, and for half-precision floating-point it's 154.220 KiB
 	// for unfiltered 32-bit it's 321.628 KiB, and for float it's 281.424 KiB
-	// for unfiltered 64-bit it's 393.437 KiB, and for double it's 368.847 KiB
-	// for unfiltered 80-bit it's 615.390 KiB, and for 80-bit floating-point it's 584.621 KiB
-	// for unfiltered 128-bit it's 294.366 KiB, and for quadruple-precision floating-point it's 285.167 KiB
-	static double constexpr lookup[]{
+	// for unfiltered 64-bit it's 359.944 KiB, and for double it's 337.447 KiB
+	// for unfiltered 80-bit it's 40.966 KiB, and for 80-bit floating-point it's 38.917 KiB
+	// for unfiltered 128-bit it's 254.196 KiB, and for quadruple-precision floating-point it's 246.253 KiB
+	static double constexpr lookupdirect[]{
 		// for 8-bit items some special-use single-pass radix sort functions work a bit differently
-		!isindirect &&// indirection
 		!(isabsvalue && issignmode) &&// both regular absolute modes
 		!(!isabsvalue && issignmode && isfltpmode)?// regular floating-point mode
 		186368. :// 8, but only when using the fill function repeatedly as a final pass for sorting the array
@@ -12820,18 +12819,43 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 		72814.273808720818350661407048004430201278061170486,// 40
 		64393.098464327098817659580987548761094000197958359,// 48
 		56945.855708581007760934640530626067131913800497922,// 56
-		50359.907501252050378459896166891626912928918600240,// 64
+		46072.77421600000,// 64, allow 4-way multithreading to fall through
 		44535.642707929346942375903232272676804163292496663,// 72
-		39384.970501763301439354140704419207634957830845224,// 80
+		20974.37380000000,// 80, allow 4-way multithreading to fall through
 		34829.988007528772935744841504930576687131758938346,// 88
 		30801.802036395718011383041443735796473492222884873,// 96
 		27239.487090384053184396796463190695907338039166910,// 104
 		24089.163876530895044271569733839811055850294430447,// 112
 		21303.184393483358464258097210348200983900207055244,// 120
-		18839.411265116472046520457904185106880809973334101// 128
+		16268.55316000000// 128, allow 4-way multithreading to fall through
+	};
+	// for unfiltered 8-bit it's 512 B, and for quarter-precision floating-point it's 256 B
+	// for unfiltered 16-bit it's 768 B, and for half-precision floating-point it's 576 B
+	// for unfiltered 32-bit it's 224 KiB, and for float it's 196 KiB
+	// for unfiltered 64-bit it's 6 KiB, and for double it's 5.625 KiB
+	// for unfiltered 80-bit it's 2 KiB, and for 80-bit floating-point it's 1.9 KiB
+	// for unfiltered 128-bit it's 254.196 KiB, and for quadruple-precision floating-point it's 246.253 KiB
+	static double constexpr lookupindirect[]{
+		// extensible, 8- and 16-bit targets were measured directly after a few test runs, the others follow the basic interpolation function: 256 * (8 / x + 1)
+		512.,// 8
+		384.,// 16
+		341.33333333333333,// 24
+		57344.,// 32
+		307.2,// 40
+		298.66666666666667,// 48
+		292.57142857142857,// 56
+		768.,// 64
+		284.44444444444444,// 72
+		128.,// 80
+		279.27272727272727,// 88
+		277.33333333333333,// 96
+		275.69230769230769,// 104
+		274.28571428571429,// 112
+		273.06666666666667,// 120
+		487677.34035400// 128, allow 6-way multithreading to fall through
 	};
 	static double constexpr base{// interpolated power scaling using regression (by means of a lookup table)
-		lookup[(typebitsize<T> >> 3) - 1u]
+		(isindirect? lookupindirect : lookupdirect)[(typebitsize<T> >> 3) - 1u]
 		// the first item is measured and tuned using the the test suite for this project
 		* ((isabsvalue != isfltpmode)? 1. - 4. / static_cast<double>(typebitsize<T>) : 1.)// 4 modes with around three extra filtering steps per input value
 		// the second item is extrapolated from the first item, and is a decent estimate
@@ -12857,6 +12881,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
 	std::size_t> base4waythreshold()noexcept{
+	// the 4-way threshold values are currently only used for and tested with functions without indirection
 	// for unfiltered 16-bit it's 7.5 GiB, and for half-precision floating-point it's 5.625 GiB
 	// for unfiltered 32-bit it's 5.25 GiB, and for float it's 4.593 GiB
 	// for unfiltered 64-bit it's 359.944 KiB, and for double it's 337.447 KiB
@@ -12909,29 +12934,29 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	8u < CHAR_BIT * sizeof(T),
 	std::size_t> base6waythreshold()noexcept{
 	// the 6-way threshold values are currently only used for and tested with functions with indirection
-	// for unfiltered 16-bit it's 13.996 GiB, and for half-precision floating-point it's 10.497 GiB
-	// for unfiltered 32-bit it's 12 GiB, and for float it's 10.5 GiB
-	// for unfiltered 64-bit it's 7.5 MiB, and for double it's 7.031 MiB
-	// for unfiltered 80-bit it's 10.5 MiB, and for 80-bit floating-point it's 9.975 MiB
-	// for unfiltered 128-bit it's 9.5 MiB, and for quadruple-precision floating-point it's 9.203 MiB
+	// for unfiltered 16-bit it's 21.206 MiB, and for half-precision floating-point it's 15.905 MiB
+	// for unfiltered 32-bit it's 19.205 MiB, and for float it's 16.805 MiB
+	// for unfiltered 64-bit it's 4.634 MiB, and for double it's 4.345 MiB
+	// for unfiltered 80-bit it's 10.321 MiB, and for 80-bit floating-point it's 9.805 MiB
+	// for unfiltered 128-bit it's 7.441 MiB, and for quadruple-precision floating-point it's 7.209 MiB
 	static double constexpr lookup[]{
-		// these items are interpolated using: -21831.888889 * (x * x * x) + 5938540.444432 * (x * x) - 514241479.11024 * x + 14311274723.539
-		10566231551.98956,// 8
-		7514253994.660408,// 16
-		5088274488.884536,// 24
-		3221225471.994936,// 32
-		1846039381.324600,// 40
-		895648654.2065200,// 48
-		302985727.9736880,// 56
-		983039.9590960000,// 64
-		-77426972.50426400,// 72, unused, just an artifact of the cubic polynomial regression in between the measurement for 80 and 64 bits
-		688127.9166000000,// 80
-		168260778.5546800,// 88
-		358223416.7429680,// 96
-		503508479.8144560,// 104
-		537048405.1021360,// 112
-		391775629.9390000,// 120
-		622591.6580400000// 128
+		// these items are interpolated using: -32.298851 * (x * x * x) + 8656.551724 * (x * x) - 737856.735632 * x + 20839996.027586
+		15474624.441154,// 8
+		11118069.405122,// 16
+		7671108.8492180,// 24
+		5034520.7031700,// 32
+		3109082.8967060,// 40
+		1795573.3595540,// 48
+		994770.02144200,// 56
+		607450.81209800,// 64
+		534393.66125000,// 72
+		676376.49862600,// 80
+		934177.25395400,// 88
+		1208573.8569620,// 96
+		1400344.2373780,// 104
+		1410266.3249300,// 112
+		1139118.0493460,// 120
+		487677.34035400// 128
 	};
 	static double constexpr base{// interpolated cubic polynomial scaling using regression (by means of a lookup table)
 		lookup[(typebitsize<T> >> 3) - 1u]
@@ -12960,6 +12985,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
 	std::size_t> base8waythreshold()noexcept{
+	// the 8-way threshold values are currently only used for and tested with functions without indirection
 	// for unfiltered 16-bit it's 640 GiB, and for half-precision floating-point it's 480 GiB
 	// for unfiltered 32-bit it's 160 GiB, and for float it's 140 GiB
 	// for unfiltered 64-bit it's 40 GiB, and for double it's 37.5 GiB
@@ -12992,6 +13018,7 @@ RSBD8_FUNC_INLINE constexpr std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
 	std::size_t> base16waythreshold()noexcept{
+	// the 16-way threshold values are currently only used for and tested with functions without indirection
 	// for unfiltered 16-bit it's 1.25 TiB, and for half-precision floating-point it's 960 GiB
 	// for unfiltered 32-bit it's 320 GiB, and for float it's 280 GiB
 	// for unfiltered 64-bit it's 80 GiB, and for double it's 75 GiB
