@@ -534,8 +534,6 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 #include <climits>
 #include <cfloat>
 #include <cstring>// for std::memcpy(), std::memset() and the like, this library doesn't use actual string functions
-#include <execution>
-#include <algorithm>
 #include <future>
 #include <atomic>
 #include <array>
@@ -13105,8 +13103,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -14648,7 +14645,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -14776,7 +14779,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -14824,7 +14826,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T const *pinput{input + count};
@@ -15184,7 +15186,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -15293,7 +15301,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -15418,7 +15432,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -15465,7 +15478,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
 			if constexpr(!ismultithreadcapable){
@@ -15910,7 +15923,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -16026,8 +16045,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -18096,7 +18114,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -18241,7 +18265,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -18298,7 +18321,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
@@ -18892,7 +18915,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -19017,7 +19046,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -19159,7 +19194,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -19215,7 +19249,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -19906,7 +19940,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -20031,8 +20071,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -20913,7 +20952,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -21045,7 +21090,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -21093,7 +21137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -21411,7 +21455,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -21517,7 +21567,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -21646,7 +21702,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -21693,7 +21748,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -22021,7 +22076,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -22137,8 +22198,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -23435,7 +23495,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -23578,7 +23644,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -23635,7 +23700,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -24148,7 +24213,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -24272,7 +24343,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -24412,7 +24489,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -24468,7 +24544,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -24983,7 +25059,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -25108,8 +25190,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -26316,7 +26397,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -26448,7 +26535,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -26496,7 +26582,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -26856,7 +26942,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -26962,7 +27054,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -27091,7 +27189,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -27138,7 +27235,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -27597,7 +27694,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -27713,8 +27816,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -29518,7 +29620,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -29659,7 +29767,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -29716,7 +29823,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -30381,7 +30488,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -30505,7 +30618,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -30645,7 +30764,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -30701,7 +30819,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -31474,7 +31592,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -31593,8 +31717,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
@@ -34945,7 +35068,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -35073,7 +35202,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -35121,7 +35249,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(64u == typebitsize<T>){
 			if constexpr(isrevorder){
@@ -37100,7 +37228,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -37210,7 +37344,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -37335,7 +37475,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -37382,7 +37521,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(64u == typebitsize<T>){
 			if constexpr(isrevorder){
@@ -40030,7 +40169,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -40137,8 +40282,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
@@ -44225,7 +44369,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -44361,7 +44511,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -44418,7 +44567,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
@@ -48186,7 +48335,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -48311,7 +48466,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -48444,7 +48605,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -48500,7 +48660,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
 					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
@@ -53002,7 +53162,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -53115,8 +53281,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(pout);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -53230,8 +53395,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// do not pass a nullptr here
 	assert(input);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -53422,9 +53586,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				T *pfillold{pfill};
 				pfill -= length;
-				std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
+				std::memset(pfill, static_cast<signed>(filler), length);
 				length = static_cast<U>(*t) + static_cast<U>(*u);
 				filler += static_cast<unsigned>(isdescsort * 2 - 1);
 				if constexpr(isdescsort){
@@ -53452,14 +53615,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					T *pfilloldodd{pfill};
 					pfill -= length;
-					std::fill(std::execution::par_unseq, pfill, pfilloldodd, static_cast<T>(filler));
+					std::memset(pfill, static_cast<signed>(filler), length);
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
 					filler -= 0x80u;// only 8 bits are used
-					T *pfilloldeven{pfill};
 					pfill -= length;
-					std::fill(std::execution::par_unseq, pfill, pfilloldeven, static_cast<T>(filler));
+					std::memset(pfill, static_cast<signed>(filler), length);
 					length = static_cast<U>(t[isdescsort * 6 - 3]) + static_cast<U>(u[isdescsort * 6 - 3]);// odd
 					filler += 0x80u + isdescsort * 2u - 1u;// offset the value of filler for the next loop
 					// step forward twice
@@ -53475,9 +53636,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						u -= 2;
 					}
 				}while(--j);
-				T *pfillold{pfill};
 				pfill -= length;
-				std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
+				std::memset(pfill, static_cast<signed>(filler), length);
 				length = static_cast<U>(*t) + static_cast<U>(*u);// even
 				filler -= 0x80u;// only 8 bits are used
 			}else{// all other modes
@@ -53490,9 +53650,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					T *pfillold{pfill};
 					pfill -= length;
-					std::fill(std::execution::par_unseq, pfill, pfillold, static_cast<T>(filler));
+					std::memset(pfill, static_cast<signed>(filler), length);
 					length = static_cast<U>(*t) + static_cast<U>(*u);
 					filler += static_cast<unsigned>(isdescsort * 2 - 1);
 					if constexpr(isdescsort){
@@ -53510,7 +53669,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 	}
-	std::fill(std::execution::par_unseq, pfill - length, pfill, static_cast<T>(filler));
+	std::memset(pfill - length, static_cast<T>(filler), length);
 }
 
 // main part for the radixsortcopynoallocsingle() and radixsortnoallocsingle() function implementation templates for single-part types without indirection
@@ -53695,9 +53854,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					T *pfillold{pfill};
+					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
-					std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 					length = static_cast<U>(*t) + static_cast<U>(*u);
 					filler += 1u - isdescsort * 2u;
 					if constexpr(isdescsort){
@@ -53725,14 +53883,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						T *pfilloldodd{pfill};
+						std::memset(pfill, static_cast<signed>(filler), length);
 						pfill += length;
-						std::fill(std::execution::par_unseq, pfilloldodd, pfill, static_cast<T>(filler));
 						length = static_cast<U>(*t) + static_cast<U>(*u);// even
 						filler -= 0x80u;// only 8 bits are used
-						T *pfilloldeven{pfill};
+						std::memset(pfill, static_cast<signed>(filler), length);
 						pfill += length;
-						std::fill(std::execution::par_unseq, pfilloldeven, pfill, static_cast<T>(filler));
 						length = static_cast<U>(t[3 - isdescsort * 6]) + static_cast<U>(u[3 - isdescsort * 6]);// odd
 						filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 						// step forward twice
@@ -53748,9 +53904,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 							u += 2;
 						}
 					}while(--j);
-					T *pfillold{pfill};
+					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
-					std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 					length = static_cast<U>(*t) + static_cast<U>(*u);// even
 					filler -= 0x80u;// only 8 bits are used
 				}else{// all other modes
@@ -53763,9 +53918,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						T *pfillold{pfill};
+						std::memset(pfill, static_cast<signed>(filler), length);
 						pfill += length;
-						std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 						length = static_cast<U>(*t) + static_cast<U>(*u);
 						filler += 1u - isdescsort * 2u;
 						if constexpr(isdescsort){
@@ -53798,9 +53952,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				T *pfillold{pfill};
+				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
-				std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 				length = *t;
 				filler += 1u - isdescsort * 2u;
 				if constexpr(isdescsort){
@@ -53811,9 +53964,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					++t;
 				}
 			}while(--j);
-			T *pfilloldmid{pfill};
+			std::memset(pfill, static_cast<signed>(filler), length);
 			pfill += length;
-			std::fill(std::execution::par_unseq, pfilloldmid, pfill, static_cast<T>(filler));
 			length = t[(isdescsort * 2 - 1) << 8];
 			filler += 1 - isdescsort * 2;// only 8 bits are used
 			t += ((1 << typebitsize<T>) - 1) * (isdescsort * 2 - 1);// offset to the start/end of the range
@@ -53823,9 +53975,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				T *pfillold{pfill};
+				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
-				std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 				length = *t;
 				filler += 1 - isdescsort * 2;
 				if constexpr(isdescsort){
@@ -53848,14 +53999,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					T *pfilloldodd{pfill};
+					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
-					std::fill(std::execution::par_unseq, pfilloldodd, pfill, static_cast<T>(filler));
 					length = *t;// even
 					filler -= 0x80u;// only 8 bits are used
-					T *pfilloldeven{pfill};
+					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
-					std::fill(std::execution::par_unseq, pfilloldeven, pfill, static_cast<T>(filler));
 					length = t[3 - isdescsort * 6];// odd
 					filler += 0x80u + 1u - isdescsort * 2u;// offset the value of filler for the next loop
 					// step forward twice
@@ -53867,9 +54016,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						t += 2;
 					}
 				}while(--j);
-				T *pfillold{pfill};
+				std::memset(pfill, static_cast<signed>(filler), length);
 				pfill += length;
-				std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 				length = *t;// even
 				filler -= 0x80u;// only 8 bits are used
 			}else{// all other modes
@@ -53881,9 +54029,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					T *pfillold{pfill};
+					std::memset(pfill, static_cast<signed>(filler), length);
 					pfill += length;
-					std::fill(std::execution::par_unseq, pfillold, pfill, static_cast<T>(filler));
 					length = *t;
 					filler += 1u - isdescsort * 2u;
 					if constexpr(isdescsort){
@@ -53898,7 +54045,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		}
 	}
 exit:
-	std::fill(std::execution::par_unseq, pfill, pfill + length, static_cast<T>(filler));
+	std::memset(pfill, static_cast<signed>(filler), length);
 }
 
 // main part, multithreading companion for the radixsortcopynoallocsinglemain() function implementation template for single-part types without indirection
@@ -53929,7 +54076,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -54015,7 +54168,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -54082,7 +54241,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -54133,7 +54291,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -54309,7 +54467,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -54420,7 +54584,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -54471,7 +54634,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -54592,7 +54755,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -54656,7 +54825,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -54740,7 +54915,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -54807,7 +54988,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -54858,7 +55038,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -55034,7 +55214,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -55143,7 +55329,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsets;// note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -55194,7 +55379,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsets{};// zeroed in advance here, note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -55307,7 +55492,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				{// combine the data from several threads
 				auto const &slicedata{pslicehandle->get()};
 				++pslicehandle;
-				std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+				X *piter{offsets.data()};
+				for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+					[[likely]]
+#endif
+					*piter++ += element;// this will usually inline and auto-vectorise
 			}while(--j);
 		}
 
@@ -55356,8 +55547,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(pout);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
-	std::fill(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), X{});// zeroed in advance here
+	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -55923,7 +56113,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -56030,7 +56226,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -56090,7 +56285,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -56394,7 +56589,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 
@@ -56503,7 +56704,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		{// combine the data from several threads
 		auto const &slicedata{pslicehandle->get()};
 		++pslicehandle;
-		std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
+		X *piter{offsetscompanion.data()};
+		for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			*piter++ += element;// this will usually inline and auto-vectorise
 	}
 
 	X *offsets;
@@ -56610,7 +56817,6 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{// a 0 or 1 count array is only allowed here in single-threaded function mode
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets;
 		// conditionally enable multithreading here
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
@@ -56670,7 +56876,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::fill(std::execution::par_unseq, offsets.begin(), offsets.end(), X{});// zeroed in advance here
+			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -56974,7 +57180,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					{// combine the data from several threads
 					auto const &slicedata{pslicehandle->get()};
 					++pslicehandle;
-					std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
+					X *piter{offsets.data()};
+					for(X element : slicedata)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+						[[likely]]
+#endif
+						*piter++ += element;// this will usually inline and auto-vectorise
 				}while(--j);
 			}
 

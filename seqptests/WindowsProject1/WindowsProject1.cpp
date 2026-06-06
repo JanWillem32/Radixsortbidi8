@@ -51,6 +51,8 @@ static std::size_t constexpr RSBD8_TEST_BATCH_SIZE[]{8uz * 1024 * 1024 * 1024};
 //#define RSBD8_THREAD_MINIMUM 1
 
 #include "..\..\Radixsortbidi8.hpp"
+#include <execution>
+#include <algorithm>
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)

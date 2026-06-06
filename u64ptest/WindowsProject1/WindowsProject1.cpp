@@ -18,6 +18,8 @@
 //#define RSBD8_THREAD_MINIMUM 1
 
 #include "..\..\Radixsortbidi8.hpp"
+#include <execution>
+#include <algorithm>
 
 // disable warning messages for this file only:
 // C4559: 'x': redefinition; the function gains __declspec(noalias)
@@ -2362,7 +2364,7 @@ __declspec(noalias safebuffers) int APIENTRY wWinMain(HINSTANCE hInstance, HINST
 
 		assert(std::is_sorted(reinterpret_cast<std::uint64_t *>(out), reinterpret_cast<std::uint64_t *>(out) + 134217728));
 	}
-	
+
 /*
 
 	{// Executing radixsortbufferless() is not recommended as it's terribly slow.
