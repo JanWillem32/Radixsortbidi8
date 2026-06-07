@@ -1784,6 +1784,10 @@ template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 std::size_t constexpr offsetslength{(80u == typebitsize<T>)? offsetsbodylength<T> + (static_cast<std::size_t>(1u) << 8) - (isabsvalue && issignmode) * (((static_cast<std::size_t>(1u) << 8) >> 1) - !isfltpmode) :
 	offsetsbodylength<T> + offsetsremainderlengthsplitup<T> - (isabsvalue && issignmode) * ((offsetsremainderlengthsplitup<T> >> 1) - !isfltpmode)};// shrink the end of the offsets length if possible
 
+// wrapper struct for the offsets std::array using the current formula for system architecture standard stack alignment
+template<bool isabsvalue, bool issignmode, bool isfltpmode, bool ismultithreadcapable, typename T, typename X>
+struct alignas(alignof(void *) * alignof(void *) >> 2) offsetstype : std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)>{};
+
 // Utilities for endianess compile-time detection
 //
 // This is a dirty method that heavily relies on proper inlining and compiler optimisation of that, but it at least can detect the floating-point mixed endianness cases if used properly.
@@ -13096,7 +13100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
 	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
@@ -13111,7 +13115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -14630,7 +14634,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -14642,7 +14646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -14791,7 +14795,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -14834,7 +14838,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T const *pinput{input + count};
@@ -15291,7 +15295,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -15300,7 +15304,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -15444,7 +15448,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -15486,7 +15490,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
 			if constexpr(!ismultithreadcapable){
@@ -16029,7 +16033,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
@@ -16053,7 +16057,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -18092,7 +18096,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -18111,7 +18115,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -18277,7 +18281,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -18329,7 +18333,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
@@ -19029,7 +19033,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -19045,7 +19049,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -19206,7 +19210,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -19257,7 +19261,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -20057,7 +20061,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
 	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -20079,7 +20083,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -20937,7 +20941,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -20949,7 +20953,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -21102,7 +21106,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -21145,7 +21149,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -21557,7 +21561,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -21566,7 +21570,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -21714,7 +21718,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -21756,7 +21760,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -22183,7 +22187,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -22206,7 +22210,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -23473,7 +23477,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -23492,7 +23496,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -23656,7 +23660,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23708,7 +23712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
@@ -24326,7 +24330,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -24342,7 +24346,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -24501,7 +24505,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -24552,7 +24556,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -25176,7 +25180,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
 	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -25198,7 +25202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			T *pdst{splitparameter<false>(varparameters...)};
@@ -26382,7 +26386,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -26394,7 +26398,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -26547,7 +26551,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -26590,7 +26594,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -27044,7 +27048,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -27053,7 +27057,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -27201,7 +27205,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -27243,7 +27247,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
@@ -27801,7 +27805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -27824,7 +27828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
 			V **pdst{splitparameter<false>(varparameters...)};
@@ -29600,7 +29604,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -29617,7 +29621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -29779,7 +29783,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -29831,7 +29835,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -30601,7 +30605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -30617,7 +30621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -30776,7 +30780,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -30827,7 +30831,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
 				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
 				if constexpr(!ismultithreadcapable){
@@ -31711,7 +31715,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
 	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -31725,7 +31729,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
@@ -35053,7 +35057,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -35065,7 +35069,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -35214,7 +35218,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -35257,7 +35261,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(64u == typebitsize<T>){
 			if constexpr(isrevorder){
@@ -37334,7 +37338,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -37343,7 +37347,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37487,7 +37491,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -37529,7 +37533,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(64u == typebitsize<T>){
 			if constexpr(isrevorder){
@@ -40275,7 +40279,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -40290,7 +40294,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(pout);
 	if constexpr(isrevorder && isinputconst) assert(splitparameter<false>(varparameters...));
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
@@ -44347,7 +44351,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -44366,7 +44370,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion;
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -44523,7 +44527,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -44575,7 +44579,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
@@ -48449,7 +48453,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -48465,7 +48469,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -48617,7 +48621,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -48668,7 +48672,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
 					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
@@ -53281,7 +53285,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[], T pout[])noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[], T pout[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
@@ -53289,7 +53293,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(pout);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -53397,13 +53401,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> radixsortnoallocsinglesimpleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[])noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsinglesimpleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[])noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	// do not pass a nullptr here
 	assert(input);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -54066,7 +54070,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
@@ -54075,7 +54079,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, output)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, output)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54158,7 +54162,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
@@ -54167,7 +54171,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54253,7 +54257,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -54299,7 +54303,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -54596,7 +54600,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -54642,7 +54646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -54815,7 +54819,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -54824,7 +54828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, buffer)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, buffer)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54907,14 +54911,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	// do not pass a nullptr here
 	assert(input);
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -55000,7 +55004,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -55046,7 +55050,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -55341,7 +55345,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -55387,7 +55391,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			++assignedslice;
 		}
-		std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsets{};// zeroed in advance here, note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
+		offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsets{};// zeroed in advance here, note that this one is unique: there is no option for the regular single-threaded mode's double-wide indices array
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -55546,7 +55550,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const input[], V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const input[], V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -55555,7 +55559,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(input);
 	assert(pout);
 
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{};// zeroed in advance here
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		// unsigned counter, not zero inclusive inside the loop
 		auto[i, loc]{initmtslicemt<2>(assignedslice, allowedthreads, count)};
@@ -56096,7 +56100,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -56112,7 +56116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, output, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, output, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -56238,7 +56242,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -56293,7 +56297,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
@@ -56687,7 +56691,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>>>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -56703,7 +56707,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
-	std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>> offsetscompanion	{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, buffer, varparameters...)};
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, buffer, varparameters...)};
 	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
 	while(--j)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -56829,7 +56833,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T>>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -56884,7 +56888,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				++assignedslice;
 			}
-			std::array<X, offsetslength<isabsvalue, issignmode, isfltpmode, T> << static_cast<unsigned>(!ismultithreadcapable)> offsets{};// zeroed in advance here
+			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
