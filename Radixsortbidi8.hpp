@@ -260,7 +260,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 };
 // ### To give an example of isdescsort = true, isrevorder = false, as it's a bit tricky to imagine without a reference:
 // myclass collA[]{{1, "first"}, {1, "second"}, {-5, "third"}, {2, "fourth"}};// list construct
-// myclass *pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
+// myclass *RSBD8_RESTRICT pcollA[]{collA, collA + 1, collA + 2, collA + 3};// list pointers
 // rsbd8::radixsortnoalloc<&myclass::keyorder, rsbd8::sortingdirection::dscfwdorder>(4, pcollA, psomeunusedbuffer);
 // Members of "pcollA" will then get sorted according to their value "keyorder", in reverse order, while keeping the same array order.
 // Pointers will in this case point to: {2, "fourth"}, {1, "first"}, {1, "second"}, {-5, "third"}.
@@ -485,7 +485,8 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 //
 // RSBD8_FUNC_INLINE is suitable to attempt force inlining of any function.
 // RSBD8_FUNC_NORMAL is specifically for template functions in this header-only library, and doesn't include even a regular "inline" statement to prevent linking issues for non-template functions.
-// These are the only two macros defined in this file, and #undef statements are used for them at the end.
+// RSBD8_RESTRICT is to access the __restrict keyword if supported by the compiler.
+// These are the only three macros defined in this file, and #undef statements are used for them at the end.
 #if defined(DEBUG) || defined(_DEBUG)// This part is debug-only. These are non-standard conforming macros, but note that the "NDEBUG" rule for detecting non-debug builds should only ever apply to runtime assert() statments in C++.
 #ifdef _MSC_VER
 #define RSBD8_FUNC_INLINE __declspec(noalias safebuffers) inline
@@ -501,7 +502,7 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 #elif defined(__GNUC__)
 #define RSBD8_FUNC_INLINE [[gnu::always_inline]] inline
 #define RSBD8_FUNC_NORMAL
-#elif defined(__xlC__) || defined(__ghs__) || defined(__KEIL__) || defined(__CA__) || defined(__C166__) || defined(__C51__) || defined(__CX51__)
+#elif defined(__xlC__) || defined(__ghs__) || defined(__KEIL__) || defined(__CA__) || defined(__C166__) || defined(__C51__) || defined(__CX51__) || defined(__CC_ARM)
 #define RSBD8_FUNC_INLINE inline __attribute__((always_inline))
 #define RSBD8_FUNC_NORMAL
 #elif defined(_MSC_VER)
@@ -512,6 +513,11 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 #define RSBD8_FUNC_INLINE inline
 #define RSBD8_FUNC_NORMAL
 #endif
+#endif
+#if defined(__restrict) || defined(__clang__) || defined(__GNUC__) || defined(_MSC_VER) || defined(__xlC__) || defined(__ghs__) || defined(__KEIL__) || defined(__CA__) || defined(__C166__) || defined(__C51__) || defined(__CX51__) || defined(__CC_ARM)
+#define RSBD8_RESTRICT __restrict
+#else
+#define RSBD8_RESTRICT
 #endif
 
 // Include statements and the last checks for compatibility
@@ -610,11 +616,11 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 // TODO: for now, tests were all with a stride of 512 bytes, but that could use some tuning
 // std::size_t constexpr prefetchmaxstride{}; typical maximum stride for the cache line prefetch after the current item in a loop, though using half the distance is common, too
 // template<auto indirection1>
-// RSBD8_FUNC_INLINE void prefetchcurrent(void const *data)noexcept{} general prefetch, allows displacement by indirection1 if it's an integer
-// RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{} general prefetch, one stride backward (negative offset) from the given address
-// RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{} general prefetch, one stride forward (positive offset) from the given address
-// RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{} write-specific prefetch, one stride backward (negative offset) from the given address
-// RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{} write-specific prefetch, one stride forward (positive offset) from the given address
+// RSBD8_FUNC_INLINE void prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{} general prefetch, allows displacement by indirection1 if it's an integer
+// RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{} general prefetch, one stride backward (negative offset) from the given address
+// RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{} general prefetch, one stride forward (positive offset) from the given address
+// RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{} write-specific prefetch, one stride backward (negative offset) from the given address
+// RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{} write-specific prefetch, one stride forward (positive offset) from the given address
 #if defined(_MSC_VER)
 // Microsoft C/C++-compatible compiler
 #include <intrin.h>
@@ -625,20 +631,20 @@ std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
 // a very reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
 #ifdef _M_X64
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
 #else
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
 #endif
 
 #elif defined(_M_ARM64) || defined(_M_ARM64EC) || defined(_M_HYBRID_X86_ARM64)
@@ -647,17 +653,17 @@ std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + indirection1, (0u << 3) | (0u << 1) | (0u << 0));}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + indirection1, (0u << 3) | (0u << 1) | (0u << 0));}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data), (0u << 3) | (0u << 1) | (0u << 0));}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data), (0u << 3) | (0u << 1) | (0u << 0));}
 // ARM64_PREFETCH_PLD | ARM64_PREFETCH_L1 | ARM64_PREFETCH_KEEP
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, (0u << 3) | (0u << 1) | (0u << 0));}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, (0u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, (0u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, (0u << 3) | (0u << 1) | (0u << 0));}
 // ARM64_PREFETCH_PST | ARM64_PREFETCH_L1 | ARM64_PREFETCH_KEEP
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, (2u << 3) | (0u << 1) | (0u << 0));}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, (2u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, (2u << 3) | (0u << 1) | (0u << 0));}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch2(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, (2u << 3) | (0u << 1) | (0u << 0));}
 
 #elif defined(_M_ARM)
 RSBD8_FUNC_INLINE void spinpause()noexcept{__dmb(_ARM_BARRIER_ISHST); __yield();}
@@ -665,15 +671,15 @@ std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + indirection1);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + indirection1);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data));}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data));}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{__prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
 
 #else
 #error This is an unsupported system architecture in combination with this compiler. Edit this library to add support for it.
@@ -687,11 +693,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{}
 #if !defined(__GNUC__) && !defined(__clang__)
 std::size_t constexpr prefetchmaxstride{};
 template<auto indirection1>
-RSBD8_FUNC_INLINE void prefetchcurrent(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{}
 #endif
 }// namespace rsbd8::helper
 
@@ -704,20 +710,20 @@ std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + indirection1, _MM_HINT_T0);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
 // a very reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
-#ifdef _M_X64
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+#ifdef __x86_64__
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
 #else
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
 #endif
 
 #if defined(__has_builtin) && __has_builtin(__builtin_add_overflow)
@@ -751,8 +757,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 }// namespace rsbd8::helper
 
-#elif (defined(__GNUC__) || defined(__clang__)) && (defined(__ARM_NEON__) || defined(__aarch64__))
-// GCC/Clang-compatible compiler, targeting ARM with NEON
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)) && (defined(__ARM_NEON__) || defined(__aarch64__))
+// GCC/Clang/ARM CfE-compatible compiler, targeting ARM with NEON
 #include <arm_neon.h>
 #if defined(MISSING_ARM_VLD1)
 #include <ATen/cpu/vec256/missing_vld1_neon.h>
@@ -766,8 +772,8 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{
 }
 }// namespace rsbd8::helper
 
-#elif (defined(__GNUC__) || defined(__clang__)) && defined(__IWMMXT__)
-// GCC/Clang-compatible compiler, targeting ARM with WMMX
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)) && defined(__IWMMXT__)
+// GCC/Clang/ARM CfE-compatible compiler, targeting ARM with WMMX
 #include <mmintrin.h>
 namespace rsbd8::helper{// avoid putting any include files into this library's namespace
 RSBD8_FUNC_INLINE void spinpause()noexcept{
@@ -776,8 +782,8 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{
 }
 }// namespace rsbd8::helper
 
-#elif (defined(__GNUC__) || defined(__clang__)) && (defined(__arm__) || (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__))
-// GCC/Clang-compatible compiler, targeting other ARM
+#elif (defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)) && (defined(__arm__) || (defined(__ARM_ARCH) && __ARM_ARCH >= 8) || defined(__ARM_ARCH_8A__))
+// GCC/Clang/ARM CfE-compatible compiler, targeting other ARM
 namespace rsbd8::helper{// avoid putting any include files into this library's namespace
 RSBD8_FUNC_INLINE void spinpause()noexcept{
 	__asm__ __volatile__ ("isb sy" ::: "memory");
@@ -835,11 +841,11 @@ RSBD8_FUNC_INLINE void spinpause()noexcept{
 #pragma message("Compiler and system architecture not detected. Edit this library to add support for it.")
 namespace rsbd8::helper{// avoid putting any include files into this library's namespace
 RSBD8_FUNC_INLINE void spinpause()noexcept{}
-#if !defined(__GNUC__) && !defined(__clang__) && !defined(__xlC__)
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{}
+#if !defined(__GNUC__) && !defined(__clang__) && !defined(__CC_ARM) && !defined(__xlC__)
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{}
 }// namespace rsbd8::helper
 #endif
 #endif
@@ -848,34 +854,36 @@ namespace rsbd8{// avoid putting any include files into this library's namespace
 namespace helper{// this libary defines a number of helper items, so categorise them as such
 
 // use the generic prefetch intrinsic functions if available
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__x86_64__) && !defined(__i386__)
+#if (defined(__GNUC__) || defined(__clang__) || defined(__CC_ARM)) && !defined(__x86_64__) && !defined(__i386__)
+// GCC/Clang/ARM CfE-compatible compiler, not targeting x86/x64
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + indirection1, 0, 3);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + indirection1, 0, 3);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data), 0, 3);}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, 0, 3);}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, 0, 3);}
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, 1, 3);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, 1, 3);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data), 0, 3);}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, 0, 3);}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, 0, 3);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride, 1, 3);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{__builtin_prefetch(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride, 1, 3);}
 #elif defined(__xlC__)
+// XLC-compatible compiler, targeting PowerPC
 std::size_t constexpr prefetchmaxstride{512u};
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + indirection1);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + indirection1);}
 template<auto indirection1>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	!std::is_integral_v<decltype(indirection1)>,
-	void> prefetchcurrent(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data));}
-RSBD8_FUNC_INLINE void prefetchbackward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchforward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwritebackward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
-RSBD8_FUNC_INLINE void prefetchwriteforward(void const *data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data));}
+RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
+RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{__prefetch_by_load(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
 #endif
 
 // Utilities for multithreaded concurrency
@@ -1124,6 +1132,7 @@ struct longdoubletest128{
 	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> operator&(std::intptr_t const &other)const noexcept{
 		return{longdoubletest128<isabsvalue, issignmode, isfltpmode>{*this} &= other};
 	}
+
 	RSBD8_FUNC_INLINE longdoubletest128<isabsvalue, issignmode, isfltpmode> &operator^=(std::intptr_t const &other)noexcept{
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX// 64-bit and larger systems
 		mantissa ^= static_cast<std::uint_least64_t>(other);
@@ -2322,7 +2331,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	isindexed2 &&
 	isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded, U index1, W index2)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p, isdiscarded, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2336,7 +2345,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	isindexed2 &&
 	isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded, U index1, W index2)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p, isdiscarded, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2349,7 +2358,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded, U index)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p, isdiscarded, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2367,7 +2376,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded, U index)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p, isdiscarded, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2385,7 +2394,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!isindexed2 &&
 	isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, isdiscarded)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p, isdiscarded)noexcept{
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2398,7 +2407,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!isindexed2 &&
 	isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, isdiscarded)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p, isdiscarded)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2411,8 +2420,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	static_cast<void>(index2);
 	// do not pass a nullptr here
 	assert(p);
@@ -2425,10 +2434,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	static_cast<void>(index2);
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2440,8 +2449,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2453,9 +2462,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2470,7 +2479,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	isindexed2 &&
 	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index1, W index2)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2484,7 +2493,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	isindexed2 &&
 	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index1, W index2)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p, U index1, W index2)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2497,7 +2506,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p, U index)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2515,7 +2524,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_object_pointer_v<decltype(indirection1)> &&
 	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p, U index)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p, U index)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2533,7 +2542,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!isindexed2 &&
 	!isextraparam &&
 	!std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *p)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>> splitget(V *RSBD8_RESTRICT p)noexcept{
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2546,7 +2555,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	!isindexed2 &&
 	!isextraparam &&
 	std::is_lvalue_reference_v<decltype(std::declval<V *>()->*indirection1)>,
-	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *p)noexcept{
+	std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)> *> splitget(V *RSBD8_RESTRICT p)noexcept{
 	using T = std::remove_reference_t<decltype(std::declval<V *>()->*indirection1)>;
 	// do not pass a nullptr here
 	assert(p);
@@ -2559,8 +2568,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	static_cast<void>(index2);
 	// do not pass a nullptr here
 	assert(p);
@@ -2573,10 +2582,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	static_cast<void>(index2);
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2588,8 +2597,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2601,9 +2610,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2635,8 +2644,8 @@ RSBD8_FUNC_INLINE void splitparameter()noexcept{
 
 // utility template to either retrieve the first-level source or output another pointer for second-level indirection
 template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>){
-	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
+RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2676,7 +2685,7 @@ RSBD8_FUNC_INLINE auto indirectinput1(V *p, vararguments... varparameters)noexce
 
 // utility template to retrieve the second-level source
 template<auto indirection1, std::ptrdiff_t indirection2, bool isindexed2, bool isextraparam, typename T, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *pintermediate, vararguments... varparameters)noexcept{
+RSBD8_FUNC_INLINE auto indirectinput2(std::byte const *RSBD8_RESTRICT pintermediate, vararguments... varparameters)noexcept{
 	// do not pass a nullptr here
 	assert(pintermediate);
 
@@ -2720,7 +2729,7 @@ struct memberpointerdeducebody;
 // partial specialisation, by std::is_member_function_pointer_v
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
 struct memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, std::enable_if_t<std::is_member_function_pointer_v<decltype(indirection1)>>, vararguments...>{
-	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;
+	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>;
 };
 
 // partial specialisation, by std::is_member_object_pointer_v
@@ -7401,7 +7410,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curm, U &cure)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curm, U &RSBD8_RESTRICT cure)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curp{static_cast<std::int_least16_t>(cure)};
 		if constexpr(isfltpmode){
@@ -7570,7 +7579,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curm, U &cure, T *out)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curm, U &RSBD8_RESTRICT cure, T *RSBD8_RESTRICT out)noexcept{
 	// do not pass a nullptr here
 	assert(out);
 
@@ -7762,7 +7771,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curm, U &cure, T *out, T *dst)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curm, U &RSBD8_RESTRICT cure, T *RSBD8_RESTRICT out, T *RSBD8_RESTRICT dst)noexcept{
 	assert(out != dst);
 	// do not pass a nullptr here
 	assert(out);
@@ -7968,7 +7977,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curma, U &curea, std::uint_least64_t &curmb, U &cureb)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curma, U &RSBD8_RESTRICT curea, std::uint_least64_t &RSBD8_RESTRICT curmb, U &RSBD8_RESTRICT cureb)noexcept{
 	using W = decltype(T::signexponent);
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::int_least16_t curpa{static_cast<std::int_least16_t>(curea)};
@@ -8271,7 +8280,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, std::uint_least64_t &curmb, U &cureb, T *outb)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curma, U &RSBD8_RESTRICT curea, T *RSBD8_RESTRICT outa, std::uint_least64_t &RSBD8_RESTRICT curmb, U &RSBD8_RESTRICT cureb, T *RSBD8_RESTRICT outb)noexcept{
 	assert(outa != outb);
 	// do not pass a nullptr here
 	assert(outa);
@@ -8606,7 +8615,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(std::uint_least64_t &curma, U &curea, T *outa, T *dsta, std::uint_least64_t &curmb, U &cureb, T *outb, T *dstb)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curma, U &RSBD8_RESTRICT curea, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, std::uint_least64_t &RSBD8_RESTRICT curmb, U &RSBD8_RESTRICT cureb, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb)noexcept{
 	assert(outa != dsta);
 	assert(dsta != outb);
 	assert(outb != dstb);
@@ -8965,7 +8974,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curlo, std::uint_least64_t &RSBD8_RESTRICT curhi)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9068,7 +9077,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curlo, std::uint_least64_t &RSBD8_RESTRICT curhi, T *RSBD8_RESTRICT out)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9191,7 +9200,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curlo, std::uint_least64_t &curhi, T *out, T *dst)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curlo, std::uint_least64_t &RSBD8_RESTRICT curhi, T *RSBD8_RESTRICT out, T *RSBD8_RESTRICT dst)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9328,7 +9337,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, std::uint_least64_t &curlob, std::uint_least64_t &curhib)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curloa, std::uint_least64_t &RSBD8_RESTRICT curhia, std::uint_least64_t &RSBD8_RESTRICT curlob, std::uint_least64_t &RSBD8_RESTRICT curhib)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9493,7 +9502,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curloa, std::uint_least64_t &RSBD8_RESTRICT curhia, T *RSBD8_RESTRICT outa, std::uint_least64_t &RSBD8_RESTRICT curlob, std::uint_least64_t &RSBD8_RESTRICT curhib, T *RSBD8_RESTRICT outb)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9691,7 +9700,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> filterinput(std::uint_least64_t &curloa, std::uint_least64_t &curhia, T *outa, T *dsta, std::uint_least64_t &curlob, std::uint_least64_t &curhib, T *outb, T *dstb)noexcept{
+	void> filterinput(std::uint_least64_t &RSBD8_RESTRICT curloa, std::uint_least64_t &RSBD8_RESTRICT curhia, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, std::uint_least64_t &RSBD8_RESTRICT curlob, std::uint_least64_t &RSBD8_RESTRICT curhib, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -9923,7 +9932,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cur)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cur)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curp{static_cast<std::make_signed_t<T>>(cur)};
 		if constexpr(!issignmode || isfltpmode){
@@ -9952,7 +9961,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cur, T *out)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cur, T *RSBD8_RESTRICT out)noexcept{
 	// do not pass a nullptr here
 	assert(out);
 
@@ -9986,7 +9995,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cur, T *out, T *dst)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cur, T *RSBD8_RESTRICT out, T *RSBD8_RESTRICT dst)noexcept{
 	assert(out != dst);
 	// do not pass a nullptr here
 	assert(out);
@@ -10027,7 +10036,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, U &curb)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, U &RSBD8_RESTRICT curb)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(!issignmode || isfltpmode){
@@ -10076,7 +10085,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, U &curb, T *outb)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb)noexcept{
 	assert(outa != outb);
 	// do not pass a nullptr here
 	assert(outa);
@@ -10134,7 +10143,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb)noexcept{
 	assert(outa != dsta);
 	assert(dsta != outb);
 	assert(outb != dstb);
@@ -10202,7 +10211,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, U &curb, U &curc)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, U &RSBD8_RESTRICT curb, U &RSBD8_RESTRICT curc)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(!issignmode || isfltpmode){
@@ -10266,7 +10275,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc)noexcept{
 	assert(outa != outb);
 	assert(outb != outc);
 	// do not pass a nullptr here
@@ -10344,7 +10353,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc, T *RSBD8_RESTRICT dstc)noexcept{
 	assert(outa != dsta);
 	assert(dsta != outb);
 	assert(outb != dstb);
@@ -10437,7 +10446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, U &curb, U &curc, U &curd)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, U &RSBD8_RESTRICT curb, U &RSBD8_RESTRICT curc, U &RSBD8_RESTRICT curd)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(!issignmode || isfltpmode){
@@ -10516,7 +10525,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc, U &curd, T *outd)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc, U &RSBD8_RESTRICT curd, T *RSBD8_RESTRICT outd)noexcept{
 	assert(outa != outb);
 	assert(outb != outc);
 	assert(outc != outd);
@@ -10614,7 +10623,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc, U &curd, T *outd, T *dstd)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc, T *RSBD8_RESTRICT dstc, U &RSBD8_RESTRICT curd, T *RSBD8_RESTRICT outd, T *RSBD8_RESTRICT dstd)noexcept{
 	assert(outa != dsta);
 	assert(dsta != outb);
 	assert(outb != dstb);
@@ -10732,7 +10741,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, U &curb, U &curc, U &curd, U &cure, U &curf, U &curg, U &curh)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, U &RSBD8_RESTRICT curb, U &RSBD8_RESTRICT curc, U &RSBD8_RESTRICT curd, U &RSBD8_RESTRICT cure, U &RSBD8_RESTRICT curf, U &RSBD8_RESTRICT curg, U &RSBD8_RESTRICT curh)noexcept{
 	if constexpr(isabsvalue != isfltpmode){// two-register filtering
 		std::make_signed_t<T> curpa{static_cast<std::make_signed_t<T>>(cura)};
 		if constexpr(!issignmode || isfltpmode){
@@ -10871,7 +10880,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, U &curb, T *outb, U &curc, T *outc, U &curd, T *outd, U &cure, T *oute, U &curf, T *outf, U &curg, T *outg, U &curh, T *outh)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc, U &RSBD8_RESTRICT curd, T *RSBD8_RESTRICT outd, U &RSBD8_RESTRICT cure, T *RSBD8_RESTRICT oute, U &RSBD8_RESTRICT curf, T *RSBD8_RESTRICT outf, U &RSBD8_RESTRICT curg, T *RSBD8_RESTRICT outg, U &RSBD8_RESTRICT curh, T *RSBD8_RESTRICT outh)noexcept{
 	assert(outa != outb);
 	assert(outb != outc);
 	assert(outc != outd);
@@ -11049,7 +11058,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	64u >= CHAR_BIT * sizeof(T) &&
 	std::is_unsigned_v<U> &&
 	64u >= CHAR_BIT * sizeof(U),
-	void> filterinput(U &cura, T *outa, T *dsta, U &curb, T *outb, T *dstb, U &curc, T *outc, T *dstc, U &curd, T *outd, T *dstd, U &cure, T *oute, T *dste, U &curf, T *outf, T *dstf, U &curg, T *outg, T *dstg, U &curh, T *outh, T *dsth)noexcept{
+	void> filterinput(U &RSBD8_RESTRICT cura, T *RSBD8_RESTRICT outa, T *RSBD8_RESTRICT dsta, U &RSBD8_RESTRICT curb, T *RSBD8_RESTRICT outb, T *RSBD8_RESTRICT dstb, U &RSBD8_RESTRICT curc, T *RSBD8_RESTRICT outc, T *RSBD8_RESTRICT dstc, U &RSBD8_RESTRICT curd, T *RSBD8_RESTRICT outd, T *RSBD8_RESTRICT dstd, U &RSBD8_RESTRICT cure, T *RSBD8_RESTRICT oute, T *RSBD8_RESTRICT dste, U &RSBD8_RESTRICT curf, T *RSBD8_RESTRICT outf, T *RSBD8_RESTRICT dstf, U &RSBD8_RESTRICT curg, T *RSBD8_RESTRICT outg, T *RSBD8_RESTRICT dstg, U &RSBD8_RESTRICT curh, T *RSBD8_RESTRICT outh, T *RSBD8_RESTRICT dsth)noexcept{
 	assert(outa != dsta);
 	assert(dsta != outb);
 	assert(outb != dstb);
@@ -11261,13 +11270,211 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
+// Utilities to produce the sums along entire offset arrays
+
+template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
+RSBD8_FUNC_NORMAL std::enable_if_t<
+	std::is_unsigned_v<X>,
+	void> accumulateoffsetsarrays(unsigned num, offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> &RSBD8_RESTRICT accumulator, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT addends)noexcept{
+	// do not pass a nullptr here
+	assert(addends);
+
+	// all loops here will usually inline and auto-vectorise items
+	// if more fine-tuning is required, manually vectorising this part shoud be easy for target architectures
+	while(7u <= num)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(unlikely)
+		[[unlikely]]
+#endif
+		{
+		auto const &RSBD8_RESTRICT r0{addends[0].get()};
+		auto const *RSBD8_RESTRICT p0{r0.data()};
+		auto const &RSBD8_RESTRICT r1{addends[1].get()};
+		auto const *RSBD8_RESTRICT p1{r1.data()};
+		auto const &RSBD8_RESTRICT r2{addends[2].get()};
+		auto const *RSBD8_RESTRICT p2{r2.data()};
+		auto const &RSBD8_RESTRICT r3{addends[3].get()};
+		auto const *RSBD8_RESTRICT p3{r3.data()};
+		auto const &RSBD8_RESTRICT r4{addends[4].get()};
+		auto const *RSBD8_RESTRICT p4{r4.data()};
+		auto const &RSBD8_RESTRICT r5{addends[5].get()};
+		auto const *RSBD8_RESTRICT p5{r5.data()};
+		auto const &RSBD8_RESTRICT r6{addends[6].get()};
+		auto const *RSBD8_RESTRICT p6{r6.data()};
+		for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+			[[likely]]
+#endif
+			{
+			auto aa{elem};
+			auto a0{*p0++};
+			auto a1{*p1++};
+			auto a2{*p2++};
+			aa += *p3++;
+			a0 += *p4++;
+			a1 += *p5++;
+			a2 += *p6++;
+			aa += a0;
+			a1 += a2;
+			aa += a1;
+			elem = aa;
+		}
+		num -= 7u;
+		addends += 7;
+	}
+	switch(num){
+	case 6u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			auto const &RSBD8_RESTRICT r1{addends[1].get()};
+			auto const *RSBD8_RESTRICT p1{r1.data()};
+			auto const &RSBD8_RESTRICT r2{addends[2].get()};
+			auto const *RSBD8_RESTRICT p2{r2.data()};
+			auto const &RSBD8_RESTRICT r3{addends[3].get()};
+			auto const *RSBD8_RESTRICT p3{r3.data()};
+			auto const &RSBD8_RESTRICT r4{addends[4].get()};
+			auto const *RSBD8_RESTRICT p4{r4.data()};
+			auto const &RSBD8_RESTRICT r5{addends[5].get()};
+			auto const *RSBD8_RESTRICT p5{r5.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				auto a0{*p0++};
+				auto a1{*p1++};
+				aa += *p2++;
+				a0 += *p3++;
+				a1 += *p4++;
+				aa += *p5++;
+				a0 += a1;
+				aa += a0;
+				elem = aa;
+			}
+		}
+		break;
+	case 5u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			auto const &RSBD8_RESTRICT r1{addends[1].get()};
+			auto const *RSBD8_RESTRICT p1{r1.data()};
+			auto const &RSBD8_RESTRICT r2{addends[2].get()};
+			auto const *RSBD8_RESTRICT p2{r2.data()};
+			auto const &RSBD8_RESTRICT r3{addends[3].get()};
+			auto const *RSBD8_RESTRICT p3{r3.data()};
+			auto const &RSBD8_RESTRICT r4{addends[4].get()};
+			auto const *RSBD8_RESTRICT p4{r4.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				auto a0{*p0++};
+				auto a1{*p1++};
+				aa += *p2++;
+				a0 += *p3++;
+				a1 += *p4++;
+				aa += a0;
+				aa += a1;
+				elem = aa;
+			}
+		}
+		break;
+	case 4u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			auto const &RSBD8_RESTRICT r1{addends[1].get()};
+			auto const *RSBD8_RESTRICT p1{r1.data()};
+			auto const &RSBD8_RESTRICT r2{addends[2].get()};
+			auto const *RSBD8_RESTRICT p2{r2.data()};
+			auto const &RSBD8_RESTRICT r3{addends[3].get()};
+			auto const *RSBD8_RESTRICT p3{r3.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				auto a0{*p0++};
+				aa += *p1++;
+				a0 += *p2++;
+				aa += *p3++;
+				aa += a0;
+				elem = aa;
+			}
+		}
+		break;
+	case 3u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			auto const &RSBD8_RESTRICT r1{addends[1].get()};
+			auto const *RSBD8_RESTRICT p1{r1.data()};
+			auto const &RSBD8_RESTRICT r2{addends[2].get()};
+			auto const *RSBD8_RESTRICT p2{r2.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				auto a0{*p0++};
+				aa += *p1++;
+				a0 += *p2++;
+				aa += a0;
+				elem = aa;
+			}
+		}
+		break;
+	case 2u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			auto const &RSBD8_RESTRICT r1{addends[1].get()};
+			auto const *RSBD8_RESTRICT p1{r1.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				aa += *p0++;
+				aa += *p1++;
+				elem = aa;
+			}
+		}
+		break;
+	case 1u:
+		{
+			auto const &RSBD8_RESTRICT r0{addends[0].get()};
+			auto const *RSBD8_RESTRICT p0{r0.data()};
+			for(auto &RSBD8_RESTRICT elem : accumulator)
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
+				[[likely]]
+#endif
+				{
+				auto aa{elem};
+				aa += *p0++;
+				elem = aa;
+			}
+		}
+		break;
+	default:
+		assert(!num);
+	}
+}
+
 // Utilities to implement the index counts to offsets transforms
 
 // version for both threads when multithreading is used at run time (writes a full set of offsets in this case)
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetshelpernotshared(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetshelpernotshared(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -11506,7 +11713,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetssinglemtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetssinglemtc(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -11635,7 +11842,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetssinglehelpermain(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetssinglehelpermain(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -11768,7 +11975,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetssinglehelpermain(std::size_t count, X offsets[])noexcept{
+	unsigned> generateoffsetssinglehelpermain(std::size_t count, X *RSBD8_RESTRICT offsets)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
@@ -12008,7 +12215,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u <= CHAR_BIT * sizeof(T),
-	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0u)noexcept{
+	unsigned> generateoffsetssinglemain(std::size_t count, X *RSBD8_RESTRICT offsets, std::nullptr_t = nullptr, unsigned = 0u)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	// do not pass a nullptr here
 	assert(offsets);
@@ -12249,7 +12456,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u <= CHAR_BIT * sizeof(T),
-	unsigned> generateoffsetssinglemain(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread)noexcept{
+	unsigned> generateoffsetssinglemain(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion, unsigned usemultithread)noexcept{
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
@@ -12270,7 +12477,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetshelpersharedlowerhalf(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetshelpersharedlowerhalf(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -12288,7 +12495,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typename X, unsigned setradix>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X>,
-	unsigned> generateoffsetshelpersharedupperhalf(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	unsigned> generateoffsetshelpersharedupperhalf(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -12311,7 +12518,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	std::array<unsigned, 2>> generateoffsetsmultimtc(std::size_t count, X offsets[], X offsetscompanion[])noexcept{
+	std::array<unsigned, 2>> generateoffsetsmultimtc(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
 	assert(offsets);
@@ -12471,7 +12678,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	std::array<unsigned, 2>> generateoffsetsmultimain(std::size_t count, X offsets[], X offsetscompanion[], unsigned usemultithread, unsigned paritybool = 0u)noexcept{
+	std::array<unsigned, 2>> generateoffsetsmultimain(std::size_t count, X *RSBD8_RESTRICT offsets, X *RSBD8_RESTRICT offsetscompanion, unsigned usemultithread, unsigned paritybool = 0u)noexcept{
 	assert(offsets != offsetscompanion);
 	assert(!usemultithread || offsetscompanion);
 	// do not pass a nullptr here
@@ -12742,7 +12949,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	std::array<unsigned, 2>> generateoffsetsmultimain(std::size_t count, X offsets[], std::nullptr_t = nullptr, unsigned = 0u, unsigned paritybool = 0u)noexcept{
+	std::array<unsigned, 2>> generateoffsetsmultimain(std::size_t count, X *RSBD8_RESTRICT offsets, std::nullptr_t = nullptr, unsigned = 0u, unsigned paritybool = 0u)noexcept{
 	// do not pass a nullptr here
 	assert(offsets);
 
@@ -13100,8 +13307,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
-	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const, T> *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -13118,7 +13325,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			T *pdst{splitparameter<false>(varparameters...)};
+			T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -13269,8 +13476,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		}else{// !isinputconst
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-			T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+			T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			do
@@ -13600,7 +13807,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -13614,10 +13821,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -13654,8 +13861,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 			std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 			std::size_t offsetb{poffset[curb]--};
-			T *pwa = pdst + offseta;
-			T *pwb = pdst + offsetb;
+			T *RSBD8_RESTRICT pwa = pdst + offseta;
+			T *RSBD8_RESTRICT pwb = pdst + offsetb;
 			pwa[0].signexponent = static_cast<W>(outea);
 			pwa[0].mantissa = outma;
 			pwb[0].signexponent = static_cast<W>(outeb);
@@ -13721,8 +13928,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]--};// the next item will be placed one lower
 				std::size_t offsetb{poffset[curb]--};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -13751,10 +13958,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::size_t offsetb{poffset[curb]--};
 				std::size_t offsetc{poffset[curc]--};
 				std::size_t offsetd{poffset[curd]--};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				T *pwc = pdst + offsetc;
-				T *pwd = pdst + offsetd;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwc = pdst + offsetc;
+				T *RSBD8_RESTRICT pwd = pdst + offsetd;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -13823,8 +14030,8 @@ handlebelowtop:
 					auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 					std::size_t offseta{offsetscompanion[cura + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
 					std::size_t offsetb{offsetscompanion[curb + (4u << 11) + (2u << 10)]--};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
+					T *RSBD8_RESTRICT pwa = pdst + offseta;
+					T *RSBD8_RESTRICT pwb = pdst + offsetb;
 					pwa[0].signexponent = static_cast<W>(outea);
 					pwa[0].mantissa = outma;
 					pwb[0].signexponent = static_cast<W>(outeb);
@@ -13853,10 +14060,10 @@ handlebelowtop:
 					std::size_t offsetb{offsetscompanion[curb + (5u << 11) + (1u << 9)]--};
 					std::size_t offsetc{offsetscompanion[curc + (5u << 11) + (1u << 9)]--};
 					std::size_t offsetd{offsetscompanion[curd + (5u << 11) + (1u << 9)]--};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					T *pwc = pdst + offsetc;
-					T *pwd = pdst + offsetd;
+					T *RSBD8_RESTRICT pwa = pdst + offseta;
+					T *RSBD8_RESTRICT pwb = pdst + offsetb;
+					T *RSBD8_RESTRICT pwc = pdst + offsetc;
+					T *RSBD8_RESTRICT pwd = pdst + offsetd;
 					pwa[0].signexponent = static_cast<W>(outea);
 					pwa[0].mantissa = outma;
 					pwb[0].signexponent = static_cast<W>(outeb);
@@ -13906,8 +14113,8 @@ handletop:
 				auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 				std::size_t offseta{offsetscompanion[cura + (1u << 8) + (4u << 11) + (2u << 10)]--};// the next item will be placed one lower
 				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (4u << 11) + (2u << 10)]--};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -13936,10 +14143,10 @@ handletop:
 				std::size_t offsetb{offsetscompanion[curb + (1u << 8) + (5u << 11) + (1u << 9)]--};
 				std::size_t offsetc{offsetscompanion[curc + (1u << 8) + (5u << 11) + (1u << 9)]--};
 				std::size_t offsetd{offsetscompanion[curd + (1u << 8) + (5u << 11) + (1u << 9)]--};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				T *pwc = pdst + offsetc;
-				T *pwd = pdst + offsetd;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwc = pdst + offsetc;
+				T *RSBD8_RESTRICT pwd = pdst + offsetd;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -13963,7 +14170,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 	assert(count && count != SIZE_MAX);
@@ -13977,10 +14184,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -14018,8 +14225,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto[cura, curb]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -14030,12 +14237,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outm{psrclo[0].mantissa};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outm & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outm >> 32), oute, shifter)};// decompose
 				std::size_t offset{poffset[cur]};
-				T *pw = pdst + offset;
+				T *RSBD8_RESTRICT pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
 				pw[0].mantissa = outm;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -14052,8 +14259,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto[curlo, curhi]{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outmlo & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmlo >> 32), outelo, static_cast<std::uint_least32_t>(outmhi & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmhi >> 32), outehi, shifter)};// decompose
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-				T *pwlo = pdst + offsetlo;
-				T *pwhi = pdst + offsethi;
+				T *RSBD8_RESTRICT pwlo = pdst + offsetlo;
+				T *RSBD8_RESTRICT pwhi = pdst + offsethi;
 				pwlo[0].signexponent = static_cast<W>(outelo);
 				pwlo[0].mantissa = outmlo;
 				pwhi[0].signexponent = static_cast<W>(outehi);
@@ -14064,7 +14271,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::uint_least64_t outm{psrclo[0].mantissa};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outm & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outm >> 32), oute, shifter)};// decompose
 				std::size_t offset{poffset[cur]};
-				T *pw = pdst + offset;
+				T *RSBD8_RESTRICT pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
 				pw[0].mantissa = outm;
 			}
@@ -14122,8 +14329,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto[cura, curb]{filtershifthi<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb, shifter)};// decompose
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -14152,10 +14359,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::size_t offsetb{poffset[curb]++};
 				std::size_t offsetc{poffset[curc]++};
 				std::size_t offsetd{poffset[curd]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
-				T *pwc = pdst + offsetc;
-				T *pwd = pdst + offsetd;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwc = pdst + offsetc;
+				T *RSBD8_RESTRICT pwd = pdst + offsetd;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -14174,8 +14381,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				auto[cura, curb]{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb, shifter)};
 				std::size_t offseta{poffset[cura]++};// the next item will be placed one higher
 				std::size_t offsetb{poffset[curb]++};
-				T *pwa = pdst + offseta;
-				T *pwb = pdst + offsetb;
+				T *RSBD8_RESTRICT pwa = pdst + offseta;
+				T *RSBD8_RESTRICT pwb = pdst + offsetb;
 				pwa[0].signexponent = static_cast<W>(outea);
 				pwa[0].mantissa = outma;
 				pwb[0].signexponent = static_cast<W>(outeb);
@@ -14191,12 +14398,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
 #endif
 				std::size_t offset{poffset[cur]};
-				T *pw = pdst + offset;
+				T *RSBD8_RESTRICT pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
 				pw[0].mantissa = outm;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -14217,8 +14424,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 #endif
 				std::size_t offsetlo{poffset[curlo]++};// the next item will be placed one higher
 				std::size_t offsethi{poffset[curhi + offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-				T *pwlo = pdst + offsetlo;
-				T *pwhi = pdst + offsethi;
+				T *RSBD8_RESTRICT pwlo = pdst + offsetlo;
+				T *RSBD8_RESTRICT pwhi = pdst + offsethi;
 				pwlo[0].signexponent = static_cast<W>(outelo);
 				pwlo[0].mantissa = outmlo;
 				pwhi[0].signexponent = static_cast<W>(outehi);
@@ -14233,7 +14440,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(outm, oute, shifter)};
 #endif
 				std::size_t offset{poffset[cur]};
-				T *pw = pdst + offset;
+				T *RSBD8_RESTRICT pw = pdst + offset;
 				pw[0].signexponent = static_cast<W>(oute);
 				pw[0].mantissa = outm;
 			}
@@ -14299,8 +14506,8 @@ handlebelowtop:
 						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 						std::size_t offseta{offsets[cura + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (4u << 11) + (2u << 10)]++};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
+						T *RSBD8_RESTRICT pwa = pdst + offseta;
+						T *RSBD8_RESTRICT pwb = pdst + offsetb;
 						pwa[0].signexponent = static_cast<W>(outea);
 						pwa[0].mantissa = outma;
 						pwb[0].signexponent = static_cast<W>(outeb);
@@ -14329,10 +14536,10 @@ handlebelowtop:
 						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
 						std::size_t offsetc{offsets[curc + (5u << 11) + (1u << 9)]++};
 						std::size_t offsetd{offsets[curd + (5u << 11) + (1u << 9)]++};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
-						T *pwc = pdst + offsetc;
-						T *pwd = pdst + offsetd;
+						T *RSBD8_RESTRICT pwa = pdst + offseta;
+						T *RSBD8_RESTRICT pwb = pdst + offsetb;
+						T *RSBD8_RESTRICT pwc = pdst + offsetc;
+						T *RSBD8_RESTRICT pwd = pdst + offsetd;
 						pwa[0].signexponent = static_cast<W>(outea);
 						pwa[0].mantissa = outma;
 						pwb[0].signexponent = static_cast<W>(outeb);
@@ -14351,8 +14558,8 @@ handlebelowtop:
 						auto[cura, curb]{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
 						std::size_t offseta{offsets[cura + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
 						std::size_t offsetb{offsets[curb + (5u << 11) + (1u << 9)]++};
-						T *pwa = pdst + offseta;
-						T *pwb = pdst + offsetb;
+						T *RSBD8_RESTRICT pwa = pdst + offseta;
+						T *RSBD8_RESTRICT pwb = pdst + offsetb;
 						pwa[0].signexponent = static_cast<W>(outea);
 						pwa[0].mantissa = outma;
 						pwb[0].signexponent = static_cast<W>(outeb);
@@ -14374,12 +14581,12 @@ handlebelowtop:
 							(5u << 11) + (1u << 9)
 #endif
 						]};
-						T *pw = pdst + offset;
+						T *RSBD8_RESTRICT pw = pdst + offset;
 						pw[0].signexponent = static_cast<W>(oute);
 						pw[0].mantissa = outm;
 					}
 				}else{// !ismultithreadcapable
-					T const *psrchi{psrclo + count};
+					T const *RSBD8_RESTRICT psrchi{psrclo + count};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -14412,8 +14619,8 @@ handlebelowtop:
 							(5u << 11) + (1u << 9)
 #endif
 							+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-						T *pwlo = pdst + offsetlo;
-						T *pwhi = pdst + offsethi;
+						T *RSBD8_RESTRICT pwlo = pdst + offsetlo;
+						T *RSBD8_RESTRICT pwhi = pdst + offsethi;
 						pwlo[0].signexponent = static_cast<W>(outelo);
 						pwlo[0].mantissa = outmlo;
 						pwhi[0].signexponent = static_cast<W>(outehi);
@@ -14434,7 +14641,7 @@ handlebelowtop:
 							(5u << 11) + (1u << 9)
 #endif
 							]};
-						T *pw = pdst + offset;
+						T *RSBD8_RESTRICT pw = pdst + offset;
 						pw[0].signexponent = static_cast<W>(oute);
 						pw[0].mantissa = outm;
 					}
@@ -14481,8 +14688,8 @@ handletop:
 					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(static_cast<std::uint_least32_t>(outma & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outma >> 32), outea, static_cast<std::uint_least32_t>(outmb & 0xFFFFFFFFu), static_cast<std::uint_least32_t>(outmb >> 32), outeb)};// decompose
 					std::size_t offseta{offsets[cura + (1u << 8) + (4u << 11) + (2u << 10)]++};// the next item will be placed one higher
 					std::size_t offsetb{offsets[curb + (1u << 8) + (4u << 11) + (2u << 10)]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
+					T *RSBD8_RESTRICT pwa = pdst + offseta;
+					T *RSBD8_RESTRICT pwb = pdst + offsetb;
 					pwa[0].signexponent = static_cast<W>(outea);
 					pwa[0].mantissa = outma;
 					pwb[0].signexponent = static_cast<W>(outeb);
@@ -14511,10 +14718,10 @@ handletop:
 					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
 					std::size_t offsetc{offsets[curc + (1u << 8) + (5u << 11) + (1u << 9)]++};
 					std::size_t offsetd{offsets[curd + (1u << 8) + (5u << 11) + (1u << 9)]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
-					T *pwc = pdst + offsetc;
-					T *pwd = pdst + offsetd;
+					T *RSBD8_RESTRICT pwa = pdst + offseta;
+					T *RSBD8_RESTRICT pwb = pdst + offsetb;
+					T *RSBD8_RESTRICT pwc = pdst + offsetc;
+					T *RSBD8_RESTRICT pwd = pdst + offsetd;
 					pwa[0].signexponent = static_cast<W>(outea);
 					pwa[0].mantissa = outma;
 					pwb[0].signexponent = static_cast<W>(outeb);
@@ -14533,8 +14740,8 @@ handletop:
 					auto[cura, curb]{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(outma, outea, outmb, outeb)};
 					std::size_t offseta{offsets[cura + (1u << 8) + (5u << 11) + (1u << 9)]++};// the next item will be placed one higher
 					std::size_t offsetb{offsets[curb + (1u << 8) + (5u << 11) + (1u << 9)]++};
-					T *pwa = pdst + offseta;
-					T *pwb = pdst + offsetb;
+					T *RSBD8_RESTRICT pwa = pdst + offseta;
+					T *RSBD8_RESTRICT pwb = pdst + offsetb;
 					pwa[0].signexponent = static_cast<W>(outea);
 					pwa[0].mantissa = outma;
 					pwb[0].signexponent = static_cast<W>(outeb);
@@ -14556,12 +14763,12 @@ handletop:
 						(1u << 8) + (5u << 11) + (1u << 9)
 #endif
 						]};
-					T *pw = pdst + offset;
+					T *RSBD8_RESTRICT pw = pdst + offset;
 					pw[0].signexponent = static_cast<W>(oute);
 					pw[0].mantissa = outm;
 				}
 			}else{// !ismultithreadcapable
-				T const *psrchi{psrclo + count};
+				T const *RSBD8_RESTRICT psrchi{psrclo + count};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -14594,8 +14801,8 @@ handletop:
 						(1u << 8) + (5u << 11) + (1u << 9)
 #endif
 						+ offsetslength<isabsvalue, issignmode, isfltpmode, T>]--};// the next item will be placed one lower
-					T *pwlo = pdst + offsetlo;
-					T *pwhi = pdst + offsethi;
+					T *RSBD8_RESTRICT pwlo = pdst + offsetlo;
+					T *RSBD8_RESTRICT pwhi = pdst + offsethi;
 					pwlo[0].signexponent = static_cast<W>(outelo);
 					pwlo[0].mantissa = outmlo;
 					pwhi[0].signexponent = static_cast<W>(outehi);
@@ -14616,7 +14823,7 @@ handletop:
 						(1u << 8) + (5u << 11) + (1u << 9)
 #endif
 						]};
-					T *pw = pdst + offset;
+					T *RSBD8_RESTRICT pw = pdst + offset;
 					pw[0].signexponent = static_cast<W>(oute);
 					pw[0].mantissa = outm;
 				}
@@ -14634,7 +14841,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -14649,24 +14856,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -14724,7 +14922,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *pdst{buffer}, *pdstnext{output};// for the next iteration
+		T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -14748,13 +14946,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -14777,7 +14975,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -14795,7 +14993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -14841,9 +15039,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
-			T const *pinput{input + count};
-			T *poutput{output};
-			T *pbuffer{buffer};
+			T const *RSBD8_RESTRICT pinput{input + count};
+			T *RSBD8_RESTRICT poutput{output};
+			T *RSBD8_RESTRICT pbuffer{buffer};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -15022,8 +15220,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}else{// not in reverse order
-			T const *pinput{input};
-			T *poutput{output};
+			T const *RSBD8_RESTRICT pinput{input};
+			T *RSBD8_RESTRICT poutput{output};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -15185,34 +15383,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -15274,7 +15460,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *pdst{buffer}, *pdstnext{output};// for the next iteration
+			T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				pdst = output;
 				pdstnext = buffer;
@@ -15295,7 +15481,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	(std::is_same_v<T, longdoubletest128<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest96<isabsvalue, issignmode, isfltpmode>> ||
 	std::is_same_v<T, longdoubletest80<isabsvalue, issignmode, isfltpmode>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -15305,24 +15491,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -15380,7 +15557,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *psrclo{input}, *pdst{buffer};
+		T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -15404,13 +15581,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	using W = decltype(T::signexponent);
 	using U = std::conditional_t<128u == CHAR_BIT * sizeof(T), std::uint_least64_t, unsigned>;// assume zero-extension to be basically free for U on basically all modern machines, but do not remove padding
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -15430,7 +15607,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -15448,7 +15625,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -15492,7 +15669,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		if constexpr(isrevorder){
-			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+			T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 			if constexpr(!ismultithreadcapable){
 				pinputlo = input;
 				pinputhi = input + count;
@@ -15758,8 +15935,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}else{// not in reverse order
-			T *pinput{input};
-			T *pbuffer{buffer};
+			T *RSBD8_RESTRICT pinput{input};
+			T *RSBD8_RESTRICT pbuffer{buffer};
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
@@ -15922,34 +16099,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 #endif
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -16011,7 +16176,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *psrclo{input}, *pdst{buffer};
+			T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				psrclo = buffer;
 				pdst = input;
@@ -16033,8 +16198,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
-	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -16060,7 +16225,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			V **pdst{splitparameter<false>(varparameters...)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -16074,11 +16239,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *p{*input};
+				V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -16132,12 +16297,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *plo{input[0]};
-				V *phi{input[1]};
+				V *RSBD8_RESTRICT plo{input[0]};
+				V *RSBD8_RESTRICT phi{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnlo, *pnhi;
+				V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnlo = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -16215,8 +16380,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{// !isinputconst
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-			V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 			// architecture: limit to one at a time when there's few registers
 			do
@@ -16224,12 +16389,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *plo{pinputlo[0]};
-				V *phi{pinputhi[0]};
+				V *RSBD8_RESTRICT plo{pinputlo[0]};
+				V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnlo, *pnhi;
+				V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -16313,12 +16478,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *plo{pinputlo[0]};
-				V *phi{pinputhi[0]};
+				V *RSBD8_RESTRICT plo{pinputlo[0]};
+				V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnlo, *pnhi;
+				V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -16411,11 +16576,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			V *p{input[i]};
+			V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16465,12 +16630,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			V *phi{input[i]};
-			V *plo{input[i - 1]};
+			V *RSBD8_RESTRICT phi{input[i]};
+			V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pnhi, *pnlo;
+			V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16552,7 +16717,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -16575,10 +16740,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -16606,12 +16771,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[likely]]
 #endif
 			{// fill the array, two at a time
-			V *pa{psrchi[0]};
-			V *pb{psrchi[-1]};
+			V *RSBD8_RESTRICT pa{psrchi[0]};
+			V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16652,7 +16817,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -16696,12 +16861,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16731,14 +16896,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16794,7 +16959,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -16834,12 +16999,12 @@ handlebelowtop:
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16869,14 +17034,14 @@ handlebelowtop:
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
-					V *pc{psrchi[-2]};
-					V *pd{psrchi[-3]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pc{psrchi[-2]};
+					V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc, *pnd;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16923,7 +17088,7 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrchi;
 					psrchi += count;
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
@@ -16953,12 +17118,12 @@ handletop:
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -16988,14 +17153,14 @@ handletop:
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -17042,7 +17207,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -17064,10 +17229,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -17100,12 +17265,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17126,8 +17291,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17140,7 +17305,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetb] = pb;
 			}while(--j);
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
@@ -17148,7 +17313,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -17158,14 +17323,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -17185,8 +17350,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -17198,7 +17363,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
@@ -17229,7 +17394,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -17278,12 +17443,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17304,8 +17469,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17329,16 +17494,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17369,10 +17534,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
+				V *RSBD8_RESTRICT pc{psrclo[2]};
+				V *RSBD8_RESTRICT pd{psrclo[3]};
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17393,8 +17558,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17408,7 +17573,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 #endif
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{
@@ -17422,7 +17587,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -17432,14 +17597,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -17465,8 +17630,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -17484,7 +17649,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{
@@ -17522,7 +17687,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -17568,12 +17733,12 @@ handlebelowtop:
 							[[likely]]
 #endif
 							{// fill the array, two at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 2);
 							psrclo += 2;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17594,8 +17759,8 @@ handlebelowtop:
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17619,16 +17784,16 @@ handlebelowtop:
 							[[likely]]
 #endif
 							{// fill the array, four at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							V *pc{psrclo[2]};
-							V *pd{psrclo[3]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
+							V *RSBD8_RESTRICT pc{psrclo[2]};
+							V *RSBD8_RESTRICT pd{psrclo[3]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 4);
 							psrclo += 4;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17659,10 +17824,10 @@ handlebelowtop:
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17683,8 +17848,8 @@ handlebelowtop:
 						pdst[offsetd] = pd;
 					}while(--j);
 					if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17698,7 +17863,7 @@ handlebelowtop:
 					}
 #endif
 					if(!(1u & count)){// fill in the final item for odd counts
-						V *p{psrclo[0]};
+						V *RSBD8_RESTRICT p{psrclo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -17712,7 +17877,7 @@ handlebelowtop:
 						pdst[offset] = p;
 					}
 				}else{// !ismultithreadcapable
-					V *const *psrchi{psrclo + count};
+					V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 					if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -17722,14 +17887,14 @@ handlebelowtop:
 						[[likely]]
 #endif
 						{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo};
-						V *phi{*psrchi};
+						V *RSBD8_RESTRICT plo{*psrclo};
+						V *RSBD8_RESTRICT phi{*psrchi};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 1);
 						++psrclo;
-						V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+						V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 						prefetchbackward(psrchi - 1);
 						--psrchi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -17761,8 +17926,8 @@ handlebelowtop:
 						[[likely]]
 #endif
 						{// fill the array, two at a time: one low-to-middle, one high-to-middle
-						V *plo{*psrclo++};
-						V *phi{*psrchi--};
+						V *RSBD8_RESTRICT plo{*psrclo++};
+						V *RSBD8_RESTRICT phi{*psrchi--};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -17786,7 +17951,7 @@ handlebelowtop:
 						pdst[offsethi] = phi;
 					}while(psrclo < psrchi);
 					if(psrclo == psrchi){// fill in the final item for odd counts
-						V *p{*psrclo};
+						V *RSBD8_RESTRICT p{*psrclo};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 						std::size_t cur{filterbelowtop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -17816,7 +17981,7 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrclo;
 					if constexpr(ismultithreadcapable){
-						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 							if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
@@ -17852,12 +18017,12 @@ handletop:
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17878,8 +18043,8 @@ handletop:
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17903,16 +18068,16 @@ handletop:
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -17943,10 +18108,10 @@ handletop:
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17967,8 +18132,8 @@ handletop:
 					pdst[offsetd] = pd;
 				}while(--j);
 				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -17982,7 +18147,7 @@ handletop:
 				}
 #endif
 				if(!(1u & count)){// fill in the final item for odd counts
-					V *p{psrclo[0]};
+					V *RSBD8_RESTRICT p{psrclo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -17996,7 +18161,7 @@ handletop:
 					pdst[offset] = p;
 				}
 			}else{// !ismultithreadcapable
-				V *const *psrchi{psrclo + count};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 				if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -18006,14 +18171,14 @@ handletop:
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo};
-					V *phi{*psrchi};
+					V *RSBD8_RESTRICT plo{*psrclo};
+					V *RSBD8_RESTRICT phi{*psrchi};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 1);
 					++psrclo;
-					V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					prefetchbackward(psrchi - 1);
 					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -18045,8 +18210,8 @@ handletop:
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *RSBD8_RESTRICT plo{*psrclo++};
+					V *RSBD8_RESTRICT phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -18070,7 +18235,7 @@ handletop:
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
-					V *p{*psrclo};
+					V *RSBD8_RESTRICT p{*psrclo};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -18096,7 +18261,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -18112,34 +18277,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -18152,7 +18308,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -18202,7 +18358,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -18225,13 +18381,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -18263,7 +18419,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -18281,7 +18437,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -18299,8 +18455,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -18321,7 +18477,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -18339,7 +18495,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if 0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX// implies x86-32 architecture
 				// architecture: limit to one at a time when there's few registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-				V *const *pinput{input + (count - i)};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 					// no need to mask out the bits for handling the remainder term after the two loops
 					std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -18348,17 +18504,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *p{*pinput};
+							V *RSBD8_RESTRICT p{*pinput};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(pinput + 1);
 							++pinput;
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -18402,7 +18558,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{*pinput++};
+					V *RSBD8_RESTRICT p{*pinput++};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[i] = p;
 					buffer[i] = p;
@@ -18435,7 +18591,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else// 64-bit and larger systems
 				// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-				V *const *pinput{input + (count - i)};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 					// no need to mask out the bits for handling the remainder term after the two loops
 					std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -18444,19 +18600,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
+							V *RSBD8_RESTRICT plo{pinput[0]};
+							V *RSBD8_RESTRICT phi{pinput[1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(pinput + 2);
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -18533,8 +18689,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinput[0]};
-					V *phi{pinput[1]};
+					V *RSBD8_RESTRICT plo{pinput[0]};
+					V *RSBD8_RESTRICT phi{pinput[1]};
 					pinput += 2;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					output[i] = plo;
@@ -18598,7 +18754,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{pinput[0]};
+					V *RSBD8_RESTRICT p{pinput[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					buffer[0] = p;
@@ -18643,17 +18799,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *p{pinput[j]};
+							V *RSBD8_RESTRICT p{pinput[j]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							pbuffer[j] = p;
@@ -18694,7 +18850,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[i] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -18734,19 +18890,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *phi{pinput[j]};
-							V *plo{pinput[j - 1]};
+							V *RSBD8_RESTRICT phi{pinput[j]};
+							V *RSBD8_RESTRICT plo{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							poutput[j] = phi;
@@ -18819,8 +18975,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					output[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -18881,7 +19037,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -18914,38 +19070,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -18959,7 +19103,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -19012,7 +19156,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					pdst = output;
 					pdstnext = buffer;
@@ -19033,7 +19177,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -19046,32 +19190,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -19084,7 +19219,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -19134,7 +19269,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **psrclo{input}, **pdst{buffer};
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -19157,13 +19292,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -19192,7 +19327,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -19210,7 +19345,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -19228,8 +19363,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -19263,7 +19398,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
-				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -19287,12 +19422,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					// register pressure performance issue on several platforms: first do the low half here
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi = plo;
@@ -19367,8 +19502,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{// very few items, so skip the prefetch
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					// register pressure performance issue on several platforms: first do the low half here
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi = plo;
@@ -19437,7 +19572,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(3u << 11) + (1u << 10) + static_cast<std::size_t>(curmhi4)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
-					V *p{pinputlo[0]};
+					V *RSBD8_RESTRICT p{pinputlo[0]};
 					// no write to input, as this is the midpoint
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					*pbufferhi = p;
@@ -19478,12 +19613,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi = plo;
 					prefetchbackward(pinputhi - 1);
@@ -19559,8 +19694,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{// very few items, so skip the prefetch
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*pbufferhi-- = plo;
@@ -19622,7 +19757,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(4u << 11) + static_cast<std::size_t>(curmhi4)];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
-					V *p{pinputlo[0]};
+					V *RSBD8_RESTRICT p{pinputlo[0]};
 					// no write to input, as this is the midpoint
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					*pbufferhi = p;
@@ -19668,17 +19803,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *p{pinput[j]};
+							V *RSBD8_RESTRICT p{pinput[j]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 1);
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							pbuffer[j] = p;
@@ -19719,7 +19854,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					buffer[i] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -19759,19 +19894,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *phi{pinput[j]};
-							V *plo{pinput[j - 1]};
+							V *RSBD8_RESTRICT phi{pinput[j]};
+							V *RSBD8_RESTRICT plo{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							pbuffer[j] = phi;
@@ -19844,8 +19979,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					buffer[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -19906,7 +20041,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					buffer[0] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -19939,38 +20074,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 #endif
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -19984,7 +20107,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -20037,7 +20160,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **psrclo{input}, **pdst{buffer};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					psrclo = buffer;
 					pdst = input;
@@ -20061,8 +20184,8 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
-	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const, T> *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -20086,7 +20209,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			T *pdst{splitparameter<false>(varparameters...)};
+			T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -20205,8 +20328,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-			T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+			T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -20430,7 +20553,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typ
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -20451,10 +20574,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
@@ -20619,7 +20742,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -20640,10 +20763,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
@@ -20695,7 +20818,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -20801,7 +20924,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -20906,7 +21029,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = out;
 				}
 			}else{// !ismultithreadcapable
-				T const *psrchi{psrclo + count};
+				T const *RSBD8_RESTRICT psrchi{psrclo + count};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -20941,7 +21064,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -20956,24 +21079,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -21031,7 +21145,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *pdst{buffer}, *pdstnext{output};// for the next iteration
+		T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -21052,13 +21166,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -21088,7 +21202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -21106,7 +21220,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -21155,8 +21269,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-			T const *pinput{input + count};
-			T *poutput{output}, *pbuffer{buffer};
+			T const *RSBD8_RESTRICT pinput{input + count};
+			T *RSBD8_RESTRICT poutput{output}, *RSBD8_RESTRICT pbuffer{buffer};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -21315,8 +21429,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{// not in reverse order
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
-			T const *pinput{input};
-			T *poutput{output};
+			T const *RSBD8_RESTRICT pinput{input};
+			T *RSBD8_RESTRICT poutput{output};
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -21454,34 +21568,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -21543,7 +21645,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *pdst{buffer}, *pdstnext{output};// for the next iteration
+			T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				pdst = output;
 				pdstnext = buffer;
@@ -21561,7 +21663,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test128<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -21571,24 +21673,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -21646,7 +21739,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *psrclo{input}, *pdst{buffer};
+		T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -21667,13 +21760,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -21700,7 +21793,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -21718,7 +21811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -21763,7 +21856,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
-			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+			T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 			if constexpr(!ismultithreadcapable){
 				pinputlo = input;
 				pinputhi = input + count;
@@ -21936,8 +22029,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{// not in reverse order
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
-			T *pinput{input};
-			T *pbuffer{buffer};
+			T *RSBD8_RESTRICT pinput{input};
+			T *RSBD8_RESTRICT pbuffer{buffer};
 			if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -22075,34 +22168,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -22164,7 +22245,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *psrclo{input}, *pdst{buffer};
+			T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				psrclo = buffer;
 				pdst = input;
@@ -22187,8 +22268,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
-	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -22213,7 +22294,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			V **pdst{splitparameter<false>(varparameters...)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			// unsigned counter, not zero inclusive inside the loop
@@ -22227,12 +22308,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *phi{input[0]};
-				V *plo{input[1]};
+				V *RSBD8_RESTRICT phi{input[0]};
+				V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnlo, *pnhi;
+				V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnlo = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -22332,19 +22413,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 			// architecture: do not limit as much when there's a reasonable amount of registers
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-			V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
 				{
-				V *plo{pinputlo[0]};
-				V *phi{pinputhi[0]};
+				V *RSBD8_RESTRICT plo{pinputlo[0]};
+				V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnlo, *pnhi;
+				V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -22458,12 +22539,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			V *phi{input[i]};
-			V *plo{input[i - 1]};
+			V *RSBD8_RESTRICT phi{input[i]};
+			V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pnhi, *pnlo;
+			V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -22565,7 +22646,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -22587,10 +22668,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
@@ -22608,14 +22689,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		[[likely]]
 #endif
 		{// fill the array, four at a time
-			V *pa{psrchi[0]};
-			V *pb{psrchi[-1]};
-			V *pc{psrchi[-2]};
-			V *pd{psrchi[-3]};
+			V *RSBD8_RESTRICT pa{psrchi[0]};
+			V *RSBD8_RESTRICT pb{psrchi[-1]};
+			V *RSBD8_RESTRICT pc{psrchi[-2]};
+			V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb, *pnc, *pnd;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -22668,7 +22749,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -22706,14 +22787,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -22768,7 +22849,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -22803,14 +22884,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -22855,7 +22936,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -22877,10 +22958,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
@@ -22903,16 +22984,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -22943,10 +23024,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
+				V *RSBD8_RESTRICT pc{psrclo[2]};
+				V *RSBD8_RESTRICT pd{psrclo[3]};
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -22967,8 +23048,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -22981,7 +23062,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetb] = pb;
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -22989,7 +23070,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -22999,14 +23080,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -23026,8 +23107,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -23039,7 +23120,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -23070,7 +23151,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -23113,16 +23194,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -23153,10 +23234,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
+				V *RSBD8_RESTRICT pc{psrclo[2]};
+				V *RSBD8_RESTRICT pd{psrclo[3]};
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -23177,8 +23258,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -23191,7 +23272,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetb] = pb;
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershifthi<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -23199,7 +23280,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -23209,14 +23290,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -23236,8 +23317,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -23249,7 +23330,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershifthi<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -23281,7 +23362,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -23322,16 +23403,16 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -23362,10 +23443,10 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -23386,8 +23467,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetd] = pd;
 				}while(--j);
 				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -23400,7 +23481,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsetb] = pb;
 				}
 				if(!(1u & count)){// fill in the final item for odd counts
-					V *p{psrclo[0]};
+					V *RSBD8_RESTRICT p{psrclo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
@@ -23408,7 +23489,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}else{// !ismultithreadcapable
-				V *const *psrchi{psrclo + count};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 				if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -23418,14 +23499,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo};
-					V *phi{*psrchi};
+					V *RSBD8_RESTRICT plo{*psrclo};
+					V *RSBD8_RESTRICT phi{*psrchi};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 1);
 					++psrclo;
-					V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					prefetchbackward(psrchi - 1);
 					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -23445,8 +23526,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *RSBD8_RESTRICT plo{*psrclo++};
+					V *RSBD8_RESTRICT phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -23458,7 +23539,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
-					V *p{*psrclo};
+					V *RSBD8_RESTRICT p{*psrclo};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least64_t, std::uint_least64_t>(out.data[HI])};
@@ -23477,7 +23558,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -23493,34 +23574,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -23533,7 +23605,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -23583,7 +23655,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -23605,13 +23677,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -23642,7 +23714,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -23660,7 +23732,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -23678,8 +23750,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -23700,7 +23772,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -23718,7 +23790,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				static_assert(defaultgprfilesize >= gprfilesize::large, "This register file size for any 64-bit or larger architecture is unexpected.");
 				// architecture: do not limit as much when there's a reasonable amount of registers
 				if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-				V *const *pinput{input + (count - i)};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 				if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 					// no need to mask out the bits for handling the remainder term after the two loops
 					std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -23727,20 +23799,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *phi{pinput[0]};
-							V *plo{pinput[1]};
+							V *RSBD8_RESTRICT phi{pinput[0]};
+							V *RSBD8_RESTRICT plo{pinput[1]};
 							pinput += 2;
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							poutput[j] = phi;
@@ -23838,8 +23910,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{pinput[0]};
-					V *plo{pinput[1]};
+					V *RSBD8_RESTRICT phi{pinput[0]};
+					V *RSBD8_RESTRICT plo{pinput[1]};
 					pinput += 2;
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					output[i] = phi;
@@ -23925,7 +23997,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{pinput[0]};
+					V *RSBD8_RESTRICT p{pinput[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					buffer[0] = p;
@@ -23979,19 +24051,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *phi{pinput[j]};
-							V *plo{pinput[j - 1]};
+							V *RSBD8_RESTRICT phi{pinput[j]};
+							V *RSBD8_RESTRICT plo{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							poutput[j] = phi;
@@ -24086,8 +24158,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					output[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -24170,7 +24242,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -24212,38 +24284,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -24257,7 +24317,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -24310,7 +24370,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					pdst = output;
 					pdstnext = buffer;
@@ -24330,7 +24390,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -24343,32 +24403,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -24381,7 +24432,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -24431,7 +24482,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **psrclo{input}, **pdst{buffer};
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -24453,13 +24504,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -24487,7 +24538,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -24505,7 +24556,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -24523,8 +24574,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -24558,7 +24609,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
-				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -24582,12 +24633,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi = plo;
 					prefetchbackward(pinputhi - 1);
@@ -24685,8 +24736,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{// very few items, so skip the prefetch
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					*pinputhi-- = plo;
 					*pbufferhi-- = plo;
@@ -24770,7 +24821,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(curhi.data[HI])];
 				}while(pinputlo < pinputhi);
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
-					V *p{pinputlo[0]};
+					V *RSBD8_RESTRICT p{pinputlo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
@@ -24825,19 +24876,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *phi{pinput[j]};
-							V *plo{pinput[j - 1]};
+							V *RSBD8_RESTRICT phi{pinput[j]};
+							V *RSBD8_RESTRICT plo{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							pbuffer[j] = phi;
@@ -24932,8 +24983,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					buffer[i] = phi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -25016,7 +25067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					buffer[0] = p;
 					auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -25058,38 +25109,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[(10u << 11) + (1u << 9) + static_cast<std::size_t>(cur.data[HI])];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -25103,7 +25142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -25156,7 +25195,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **psrclo{input}, **pdst{buffer};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					psrclo = buffer;
 					pdst = input;
@@ -25180,8 +25219,8 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
-	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const, T> *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -25205,7 +25244,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			T *pdst{splitparameter<false>(varparameters...)};
+			T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -25382,8 +25421,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{// !isinputconst
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-			T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+			T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -25775,7 +25814,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, typ
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -25796,10 +25835,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
@@ -26013,7 +26052,7 @@ template<bool isrevorder, bool isabsvalue, bool issignmode, bool isfltpmode, boo
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -26034,10 +26073,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
@@ -26106,7 +26145,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -26229,7 +26268,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = out;
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -26351,7 +26390,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = out;
 				}
 			}else{// !ismultithreadcapable
-				T const *psrchi{psrclo + count};
+				T const *RSBD8_RESTRICT psrchi{psrclo + count};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -26386,7 +26425,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -26401,24 +26440,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -26476,7 +26506,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *pdst{buffer}, *pdstnext{output};// for the next iteration
+		T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -26497,13 +26527,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -26533,7 +26563,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -26551,7 +26581,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -26598,7 +26628,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
 			if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-			T const *pinput{input + (count - i)};
+			T const *RSBD8_RESTRICT pinput{input + (count - i)};
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -26941,34 +26971,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -27030,7 +27048,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *pdst{buffer}, *pdstnext{output};// for the next iteration
+			T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				pdst = output;
 				pdstnext = buffer;
@@ -27048,7 +27066,7 @@ template<bool isdescsort, bool isrevorder, bool isabsvalue, bool issignmode, boo
 RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_same_v<T, test64<isabsvalue, issignmode, isfltpmode>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -27058,24 +27076,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -27133,7 +27142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *psrclo{input}, *pdst{buffer};
+		T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -27154,13 +27163,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -27187,7 +27196,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -27205,7 +27214,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -27250,7 +27259,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(isrevorder){
-			T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+			T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 			if constexpr(!ismultithreadcapable){
 				pinputlo = input;
 				pinputhi = input + count;
@@ -27693,34 +27702,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -27782,7 +27779,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *psrclo{input}, *pdst{buffer};
+			T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				psrclo = buffer;
 				pdst = input;
@@ -27805,9 +27802,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
-	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
 		// basic endianess detection, relies on proper inlining and compiler optimisation of that
@@ -27831,7 +27828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{};// zeroed in advance here
 	if constexpr(isrevorder){
 		if constexpr(isinputconst){
-			V **pdst{splitparameter<false>(varparameters...)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -27844,11 +27841,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{*input};
+					V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -27901,11 +27898,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{*input};
+					V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -27952,12 +27949,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[0]};
-					V *plo{input[1]};
+					V *RSBD8_RESTRICT phi{input[0]};
+					V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnhi, *pnlo;
+					V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnhi = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -28019,20 +28016,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}else{// !isinputconst
 			// unsigned counter, not zero inclusive inside the loop
 			auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-			V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-			V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+			V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 			if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnlo, *pnhi;
+					V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -28115,12 +28112,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnlo, *pnhi;
+					V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -28191,12 +28188,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *plo{pinputlo[0]};
-					V *phi{pinputhi[0]};
+					V *RSBD8_RESTRICT plo{pinputlo[0]};
+					V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnlo, *pnhi;
+					V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -28272,11 +28269,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *p{input[i]};
+				V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28325,11 +28322,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *p{input[i]};
+				V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28372,12 +28369,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V *phi{input[i]};
-				V *plo{input[i - 1]};
+				V *RSBD8_RESTRICT phi{input[i]};
+				V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pnhi, *pnlo;
+				V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28442,7 +28439,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -28464,10 +28461,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
@@ -28484,12 +28481,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28518,14 +28515,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28579,7 +28576,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -28615,12 +28612,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28649,14 +28646,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28711,7 +28708,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -28745,12 +28742,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28779,14 +28776,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
-					V *pc{psrchi[-2]};
-					V *pd{psrchi[-3]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pc{psrchi[-2]};
+					V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc, *pnd;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -28832,7 +28829,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -28854,10 +28851,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	shifter *= typeradix<T>;
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
@@ -28879,12 +28876,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -28905,8 +28902,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -28929,16 +28926,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -28969,10 +28966,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -28993,8 +28990,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pdst[offsetd] = pd;
 				}while(--j);
 				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29008,7 +29005,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -29016,7 +29013,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -29026,14 +29023,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -29053,8 +29050,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -29066,7 +29063,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershiftlo<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -29097,7 +29094,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -29139,12 +29136,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -29165,8 +29162,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29189,16 +29186,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -29229,10 +29226,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29253,8 +29250,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pdst[offsetd] = pd;
 				}while(--j);
 				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29268,7 +29265,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershifthi<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -29276,7 +29273,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -29286,14 +29283,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -29313,8 +29310,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -29326,7 +29323,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershifthi<isabsvalue, issignmode, isfltpmode>(out, shifter)};
@@ -29358,7 +29355,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -29398,12 +29395,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 							[[likely]]
 #endif
 							{// fill the array, two at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 2);
 							psrclo += 2;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -29424,8 +29421,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29448,16 +29445,16 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 							[[likely]]
 #endif
 							{// fill the array, four at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							V *pc{psrclo[2]};
-							V *pd{psrclo[3]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
+							V *RSBD8_RESTRICT pc{psrclo[2]};
+							V *RSBD8_RESTRICT pd{psrclo[3]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 4);
 							psrclo += 4;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -29488,10 +29485,10 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29512,8 +29509,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						pdst[offsetd] = pd;
 					}while(--j);
 					if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -29527,7 +29524,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					}
 				}
 				if(!(1u & count)){// fill in the final item for odd counts
-					V *p{psrclo[0]};
+					V *RSBD8_RESTRICT p{psrclo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(out.data[HI])};
@@ -29535,7 +29532,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}else{// !ismultithreadcapable
-				V *const *psrchi{psrclo + count};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 				if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -29545,14 +29542,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo};
-					V *phi{*psrchi};
+					V *RSBD8_RESTRICT plo{*psrclo};
+					V *RSBD8_RESTRICT phi{*psrchi};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 1);
 					++psrclo;
-					V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					prefetchbackward(psrchi - 1);
 					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -29572,8 +29569,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *RSBD8_RESTRICT plo{*psrclo++};
+					V *RSBD8_RESTRICT phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					auto outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -29585,7 +29582,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
-					V *p{*psrclo};
+					V *RSBD8_RESTRICT p{*psrclo};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					auto out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, std::uint_least32_t, std::uint_least32_t>(out.data[HI])};
@@ -29604,7 +29601,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -29618,34 +29615,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -29658,7 +29646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -29708,7 +29696,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -29730,13 +29718,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -29765,7 +29753,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -29783,7 +29771,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -29801,8 +29789,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -29823,7 +29811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -29839,7 +29827,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 			if constexpr(isrevorder){
 				if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-				V *const *pinput{input + (count - i)};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 						std::ptrdiff_t j{static_cast<std::ptrdiff_t>(i - prefetchmaxstride / (2u * sizeof(V *)))};
@@ -29848,17 +29836,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{*pinput};
+								V *RSBD8_RESTRICT p{*pinput};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 								prefetchforward(pinput + 1);
 								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -29902,7 +29890,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*pinput++};
+						V *RSBD8_RESTRICT p{*pinput++};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
 						buffer[i] = p;
@@ -29940,17 +29928,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{*pinput};
+								V *RSBD8_RESTRICT p{*pinput};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 								prefetchforward(pinput + 1);
 								++pinput;
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -29988,7 +29976,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*pinput++};
+						V *RSBD8_RESTRICT p{*pinput++};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
 						buffer[i] = p;
@@ -30021,19 +30009,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *plo{pinput[0]};
-								V *phi{pinput[1]};
+								V *RSBD8_RESTRICT plo{pinput[0]};
+								V *RSBD8_RESTRICT phi{pinput[1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 								prefetchforward(pinput + 2);
 								pinput += 2;
 								auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -30094,8 +30082,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinput[0]};
-						V *phi{pinput[1]};
+						V *RSBD8_RESTRICT plo{pinput[0]};
+						V *RSBD8_RESTRICT phi{pinput[1]};
 						pinput += 2;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						output[i] = plo;
@@ -30143,7 +30131,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						i -= 2;
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{pinput[0]};
+						V *RSBD8_RESTRICT p{pinput[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[0] = p;
 						buffer[0] = p;
@@ -30179,17 +30167,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{pinput[j]};
+								V *RSBD8_RESTRICT p{pinput[j]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 								prefetchbackward(pinput + j - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								poutput[j] = p;
@@ -30230,7 +30218,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{input[i]};
+						V *RSBD8_RESTRICT p{input[i]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -30269,17 +30257,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{pinput[j]};
+								V *RSBD8_RESTRICT p{pinput[j]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 								prefetchbackward(pinput + j - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								poutput[j] = p;
@@ -30314,7 +30302,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{input[i]};
+						V *RSBD8_RESTRICT p{input[i]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[i] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -30347,19 +30335,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *phi{pinput[j]};
-								V *plo{pinput[j - 1]};
+								V *RSBD8_RESTRICT phi{pinput[j]};
+								V *RSBD8_RESTRICT plo{pinput[j - 1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								prefetchbackward(pinput + j - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								poutput[j] = phi;
@@ -30416,8 +30404,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
+						V *RSBD8_RESTRICT phi{input[i]};
+						V *RSBD8_RESTRICT plo{input[i - 1]};
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						output[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -30462,7 +30450,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						i -= 2;
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
+						V *RSBD8_RESTRICT p{input[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						output[0] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -30487,38 +30475,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -30532,7 +30508,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -30585,7 +30561,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					pdst = output;
 					pdstnext = buffer;
@@ -30605,7 +30581,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -30618,32 +30594,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -30656,7 +30623,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -30706,7 +30673,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **psrclo{input}, **pdst{buffer};
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -30728,13 +30695,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -30762,7 +30729,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -30780,7 +30747,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -30798,8 +30765,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -30833,7 +30800,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(isrevorder){
-				V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -30856,12 +30823,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+						V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi = plo;
@@ -30936,8 +30903,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{// very few items, so skip the prefetch
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
@@ -31007,12 +30974,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+						V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi = plo;
@@ -31075,8 +31042,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{// very few items, so skip the prefetch
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						// register pressure performance issue on several platforms: first do the low half here
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
@@ -31134,12 +31101,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+						V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi = plo;
 						prefetchbackward(pinputhi - 1);
@@ -31199,8 +31166,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{// very few items, so skip the prefetch
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 						*pinputhi-- = plo;
 						*pbufferhi-- = plo;
@@ -31247,7 +31214,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(pinputlo < pinputhi);
 				}
 				if(pinputlo == pinputhi){// fill in the final item for odd counts
-					V *p{pinputlo[0]};
+					V *RSBD8_RESTRICT p{pinputlo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					// no write to input, as this is the midpoint
 					*pbufferhi = p;
@@ -31283,17 +31250,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{pinput[j]};
+								V *RSBD8_RESTRICT p{pinput[j]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								prefetchbackward(pinput + j - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								pbuffer[j] = p;
@@ -31334,7 +31301,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{input[i]};
+						V *RSBD8_RESTRICT p{input[i]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[i] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -31373,17 +31340,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *p{pinput[j]};
+								V *RSBD8_RESTRICT p{pinput[j]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								prefetchbackward(pinput + j - 1);
 								auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 								pbuffer[j] = p;
@@ -31418,7 +31385,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{input[i]};
+						V *RSBD8_RESTRICT p{input[i]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[i] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -31451,19 +31418,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-							V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+							V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+							V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 							do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 								[[likely]]
 #endif
 								{
-								V *phi{pinput[j]};
-								V *plo{pinput[j - 1]};
+								V *RSBD8_RESTRICT phi{pinput[j]};
+								V *RSBD8_RESTRICT plo{pinput[j - 1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								prefetchbackward(pinput + j - 2);
 								auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 								pbuffer[j] = phi;
@@ -31520,8 +31487,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[i]};
-						V *plo{input[i - 1]};
+						V *RSBD8_RESTRICT phi{input[i]};
+						V *RSBD8_RESTRICT plo{input[i - 1]};
 						auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 						buffer[i] = phi;
 						auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -31566,7 +31533,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						i -= 2;
 					}while(0 < i);
 					if(!(1 & i)){// fill in the final item for odd counts
-						V *p{input[0]};
+						V *RSBD8_RESTRICT p{input[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						buffer[0] = p;
 						auto cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -31591,38 +31558,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -31636,7 +31591,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -31689,7 +31644,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **psrclo{input}, **pdst{buffer};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					psrclo = buffer;
 					pdst = input;
@@ -31715,8 +31670,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const *, T *> input, T pout[], vararguments... varparameters)noexcept{
-	// if isrevorder and isinputconst are set, the parameter is used for T pdst[]
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, T const, T> *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept{
+	// if isrevorder and isinputconst are set, the parameter is used for T *RSBD8_RESTRICT pdst
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
@@ -31733,7 +31688,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -31902,8 +31857,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-				T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+				T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -32294,7 +32249,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(56u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -32422,8 +32377,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-				T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+				T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -32703,7 +32658,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(48u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -32822,8 +32777,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-				T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+				T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -33082,7 +33037,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(40u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -33192,8 +33147,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-				T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+				T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -33429,7 +33384,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(32u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -33572,8 +33527,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -33639,8 +33594,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -33700,8 +33655,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<6>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -33940,7 +33895,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(24u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -34045,8 +34000,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -34106,8 +34061,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<6>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -34313,7 +34268,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(16u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				T *pdst{splitparameter<false>(varparameters...)};
+				T *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -34417,8 +34372,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -34472,8 +34427,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<4>(assignedslice, allowedthreads, count)};
-					T *pinputlo{input + loc}, *pinputhi{input + (count - loc)};
-					T *poutputlo{pout + loc}, *poutputhi{pout + (count - loc)};
+					T *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					T *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -34640,7 +34595,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultisortmtc(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
@@ -34653,10 +34608,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -34804,7 +34759,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultisortmain(std::size_t count, T const input[], T pdst[], T pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultisortmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pdst, T *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
 	assert(input != pdst);// input is under condition allowed to be the same as pdstnext
@@ -34817,10 +34772,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -34890,7 +34845,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = static_cast<T>(out);
 			}
 		}else{// !ismultithreadcapable
-			T const *psrchi{psrclo + count};
+			T const *RSBD8_RESTRICT psrchi{psrclo + count};
 			do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -35018,7 +34973,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = static_cast<T>(out);
 				}
 			}else{// !ismultithreadcapable
-				T const *psrchi{psrclo + count};
+				T const *RSBD8_RESTRICT psrchi{psrclo + count};
 				do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -35057,7 +35012,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	assert(input != buffer);
@@ -35072,24 +35027,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
 	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X, T *>(1u, allowedthreads, count, input, output, buffer);
 	else offsetscompanion = radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, true, T, X>(1u, allowedthreads, count, input, output);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -35147,7 +35093,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *pdst{buffer}, *pdstnext{output};// for the next iteration
+		T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -35172,13 +35118,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -35200,7 +35146,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -35218,7 +35164,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -35267,7 +35213,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35313,7 +35259,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35353,7 +35299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35612,7 +35558,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35655,7 +35601,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35894,7 +35840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -35934,7 +35880,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36152,7 +36098,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36189,7 +36135,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36384,7 +36330,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36418,7 +36364,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36449,7 +36395,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36715,7 +36661,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36746,7 +36692,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -36983,7 +36929,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(isrevorder){
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -37011,7 +36957,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}while(0 <= --i);
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
-					T const *pinput{input + (count - i)};
+					T const *RSBD8_RESTRICT pinput{input + (count - i)};
 					i -= 3;
 					while(0 <= i)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -37227,34 +37173,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -37316,7 +37250,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *pdst{buffer}, *pdstnext{output};// for the next iteration
+			T *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				pdst = output;
 				pdstnext = buffer;
@@ -37338,7 +37272,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -37348,24 +37282,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<isrevorder, isabsvalue, issignmode, isfltpmode, false, T, X>(1u, allowedthreads, count, input, buffer)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -37423,7 +37348,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		T *psrclo{input}, *pdst{buffer};
+		T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -37448,13 +37373,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -37473,7 +37398,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -37491,7 +37416,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -37537,7 +37462,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		std::ptrdiff_t i{static_cast<std::ptrdiff_t>(count)};
 		if constexpr(64u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -37977,7 +37902,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(56u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -38316,7 +38241,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(48u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -38628,7 +38553,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(40u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -38911,7 +38836,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(32u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				std::size_t initialcount;
 				if constexpr(!ismultithreadcapable){
 					initialcount = count + 1u;
@@ -39439,7 +39364,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(24u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				std::size_t initialcount;
 				if constexpr(!ismultithreadcapable){
 					initialcount = count + 1u;
@@ -39875,7 +39800,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 		}else if constexpr(16u == typebitsize<T>){
 			if constexpr(isrevorder){
-				T *pinputlo, *pinputhi, *pbufferlo, *pbufferhi;
+				T *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT pbufferhi;
 				if constexpr(!ismultithreadcapable){
 					pinputlo = input;
 					pinputhi = input + count;
@@ -40168,34 +40093,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}
 		}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -40257,7 +40170,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			T *psrclo{input}, *pdst{buffer};
+			T *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT pdst{buffer};
 			if(paritybool){// swap if the count of sorting actions to do is odd
 				psrclo = buffer;
 				pdst = input;
@@ -40279,8 +40192,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const *, V **> input, V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
-	// if isrevorder and isinputconst are set, the first parameter is used for V *pdst[], and all the other ones are for the getter function
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -40298,7 +40211,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	if constexpr(64u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -40311,11 +40224,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40370,11 +40283,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40423,12 +40336,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[0]};
-						V *plo{input[1]};
+						V *RSBD8_RESTRICT phi{input[0]};
+						V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnhi, *pnlo;
+						V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnhi = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40494,20 +40407,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-				V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40594,12 +40507,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40674,12 +40587,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -40759,11 +40672,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -40814,11 +40727,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -40863,12 +40776,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnhi, *pnlo;
+					V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -40931,7 +40844,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(56u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -40944,11 +40857,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41000,12 +40913,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[0]};
-						V *plo{input[1]};
+						V *RSBD8_RESTRICT phi{input[0]};
+						V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41077,20 +40990,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-				V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41171,12 +41084,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41262,11 +41175,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -41314,12 +41227,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnhi, *pnlo;
+					V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -41388,7 +41301,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(48u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -41401,11 +41314,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41454,12 +41367,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[0]};
-						V *plo{input[1]};
+						V *RSBD8_RESTRICT phi{input[0]};
+						V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41525,20 +41438,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-				V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41613,12 +41526,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41698,11 +41611,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -41747,12 +41660,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnhi, *pnlo;
+					V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -41815,7 +41728,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(40u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -41828,11 +41741,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41878,12 +41791,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *phi{input[0]};
-						V *plo{input[1]};
+						V *RSBD8_RESTRICT phi{input[0]};
+						V *RSBD8_RESTRICT plo{input[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -41943,20 +41856,20 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}else{// !isinputconst
 				// unsigned counter, not zero inclusive inside the loop
 				auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-				V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-				V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42025,12 +41938,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42102,11 +42015,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -42148,12 +42061,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *phi{input[i]};
-					V *plo{input[i - 1]};
+					V *RSBD8_RESTRICT phi{input[i]};
+					V *RSBD8_RESTRICT plo{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pnhi, *pnlo;
+					V *RSBD8_RESTRICT pnhi, *RSBD8_RESTRICT pnlo;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pnhi = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -42208,7 +42121,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(32u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -42221,11 +42134,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42265,13 +42178,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *pa{input[0]};
-						V *pb{input[1]};
-						V *pc{input[2]};
+						V *RSBD8_RESTRICT pa{input[0]};
+						V *RSBD8_RESTRICT pb{input[1]};
+						V *RSBD8_RESTRICT pc{input[2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42332,19 +42245,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42404,19 +42317,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42470,27 +42383,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<6>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
+						V *RSBD8_RESTRICT pa{pinputlo[0]};
+						V *RSBD8_RESTRICT pb{pinputhi[0]};
+						V *RSBD8_RESTRICT pc{pinputlo[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
 							pnb = pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 							pnc = pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))];
 						}
-						V *pd{pinputhi[-1]};
+						V *RSBD8_RESTRICT pd{pinputhi[-1]};
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						pinputhi[0] = pa;
 						poutputhi[0] = pa;
@@ -42536,12 +42449,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curb)];
 						++offsetscompanion[(1u << 11) + static_cast<std::size_t>(cur1c)];
 						++offsetscompanion[(2u << 11) + static_cast<std::size_t>(curc)];
-						V *pe{pinputlo[2]};
-						V *pf{pinputhi[-2]};
+						V *RSBD8_RESTRICT pe{pinputlo[2]};
+						V *RSBD8_RESTRICT pf{pinputhi[-2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnd, *pne, *pnf;
+						V *RSBD8_RESTRICT pnd, *RSBD8_RESTRICT pne, *RSBD8_RESTRICT pnf;
 						if constexpr(prefetchmaxstride){
 							pnd = pinputhi[-1 -static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 							pne = pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))];
@@ -42615,11 +42528,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -42658,11 +42571,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -42698,13 +42611,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i]};
-					V *pb{input[i - 1]};
-					V *pc{input[i - 2]};
+					V *RSBD8_RESTRICT pa{input[i]};
+					V *RSBD8_RESTRICT pb{input[i - 1]};
+					V *RSBD8_RESTRICT pc{input[i - 2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -42760,7 +42673,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(24u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -42773,11 +42686,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42817,13 +42730,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *pa{input[0]};
-						V *pb{input[1]};
-						V *pc{input[2]};
+						V *RSBD8_RESTRICT pa{input[0]};
+						V *RSBD8_RESTRICT pb{input[1]};
+						V *RSBD8_RESTRICT pc{input[2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42884,19 +42797,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -42950,27 +42863,27 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<6>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
+						V *RSBD8_RESTRICT pa{pinputlo[0]};
+						V *RSBD8_RESTRICT pb{pinputhi[0]};
+						V *RSBD8_RESTRICT pc{pinputlo[1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
 							pnb = pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 							pnc = pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))];
 						}
-						V *pd{pinputhi[-1]};
+						V *RSBD8_RESTRICT pd{pinputhi[-1]};
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						pinputhi[0] = pa;
 						poutputhi[0] = pa;
@@ -43016,12 +42929,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curb)];
 						++offsetscompanion[(1u << 8) + static_cast<std::size_t>(cur1c)];
 						++offsetscompanion[(2u << 8) + static_cast<std::size_t>(curc)];
-						V *pe{pinputlo[2]};
-						V *pf{pinputhi[-2]};
+						V *RSBD8_RESTRICT pe{pinputlo[2]};
+						V *RSBD8_RESTRICT pf{pinputhi[-2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnd, *pne, *pnf;
+						V *RSBD8_RESTRICT pnd, *RSBD8_RESTRICT pne, *RSBD8_RESTRICT pnf;
 						if constexpr(prefetchmaxstride){
 							pnd = pinputhi[-1 -static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 							pne = pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))];
@@ -43095,11 +43008,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43135,13 +43048,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i]};
-					V *pb{input[i - 1]};
-					V *pc{input[i - 2]};
+					V *RSBD8_RESTRICT pa{input[i]};
+					V *RSBD8_RESTRICT pb{input[i - 1]};
+					V *RSBD8_RESTRICT pc{input[i - 2]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43197,7 +43110,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	}else if constexpr(16u == typebitsize<T>){
 		if constexpr(isrevorder){
 			if constexpr(isinputconst){
-				V **pdst{splitparameter<false>(varparameters...)};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{splitparameter<false>(varparameters...)};
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtslicemt<1>(assignedslice, allowedthreads, count)};
@@ -43210,11 +43123,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *p{*input};
+						V *RSBD8_RESTRICT p{*input};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pn;
+						V *RSBD8_RESTRICT pn;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pn = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -43251,14 +43164,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *pa{input[0]};
-						V *pb{input[1]};
-						V *pc{input[2]};
-						V *pd{input[3]};
+						V *RSBD8_RESTRICT pa{input[0]};
+						V *RSBD8_RESTRICT pb{input[1]};
+						V *RSBD8_RESTRICT pc{input[2]};
+						V *RSBD8_RESTRICT pd{input[3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc, *pnd;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = input[prefetchmaxstride / (2u * sizeof(V *))];
@@ -43321,19 +43234,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<2>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *plo{pinputlo[0]};
-						V *phi{pinputhi[0]};
+						V *RSBD8_RESTRICT plo{pinputlo[0]};
+						V *RSBD8_RESTRICT phi{pinputhi[0]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pnlo, *pnhi;
+						V *RSBD8_RESTRICT pnlo, *RSBD8_RESTRICT pnhi;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pnlo = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -43381,21 +43294,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}else{// architecture: do not limit as much when there's a reasonable amount of registers
 					// unsigned counter, not zero inclusive inside the loop
 					auto[i, loc]{initmtsliceswapsmt<4>(assignedslice, allowedthreads, count)};
-					V **pinputlo{input + loc}, **pinputhi{input + (count - loc)};
-					V **poutputlo{pout + loc}, **poutputhi{pout + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo{input + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi{input + (count - loc)};
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT poutputlo{pout + loc}, *RSBD8_RESTRICT *RSBD8_RESTRICT poutputhi{pout + (count - loc)};
 					do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
 #endif
 						{
-						V *pa{pinputlo[0]};
-						V *pb{pinputhi[0]};
-						V *pc{pinputlo[1]};
-						V *pd{pinputhi[-1]};
+						V *RSBD8_RESTRICT pa{pinputlo[0]};
+						V *RSBD8_RESTRICT pb{pinputhi[0]};
+						V *RSBD8_RESTRICT pc{pinputlo[1]};
+						V *RSBD8_RESTRICT pd{pinputhi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 						[[maybe_unused]]
 #endif
-						V *pna, *pnb, *pnc, *pnd;
+						V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 						if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
 							pna = pinputlo[prefetchmaxstride / (2u * sizeof(V *))];
@@ -43471,11 +43384,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *p{input[i]};
+					V *RSBD8_RESTRICT p{input[i]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pn;
+					V *RSBD8_RESTRICT pn;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pn = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43508,14 +43421,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i]};
-					V *pb{input[i - 1]};
-					V *pc{input[i - 2]};
-					V *pd{input[i - 3]};
+					V *RSBD8_RESTRICT pa{input[i]};
+					V *RSBD8_RESTRICT pb{input[i - 1]};
+					V *RSBD8_RESTRICT pc{input[i - 2]};
+					V *RSBD8_RESTRICT pd{input[i - 3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc, *pnd;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = input[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43580,7 +43493,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsetscompanion[], unsigned runsteps, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -43594,10 +43507,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	while(1u < atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or 1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -43615,12 +43528,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43649,14 +43562,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrchi[0]};
-				V *pb{psrchi[-1]};
-				V *pc{psrchi[-2]};
-				V *pd{psrchi[-3]};
+				V *RSBD8_RESTRICT pa{psrchi[0]};
+				V *RSBD8_RESTRICT pb{psrchi[-1]};
+				V *RSBD8_RESTRICT pc{psrchi[-2]};
+				V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pna, *pnb, *pnc, *pnd;
+				V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
 					pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43717,7 +43630,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * typeradix<T>;
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -43751,12 +43664,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43785,14 +43698,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrchi[0]};
-					V *pb{psrchi[-1]};
-					V *pc{psrchi[-2]};
-					V *pd{psrchi[-3]};
+					V *RSBD8_RESTRICT pa{psrchi[0]};
+					V *RSBD8_RESTRICT pb{psrchi[-1]};
+					V *RSBD8_RESTRICT pc{psrchi[-2]};
+					V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 					[[maybe_unused]]
 #endif
-					V *pna, *pnb, *pnc, *pnd;
+					V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 					if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
 						pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -43839,7 +43752,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const input[], V *pdst[], V *pdstnext[], X offsets[], unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -43853,10 +43766,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V **psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
-	X *poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
+	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
 	if constexpr(ismultithreadcapable) while(1u < 1u + atomiclightbarrier.load(std::memory_order_relaxed)){// continue if it's 0 or -1
 		spinpause();// catch up until the other thread releases the barrier
 	}// do not place this inside the main loop, as the barrier is released there by cancelling 1 and -1 in interlocked add-fetch operations
@@ -43879,12 +43792,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 2);
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -43905,8 +43818,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -43929,16 +43842,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						// also prefetch on the first-level indirection to lessen the impact of a random read
 						// the intermediate prefetch is applied at half the maximum prefetch stride
-						V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-						V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+						V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 						prefetchforward(psrclo + 4);
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -43969,10 +43882,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -43993,8 +43906,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					pdst[offsetd] = pd;
 				}while(--j);
 				if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -44008,7 +43921,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				}
 			}
 			if(!(1u & count)){// fill in the final item for odd counts
-				V *p{psrclo[0]};
+				V *RSBD8_RESTRICT p{psrclo[0]};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
@@ -44016,7 +43929,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offset] = p;
 			}
 		}else{// !ismultithreadcapable
-			V *const *psrchi{psrclo + count};
+			V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 			if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
@@ -44026,14 +43939,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo};
-				V *phi{*psrchi};
+				V *RSBD8_RESTRICT plo{*psrclo};
+				V *RSBD8_RESTRICT phi{*psrchi};
 				// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+				V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 				prefetchforward(psrclo + 1);
 				++psrclo;
-				V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+				V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 				prefetchbackward(psrchi - 1);
 				--psrchi;
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -44053,8 +43966,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time: one low-to-middle, one high-to-middle
-				V *plo{*psrclo++};
-				V *phi{*psrchi--};
+				V *RSBD8_RESTRICT plo{*psrclo++};
+				V *RSBD8_RESTRICT phi{*psrchi--};
 				auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 				auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 				U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -44066,7 +43979,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsethi] = phi;
 			}while(psrclo < psrchi);
 			if(psrclo == psrchi){// fill in the final item for odd counts
-				V *p{*psrclo};
+				V *RSBD8_RESTRICT p{*psrclo};
 				auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 				U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 				std::size_t cur{filtershift<isabsvalue, issignmode, isfltpmode, T, U>(out, shifter)};
@@ -44104,7 +44017,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(!old) do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 						[[likely]]
@@ -44144,12 +44057,12 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 							[[likely]]
 #endif
 							{// fill the array, two at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 2);
 							psrclo += 2;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -44170,8 +44083,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						[[likely]]
 #endif
 						{// fill the array, two at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -44194,16 +44107,16 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 							[[likely]]
 #endif
 							{// fill the array, four at a time
-							V *pa{psrclo[0]};
-							V *pb{psrclo[1]};
-							V *pc{psrclo[2]};
-							V *pd{psrclo[3]};
+							V *RSBD8_RESTRICT pa{psrclo[0]};
+							V *RSBD8_RESTRICT pb{psrclo[1]};
+							V *RSBD8_RESTRICT pc{psrclo[2]};
+							V *RSBD8_RESTRICT pd{psrclo[3]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 							prefetchforward(psrclo + 4);
 							psrclo += 4;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -44234,10 +44147,10 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						[[likely]]
 #endif
 						{// fill the array, four at a time
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
-						V *pc{psrclo[2]};
-						V *pd{psrclo[3]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
+						V *RSBD8_RESTRICT pc{psrclo[2]};
+						V *RSBD8_RESTRICT pd{psrclo[3]};
 						psrclo += 4;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -44258,8 +44171,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 						pdst[offsetd] = pd;
 					}while(--j);
 					if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-						V *pa{psrclo[0]};
-						V *pb{psrclo[1]};
+						V *RSBD8_RESTRICT pa{psrclo[0]};
+						V *RSBD8_RESTRICT pb{psrclo[1]};
 						psrclo += 2;
 						auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 						auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -44273,7 +44186,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					}
 				}
 				if(!(1u & count)){// fill in the final item for odd counts
-					V *p{psrclo[0]};
+					V *RSBD8_RESTRICT p{psrclo[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -44281,7 +44194,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offset] = p;
 				}
 			}else{// !ismultithreadcapable
-				V *const *psrchi{psrclo + count};
+				V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 				if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 					[[likely]]
@@ -44291,14 +44204,14 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo};
-					V *phi{*psrchi};
+					V *RSBD8_RESTRICT plo{*psrclo};
+					V *RSBD8_RESTRICT phi{*psrchi};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 1);
 					++psrclo;
-					V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+					V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 					prefetchbackward(psrchi - 1);
 					--psrchi;
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -44318,8 +44231,8 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					[[likely]]
 #endif
 					{// fill the array, two at a time: one low-to-middle, one high-to-middle
-					V *plo{*psrclo++};
-					V *phi{*psrchi--};
+					V *RSBD8_RESTRICT plo{*psrclo++};
+					V *RSBD8_RESTRICT phi{*psrchi--};
 					auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 					auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 					U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -44331,7 +44244,7 @@ handletop:// this prevents "!isabsvalue && isfltpmode" to be made constexpr here
 					pdst[offsethi] = phi;
 				}while(psrclo < psrchi);
 				if(psrclo == psrchi){// fill in the final item for odd counts
-					V *p{*psrclo};
+					V *RSBD8_RESTRICT p{*psrclo};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 					std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -44351,7 +44264,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -44367,34 +44280,25 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -44407,7 +44311,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -44457,7 +44361,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **pdst{buffer}, **pdstnext{output};// for the next iteration
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			pdst = output;
 			pdstnext = buffer;
@@ -44480,13 +44384,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortcopynoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -44509,7 +44413,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -44527,7 +44431,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -44545,8 +44449,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -44567,7 +44471,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -44585,7 +44489,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -44594,17 +44498,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -44650,7 +44554,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -44684,7 +44588,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -44693,17 +44597,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -44743,7 +44647,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -44771,7 +44675,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -44780,19 +44684,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *plo{pinput[0]};
-									V *phi{pinput[1]};
+									V *RSBD8_RESTRICT plo{pinput[0]};
+									V *RSBD8_RESTRICT phi{pinput[1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 2);
 									pinput += 2;
 									auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -44857,8 +44761,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
+							V *RSBD8_RESTRICT plo{pinput[0]};
+							V *RSBD8_RESTRICT phi{pinput[1]};
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
@@ -44910,7 +44814,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -44948,17 +44852,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -45001,7 +44905,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -45042,17 +44946,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -45089,7 +44993,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -45124,19 +45028,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									poutput[j] = phi;
@@ -45197,8 +45101,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -45247,7 +45151,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -45278,7 +45182,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45287,17 +45191,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -45340,7 +45244,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -45371,7 +45275,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45380,19 +45284,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *plo{pinput[0]};
-									V *phi{pinput[1]};
+									V *RSBD8_RESTRICT plo{pinput[0]};
+									V *RSBD8_RESTRICT phi{pinput[1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 2);
 									pinput += 2;
 									auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -45463,8 +45367,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
+							V *RSBD8_RESTRICT plo{pinput[0]};
+							V *RSBD8_RESTRICT phi{pinput[1]};
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
@@ -45522,7 +45426,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -45563,17 +45467,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -45613,7 +45517,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -45651,19 +45555,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									poutput[j] = phi;
@@ -45730,8 +45634,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -45786,7 +45690,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -45820,7 +45724,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45829,17 +45733,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -45879,7 +45783,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -45907,7 +45811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -45916,19 +45820,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *plo{pinput[0]};
-									V *phi{pinput[1]};
+									V *RSBD8_RESTRICT plo{pinput[0]};
+									V *RSBD8_RESTRICT phi{pinput[1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 2);
 									pinput += 2;
 									auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -45993,8 +45897,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
+							V *RSBD8_RESTRICT plo{pinput[0]};
+							V *RSBD8_RESTRICT phi{pinput[1]};
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
@@ -46046,7 +45950,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -46084,17 +45988,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -46131,7 +46035,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -46166,19 +46070,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									poutput[j] = phi;
@@ -46239,8 +46143,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -46289,7 +46193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -46320,7 +46224,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46329,17 +46233,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -46376,7 +46280,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -46401,7 +46305,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<2>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46410,19 +46314,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *plo{pinput[0]};
-									V *phi{pinput[1]};
+									V *RSBD8_RESTRICT plo{pinput[0]};
+									V *RSBD8_RESTRICT phi{pinput[1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnlo{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnhi{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 2);
 									pinput += 2;
 									auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -46479,8 +46383,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinput[0]};
-							V *phi{pinput[1]};
+							V *RSBD8_RESTRICT plo{pinput[0]};
+							V *RSBD8_RESTRICT phi{pinput[1]};
 							pinput += 2;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							output[i] = plo;
@@ -46524,7 +46428,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -46559,17 +46463,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -46603,7 +46507,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -46635,19 +46539,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									poutput[j] = phi;
@@ -46700,8 +46604,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							output[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -46742,7 +46646,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -46770,7 +46674,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::medium){// architecture: limit to 8-bit and one at a time when there's very few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46779,17 +46683,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -46823,7 +46727,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -46845,7 +46749,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -46854,17 +46758,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -46895,7 +46799,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -46914,7 +46818,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 2;
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
@@ -46924,21 +46828,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[0]};
-									V *pb{pinput[1]};
-									V *pc{pinput[2]};
+									V *RSBD8_RESTRICT pa{pinput[0]};
+									V *RSBD8_RESTRICT pb{pinput[1]};
+									V *RSBD8_RESTRICT pc{pinput[2]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 3);
 									pinput += 3;
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -46996,9 +46900,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
-							V *pc{pinput[2]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
+							V *RSBD8_RESTRICT pc{pinput[2]};
 							pinput += 3;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 2] = pa;
@@ -47043,8 +46947,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[1] = pa;
 							buffer[1] = pa;
@@ -47073,7 +46977,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -47102,17 +47006,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -47143,7 +47047,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -47172,17 +47076,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -47210,7 +47114,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -47237,21 +47141,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 2]};
-									V *pb{pinput[j + 1]};
-									V *pc{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 2]};
+									V *RSBD8_RESTRICT pb{pinput[j + 1]};
+									V *RSBD8_RESTRICT pc{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									poutput[j + 2] = pa;
@@ -47304,9 +47208,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 2]};
-							V *pb{input[i + 1]};
-							V *pc{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 2]};
+							V *RSBD8_RESTRICT pb{input[i + 1]};
+							V *RSBD8_RESTRICT pc{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 2] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -47347,8 +47251,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{input[1]};
-							V *pb{input[0]};
+							V *RSBD8_RESTRICT pa{input[1]};
+							V *RSBD8_RESTRICT pb{input[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[1] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -47375,7 +47279,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -47397,7 +47301,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47406,17 +47310,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -47447,7 +47351,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -47466,7 +47370,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<3>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 2;
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
@@ -47476,21 +47380,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[0]};
-									V *pb{pinput[1]};
-									V *pc{pinput[2]};
+									V *RSBD8_RESTRICT pa{pinput[0]};
+									V *RSBD8_RESTRICT pb{pinput[1]};
+									V *RSBD8_RESTRICT pc{pinput[2]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 3);
 									pinput += 3;
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -47548,9 +47452,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
-							V *pc{pinput[2]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
+							V *RSBD8_RESTRICT pc{pinput[2]};
 							pinput += 3;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 2] = pa;
@@ -47595,8 +47499,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[1] = pa;
 							buffer[1] = pa;
@@ -47625,7 +47529,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -47654,17 +47558,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -47692,7 +47596,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -47719,21 +47623,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 2]};
-									V *pb{pinput[j + 1]};
-									V *pc{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 2]};
+									V *RSBD8_RESTRICT pb{pinput[j + 1]};
+									V *RSBD8_RESTRICT pc{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									poutput[j + 2] = pa;
@@ -47786,9 +47690,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 2]};
-							V *pb{input[i + 1]};
-							V *pc{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 2]};
+							V *RSBD8_RESTRICT pb{input[i + 1]};
+							V *RSBD8_RESTRICT pc{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 2] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -47829,8 +47733,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{input[1]};
-							V *pb{input[0]};
+							V *RSBD8_RESTRICT pa{input[1]};
+							V *RSBD8_RESTRICT pb{input[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[1] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -47857,7 +47761,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -47879,7 +47783,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if constexpr(isrevorder){
 					if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to one at a time when there's few registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<1>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
 							std::ptrdiff_t j{i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))};
@@ -47888,17 +47792,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{*pinput};
+									V *RSBD8_RESTRICT p{*pinput};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pn{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 1);
 									++pinput;
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
@@ -47926,7 +47830,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{*pinput++};
+							V *RSBD8_RESTRICT p{*pinput++};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							buffer[i] = p;
@@ -47942,7 +47846,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(0 <= --i);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if constexpr(ismultithreadcapable) i = initmtslicemain<4>(assignedslice, allowedthreads, count);
-						V *const *pinput{input + (count - i)};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + (count - i)};
 						i -= 3;
 						if constexpr(prefetchmaxstride){// disable the extra loop if prefetching is not supported
 							// no need to mask out the bits for handling the remainder term after the two loops
@@ -47952,23 +47856,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[0]};
-									V *pb{pinput[1]};
-									V *pc{pinput[2]};
-									V *pd{pinput[3]};
+									V *RSBD8_RESTRICT pa{pinput[0]};
+									V *RSBD8_RESTRICT pb{pinput[1]};
+									V *RSBD8_RESTRICT pc{pinput[2]};
+									V *RSBD8_RESTRICT pd{pinput[3]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-									V *pnd{pinput[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pna{pinput[prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnb{pinput[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnc{pinput[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+									V *RSBD8_RESTRICT pnd{pinput[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 									prefetchforward(pinput + 4);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									poutput[j + 3] = pa;
@@ -48026,10 +47930,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
-							V *pc{pinput[2]};
-							V *pd{pinput[3]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
+							V *RSBD8_RESTRICT pc{pinput[2]};
+							V *RSBD8_RESTRICT pd{pinput[3]};
 							pinput += 4;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 3] = pa;
@@ -48073,8 +47977,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 4;
 						}
 						if(2 & i){
-							V *pa{pinput[0]};
-							V *pb{pinput[1]};
+							V *RSBD8_RESTRICT pa{pinput[0]};
+							V *RSBD8_RESTRICT pb{pinput[1]};
 							pinput += 2;
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 3] = pa;
@@ -48099,7 +48003,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curb)];
 						}
 						if(1 & i){// fill in the final item for odd counts
-							V *p{pinput[0]};
+							V *RSBD8_RESTRICT p{pinput[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							buffer[0] = p;
@@ -48125,17 +48029,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									poutput[j] = p;
@@ -48160,7 +48064,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -48183,23 +48087,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 3]};
-									V *pb{pinput[j + 2]};
-									V *pc{pinput[j + 1]};
-									V *pd{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 3]};
+									V *RSBD8_RESTRICT pb{pinput[j + 2]};
+									V *RSBD8_RESTRICT pc{pinput[j + 1]};
+									V *RSBD8_RESTRICT pd{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnd{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnd{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									poutput[j + 3] = pa;
@@ -48253,10 +48157,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 3]};
-							V *pb{input[i + 2]};
-							V *pc{input[i + 1]};
-							V *pd{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 3]};
+							V *RSBD8_RESTRICT pb{input[i + 2]};
+							V *RSBD8_RESTRICT pc{input[i + 1]};
+							V *RSBD8_RESTRICT pd{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 3] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -48295,8 +48199,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 4;
 						}
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
-							V *pa{input[i + 3]};
-							V *pb{input[i + 2]};
+							V *RSBD8_RESTRICT pa{input[i + 3]};
+							V *RSBD8_RESTRICT pb{input[i + 2]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							output[i + 3] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -48318,7 +48222,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curb)];
 						}
 						if(1 & i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							output[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -48334,38 +48238,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -48379,7 +48271,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -48432,7 +48324,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **pdst{buffer}, **pdstnext{output};// for the next iteration
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext{output};// for the next iteration
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					pdst = output;
 					pdstnext = buffer;
@@ -48453,7 +48345,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -48466,32 +48358,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -48504,7 +48387,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -48554,7 +48437,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		[[likely]]
 #endif
 		{
-		V **psrclo{input}, **pdst{buffer};
+		V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 		if(paritybool){// swap if the count of sorting actions to do is odd
 			psrclo = buffer;
 			pdst = input;
@@ -48577,13 +48460,13 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 2 >= (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	> radixsortnoallocmultimain(
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -48603,7 +48486,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(buffer);
 
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
-	std::future<void> asynchandle;
+	std::shared_future<void> asynchandle;
 #else
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
@@ -48621,7 +48504,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -48639,8 +48522,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -48675,7 +48558,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			offsetstype<isabsvalue, issignmode, isfltpmode, ismultithreadcapable, T, X> offsets{};// zeroed in advance here
 			if constexpr(64u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
 						pinputhi = input + count;
@@ -48698,12 +48581,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -48782,8 +48665,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -48857,12 +48740,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -48929,8 +48812,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -48992,12 +48875,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -49061,8 +48944,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -49113,7 +48996,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(pinputlo < pinputhi);
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -49151,17 +49034,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -49204,7 +49087,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -49245,17 +49128,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -49292,7 +49175,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -49327,19 +49210,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									pbuffer[j] = phi;
@@ -49400,8 +49283,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -49450,7 +49333,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -49479,7 +49362,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(56u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
 						pinputhi = input + count;
@@ -49502,12 +49385,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -49580,8 +49463,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -49649,12 +49532,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -49724,8 +49607,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -49782,7 +49665,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(pinputlo < pinputhi);
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -49823,17 +49706,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -49873,7 +49756,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -49911,19 +49794,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									pbuffer[j] = phi;
@@ -49990,8 +49873,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -50046,7 +49929,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -50078,7 +49961,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(48u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
 						pinputhi = input + count;
@@ -50101,12 +49984,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -50173,8 +50056,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -50236,12 +50119,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -50305,8 +50188,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -50392,17 +50275,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -50439,7 +50322,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -50474,19 +50357,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									pbuffer[j] = phi;
@@ -50547,8 +50430,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -50597,7 +50480,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -50626,7 +50509,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(40u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
 						pinputhi = input + count;
@@ -50649,12 +50532,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -50715,8 +50598,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -50772,12 +50655,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
 							prefetchbackward(pinputhi - 1);
@@ -50833,8 +50716,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
 							*pbufferhi-- = plo;
@@ -50877,7 +50760,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(pinputlo < pinputhi);
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -50912,17 +50795,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -50956,7 +50839,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -50988,19 +50871,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *phi{pinput[j]};
-									V *plo{pinput[j - 1]};
+									V *RSBD8_RESTRICT phi{pinput[j]};
+									V *RSBD8_RESTRICT plo{pinput[j - 1]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 2);
 									auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 									pbuffer[j] = phi;
@@ -51053,8 +50936,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *phi{input[i]};
-							V *plo{input[i - 1]};
+							V *RSBD8_RESTRICT phi{input[i]};
+							V *RSBD8_RESTRICT plo{input[i - 1]};
 							auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 							buffer[i] = phi;
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -51095,7 +50978,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 2;
 						}while(0 < i);
 						if(!(1 & i)){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -51121,7 +51004,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(32u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
 						initialcount = count + 1u;
@@ -51148,12 +51031,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -51208,8 +51091,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -51259,12 +51142,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -51313,8 +51196,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -51351,10 +51234,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						initialcount %= 6u;
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
-							V *pa{pinputlo[0]};
-							V *pb{pinputhi[0]};
-							V *pc{pinputlo[1]};
-							V *pd{pinputhi[-1]};
+							V *RSBD8_RESTRICT pa{pinputlo[0]};
+							V *RSBD8_RESTRICT pb{pinputhi[0]};
+							V *RSBD8_RESTRICT pc{pinputlo[1]};
+							V *RSBD8_RESTRICT pd{pinputhi[-1]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							pinputhi[0] = pa;
 							pbufferhi[0] = pa;
@@ -51411,8 +51294,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1d)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curd)];
 						}else if(2u & initialcount){// possibly initialise with 2 entries before the loop below
-							V *pa{pinputlo[0]};
-							V *pb{pinputhi[0]};
+							V *RSBD8_RESTRICT pa{pinputlo[0]};
+							V *RSBD8_RESTRICT pb{pinputhi[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							*pinputhi-- = pa;
 							*pbufferhi-- = pa;
@@ -51455,15 +51338,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								// register pressure performance issue on several platforms: first do the high half here
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
@@ -51507,11 +51390,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(curb)];
 								++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 								++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
-								V *pe{pinputlo[2]};
-								V *pf{pinputhi[-2]};
-								V *pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pne{pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnf{pinputhi[-2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pe{pinputlo[2]};
+								V *RSBD8_RESTRICT pf{pinputhi[-2]};
+								V *RSBD8_RESTRICT pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pne{pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnf{pinputhi[-2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								// register pressure performance issue on several platforms: do the low half here second
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
@@ -51569,10 +51452,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{// very few items, so skip the prefetch
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								// register pressure performance issue on several platforms: first do the high half here
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
@@ -51613,8 +51496,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 11) + static_cast<std::size_t>(curb)];
 								++offsets[(1u << 11) + static_cast<std::size_t>(cur1c)];
 								++offsets[(2u << 11) + static_cast<std::size_t>(curc)];
-								V *pe{pinputlo[2]};
-								V *pf{pinputhi[-2]};
+								V *RSBD8_RESTRICT pe{pinputlo[2]};
+								V *RSBD8_RESTRICT pf{pinputhi[-2]};
 								// register pressure performance issue on several platforms: do the low half here second
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
@@ -51663,7 +51546,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -51692,17 +51575,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -51733,7 +51616,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -51762,17 +51645,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -51800,7 +51683,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -51827,21 +51710,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 2]};
-									V *pb{pinput[j + 1]};
-									V *pc{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 2]};
+									V *RSBD8_RESTRICT pb{pinput[j + 1]};
+									V *RSBD8_RESTRICT pc{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									pbuffer[j + 2] = pa;
@@ -51894,9 +51777,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 2]};
-							V *pb{input[i + 1]};
-							V *pc{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 2]};
+							V *RSBD8_RESTRICT pb{input[i + 1]};
+							V *RSBD8_RESTRICT pc{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 2] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -51937,8 +51820,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{input[1]};
-							V *pb{input[0]};
+							V *RSBD8_RESTRICT pa{input[1]};
+							V *RSBD8_RESTRICT pb{input[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[1] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -51965,7 +51848,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 11) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 11) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -51985,7 +51868,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(24u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					std::size_t initialcount;
 					if constexpr(!ismultithreadcapable){
 						initialcount = count + 1u;
@@ -52012,12 +51895,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -52066,8 +51949,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -52104,10 +51987,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						initialcount %= 6u;
 						if(4u & initialcount){// possibly initialise with 4 entries before the loop below
-							V *pa{pinputlo[0]};
-							V *pb{pinputhi[0]};
-							V *pc{pinputlo[1]};
-							V *pd{pinputhi[-1]};
+							V *RSBD8_RESTRICT pa{pinputlo[0]};
+							V *RSBD8_RESTRICT pb{pinputhi[0]};
+							V *RSBD8_RESTRICT pc{pinputlo[1]};
+							V *RSBD8_RESTRICT pd{pinputhi[-1]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							pinputhi[0] = pa;
 							pbufferhi[0] = pa;
@@ -52164,8 +52047,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1d)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curd)];
 						}else if(2u & initialcount){// possibly initialise with 2 entries before the loop below
-							V *pa{pinputlo[0]};
-							V *pb{pinputhi[0]};
+							V *RSBD8_RESTRICT pa{pinputlo[0]};
+							V *RSBD8_RESTRICT pb{pinputhi[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							*pinputhi-- = pa;
 							*pbufferhi-- = pa;
@@ -52208,15 +52091,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								// register pressure performance issue on several platforms: first do the high half here
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
@@ -52260,11 +52143,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(curb)];
 								++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 								++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
-								V *pe{pinputlo[2]};
-								V *pf{pinputhi[-2]};
-								V *pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pne{pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnf{pinputhi[-2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pe{pinputlo[2]};
+								V *RSBD8_RESTRICT pf{pinputhi[-2]};
+								V *RSBD8_RESTRICT pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pne{pinputlo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnf{pinputhi[-2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								// register pressure performance issue on several platforms: do the low half here second
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
@@ -52322,10 +52205,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{// very few items, so skip the prefetch
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								// register pressure performance issue on several platforms: first do the high half here
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
@@ -52366,8 +52249,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[(2u << 8) + static_cast<std::size_t>(curb)];
 								++offsets[(1u << 8) + static_cast<std::size_t>(cur1c)];
 								++offsets[(2u << 8) + static_cast<std::size_t>(curc)];
-								V *pe{pinputlo[2]};
-								V *pf{pinputhi[-2]};
+								V *RSBD8_RESTRICT pe{pinputlo[2]};
+								V *RSBD8_RESTRICT pf{pinputhi[-2]};
 								// register pressure performance issue on several platforms: do the low half here second
 								auto imd{indirectinput1<indirection1, isindexed2, false, T, V>(pd, varparameters...)};
 								pinputlo[1] = pd;
@@ -52416,7 +52299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -52445,17 +52328,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -52483,7 +52366,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -52510,21 +52393,21 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 2]};
-									V *pb{pinput[j + 1]};
-									V *pc{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 2]};
+									V *RSBD8_RESTRICT pb{pinput[j + 1]};
+									V *RSBD8_RESTRICT pc{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									pbuffer[j + 2] = pa;
@@ -52577,9 +52460,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 2]};
-							V *pb{input[i + 1]};
-							V *pc{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 2]};
+							V *RSBD8_RESTRICT pb{input[i + 1]};
+							V *RSBD8_RESTRICT pc{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 2] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -52620,8 +52503,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 						// handle remainder terms of non-power-of-two divisors correctly
 						if(-2 < i){// fill in the final two items for a remainder of 2
-							V *pa{input[1]};
-							V *pb{input[0]};
+							V *RSBD8_RESTRICT pa{input[1]};
+							V *RSBD8_RESTRICT pb{input[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[1] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -52648,7 +52531,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(cur1b)];
 							++offsets[(2u << 8) + static_cast<std::size_t>(curb)];
 						}else if(-2 <= i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -52668,7 +52551,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 			}else if constexpr(16u == typebitsize<T>){
 				if constexpr(isrevorder){
-					V **pinputlo, **pinputhi, **pbufferlo, **pbufferhi;
+					V *RSBD8_RESTRICT *RSBD8_RESTRICT pinputlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pinputhi, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferlo, *RSBD8_RESTRICT *RSBD8_RESTRICT pbufferhi;
 					if constexpr(!ismultithreadcapable){
 						pinputlo = input;
 						pinputhi = input + count;
@@ -52692,12 +52575,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-							V *pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+							V *RSBD8_RESTRICT pnhi{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi = plo;
@@ -52740,8 +52623,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{// very few items, so skip the prefetch
-							V *plo{pinputlo[0]};
-							V *phi{pinputhi[0]};
+							V *RSBD8_RESTRICT plo{pinputlo[0]};
+							V *RSBD8_RESTRICT phi{pinputhi[0]};
 							// register pressure performance issue on several platforms: first do the low half here
 							auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 							*pinputhi-- = plo;
@@ -52771,8 +52654,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}while(pinputlo < pinputhi);
 					}else{// architecture: do not limit as much when there's a reasonable amount of registers
 						if(2u & count + 1u){// possibly initialise with 2 entries before the loop below
-							V *pa{pinputlo[0]};
-							V *pb{pinputhi[0]};
+							V *RSBD8_RESTRICT pa{pinputlo[0]};
+							V *RSBD8_RESTRICT pb{pinputhi[0]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							*pinputhi-- = pa;
 							*pbufferhi-- = pa;
@@ -52809,16 +52692,16 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								// also prefetch on the first-level indirection to lessen the impact of a random read
 								// the intermediate prefetch is applied at half the maximum prefetch stride
-								V *pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-								V *pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-								V *pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pna{pinputlo[prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnb{pinputhi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+								V *RSBD8_RESTRICT pnc{pinputlo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+								V *RSBD8_RESTRICT pnd{pinputhi[-1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
 								pbufferhi[0] = pa;
@@ -52876,10 +52759,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{// very few items, so skip the prefetch
-								V *pa{pinputlo[0]};
-								V *pb{pinputhi[0]};
-								V *pc{pinputlo[1]};
-								V *pd{pinputhi[-1]};
+								V *RSBD8_RESTRICT pa{pinputlo[0]};
+								V *RSBD8_RESTRICT pb{pinputhi[0]};
+								V *RSBD8_RESTRICT pc{pinputlo[1]};
+								V *RSBD8_RESTRICT pd{pinputhi[-1]};
 								auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 								pinputhi[0] = pa;
 								pbufferhi[0] = pa;
@@ -52927,7 +52810,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						}
 					}
 					if(pinputlo == pinputhi){// fill in the final item for odd counts
-						V *p{pinputlo[0]};
+						V *RSBD8_RESTRICT p{pinputlo[0]};
 						auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 						// no write to input, as this is the midpoint
 						*pbufferhi = p;
@@ -52953,17 +52836,17 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *p{pinput[j]};
+									V *RSBD8_RESTRICT p{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pn{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 									pbuffer[j] = p;
@@ -52988,7 +52871,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *p{input[i]};
+							V *RSBD8_RESTRICT p{input[i]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[i] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -53012,23 +52895,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								[[likely]]
 #endif
 								{
-								V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-								V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+								V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+								V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 								do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 									[[likely]]
 #endif
 									{
-									V *pa{pinput[j + 3]};
-									V *pb{pinput[j + 2]};
-									V *pc{pinput[j + 1]};
-									V *pd{pinput[j]};
+									V *RSBD8_RESTRICT pa{pinput[j + 3]};
+									V *RSBD8_RESTRICT pb{pinput[j + 2]};
+									V *RSBD8_RESTRICT pc{pinput[j + 1]};
+									V *RSBD8_RESTRICT pd{pinput[j]};
 									// also prefetch on the first-level indirection to lessen the impact of a random read
 									// the intermediate prefetch is applied at half the maximum prefetch stride
-									V *pna{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnb{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnc{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-									V *pnd{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pna{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnb{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnc{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+									V *RSBD8_RESTRICT pnd{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 									prefetchbackward(pinput + j - 1);
 									auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 									pbuffer[j + 3] = pa;
@@ -53081,10 +52964,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							[[likely]]
 #endif
 							{
-							V *pa{input[i + 3]};
-							V *pb{input[i + 2]};
-							V *pc{input[i + 1]};
-							V *pd{input[i]};
+							V *RSBD8_RESTRICT pa{input[i + 3]};
+							V *RSBD8_RESTRICT pb{input[i + 2]};
+							V *RSBD8_RESTRICT pc{input[i + 1]};
+							V *RSBD8_RESTRICT pd{input[i]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 3] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -53123,8 +53006,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							i -= 4;
 						}
 						if(2 & i){// fill in the final two items for a remainder of 2 or 3
-							V *pa{input[i + 3]};
-							V *pb{input[i + 2]};
+							V *RSBD8_RESTRICT pa{input[i + 3]};
+							V *RSBD8_RESTRICT pb{input[i + 2]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							buffer[i + 3] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -53146,7 +53029,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 							++offsets[(1u << 8) + static_cast<std::size_t>(curb)];
 						}
 						if(1 & i){// fill in the final item for odd counts
-							V *p{input[0]};
+							V *RSBD8_RESTRICT p{input[0]};
 							auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 							buffer[0] = p;
 							U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -53161,38 +53044,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					}
 				}
 			}else static_assert(false, "Implementing larger types will require additional work and optimisation for this library.");
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -53206,7 +53077,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -53259,7 +53130,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				[[likely]]
 #endif
 				{
-				V **psrclo{input}, **pdst{buffer};
+				V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{input}, *RSBD8_RESTRICT *RSBD8_RESTRICT pdst{buffer};
 				if(paritybool){// swap if the count of sorting actions to do is odd
 					psrclo = buffer;
 					pdst = input;
@@ -53285,7 +53156,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[], T pout[])noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT pout)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(input != pout);
@@ -53401,7 +53272,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsinglesimpleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const input[])noexcept{
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> radixsortnoallocsinglesimpleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	// do not pass a nullptr here
@@ -53485,7 +53356,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||	// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglesortmtc(std::size_t count, T const psrclo[], T pdst[], X offsetscompanion[])noexcept{
+	void> radixsortnoallocsinglesortmtc(std::size_t count, T const *RSBD8_RESTRICT psrclo, T *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(psrclo != pdst);
@@ -53494,7 +53365,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsetscompanion);
 
-	T const *psrchi{psrclo + count};
+	T const *RSBD8_RESTRICT psrchi{psrclo + count};
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 		do
@@ -53562,7 +53433,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplesortmtc(std::size_t count, T pdst[], X const offsets[], X const offsetscompanion[])noexcept{
+	void> radixsortnoallocsinglesimplesortmtc(std::size_t count, T *RSBD8_RESTRICT pdst, X const *RSBD8_RESTRICT offsets, X const *RSBD8_RESTRICT offsetscompanion)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(T)) - 1u <= count);// small arrays are only allowed in single-threaded mode
 	assert(offsets != offsetscompanion);
@@ -53583,7 +53454,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		- (isdescsort && (isabsvalue || !issignmode)) * (offsetslength<isabsvalue, issignmode, isfltpmode, T> - 1u)
 		- (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U length{static_cast<U>(*t) + static_cast<U>(*u)};
-	T *pfill{pdst + count + 1u};
+	T *RSBD8_RESTRICT pfill{pdst + count + 1u};
 	unsigned filler;
 	if constexpr(false){// impossible: isrevorder){
 	}else{// not reversed order
@@ -53694,7 +53565,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglesortmain(std::size_t count, T const psrclo[], T pdst[], X offsets[], unsigned usemultithread)noexcept{
+	void> radixsortnoallocsinglesortmain(std::size_t count, T const *RSBD8_RESTRICT psrclo, T *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsets, unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
 	assert(psrclo != pdst);
@@ -53782,7 +53653,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offset] = static_cast<T>(out);
 		}
 	}else{// !ismultithreadcapable
-		T const *psrchi{psrclo + count};
+		T const *RSBD8_RESTRICT psrchi{psrclo + count};
 		do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
@@ -53825,7 +53696,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplesortmain(T pdst[], X const offsets[], X const offsetscompanion[], unsigned usemultithread)noexcept{
+	void> radixsortnoallocsinglesimplesortmain(T *RSBD8_RESTRICT pdst, X const *RSBD8_RESTRICT offsets, X const *RSBD8_RESTRICT offsetscompanion, unsigned usemultithread)noexcept{
 	using U = std::conditional_t<sizeof(X) < sizeof(unsigned), unsigned, X>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(offsets != offsetscompanion);
 	// do not pass a nullptr here
@@ -53841,7 +53712,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		+ (isdescsort && (isabsvalue || !issignmode)) * (offsetslength<isabsvalue, issignmode, isfltpmode, T> - 1u)
 		+ (isabsvalue && !issignmode && isfltpmode) * (1 - isdescsort * 2)};
 	U length{*t};
-	T *pfill{pdst};
+	T *RSBD8_RESTRICT pfill{pdst};
 	unsigned filler;
 	if constexpr(ismultithreadcapable) if(usemultithread)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
@@ -54070,7 +53941,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
@@ -54080,24 +53951,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, output)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -54162,7 +54024,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const input[], T output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortcopynoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != output);
 	// do not pass a nullptr here
@@ -54172,24 +54034,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -54228,7 +54081,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -54257,11 +54110,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -54466,34 +54319,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -54571,7 +54412,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T const input[], T output[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -54600,11 +54441,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -54754,34 +54595,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -54819,7 +54648,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	((isabsvalue && issignmode) ||// both regular absolute modes
 	(!isabsvalue && issignmode && isfltpmode)),// regular floating-point mode
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T input[], T buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -54829,24 +54658,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input, buffer)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -54911,7 +54731,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T input[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier)noexcept{
+	void> radixsortnoallocsinglesimplemtc(unsigned allowedthreads, std::size_t count, T *RSBD8_RESTRICT input, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier)noexcept{
 	assert(1u < allowedthreads);
 	// do not pass a nullptr here
 	assert(input);
@@ -54919,24 +54739,15 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// generate the histograms for each part, all in one go
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsinglesimpleinitmt<isabsvalue, issignmode, isfltpmode, T, X>(1u, allowedthreads, count, input)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		if(!other){
@@ -54975,7 +54786,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[], T buffer[])noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -55004,11 +54815,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -55213,34 +55024,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -55318,7 +55117,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, T input[])noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input)noexcept{
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
 	static bool constexpr ismultithreadcapable{false};
@@ -55345,11 +55144,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -55491,34 +55290,22 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsets[cur];
 			}
 		}
-		if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+		// combine the data from several threads
+		// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+		if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
 #endif
-			{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			{
 			auto pslicehandle{initasynchandlesvector.data()};
-			do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-				[[likely]]
-#endif
-				{// combine the data from several threads
-				auto const &slicedata{pslicehandle->get()};
-				++pslicehandle;
-				//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-				X *piter{offsets.data()};
-				for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					*piter++ += element;// this will usually inline and auto-vectorise
-			}while(--j);
+			accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 		}
 
 		// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+		std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 		if constexpr(ismultithreadcapable){
 			std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 			// simply do not spin if usemultithread is zero
@@ -55550,7 +55337,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const input[], V *pout[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -55571,12 +55358,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			V *pa{input[i]};
-			V *pb{input[i - 1]};
+			V *RSBD8_RESTRICT pa{input[i]};
+			V *RSBD8_RESTRICT pb{input[i - 1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -55611,14 +55398,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[likely]]
 #endif
 			{
-			V *pa{input[i]};
-			V *pb{input[i - 1]};
-			V *pc{input[i - 2]};
-			V *pd{input[i - 3]};
+			V *RSBD8_RESTRICT pa{input[i]};
+			V *RSBD8_RESTRICT pb{input[i - 1]};
+			V *RSBD8_RESTRICT pc{input[i - 2]};
+			V *RSBD8_RESTRICT pd{input[i - 3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb, *pnc, *pnd;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = input[i - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -55652,14 +55439,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				++offsetscompanion[curc];
 				++offsetscompanion[curd];
 			}
-			V *pe{input[i - 4]};
-			V *pf{input[i - 5]};
-			V *pg{input[i - 6]};
-			V *ph{input[i - 7]};
+			V *RSBD8_RESTRICT pe{input[i - 4]};
+			V *RSBD8_RESTRICT pf{input[i - 5]};
+			V *RSBD8_RESTRICT pg{input[i - 6]};
+			V *RSBD8_RESTRICT ph{input[i - 7]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pne, *pnf, *png, *pnh;
+			V *RSBD8_RESTRICT pne, *RSBD8_RESTRICT pnf, *RSBD8_RESTRICT png, *RSBD8_RESTRICT pnh;
 			if constexpr(prefetchmaxstride){
 				pne = input[i - 4 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				pnf = input[i - 5 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -55713,7 +55500,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const psrclo[], V *pdst[], X offsetscompanion[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -55723,7 +55510,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(pdst);
 	assert(offsetscompanion);
 
-	V *const *psrchi{psrclo + count};
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 	if constexpr(defaultgprfilesize < gprfilesize::large){// architecture: limit to two at a time when there's few registers
 		std::size_t j{(count + 1u + 2u) >> 2};// rounded up in the top part
 		do
@@ -55731,12 +55518,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[likely]]
 #endif
 			{// fill the array, two at a time
-			V *pa{psrchi[0]};
-			V *pb{psrchi[-1]};
+			V *RSBD8_RESTRICT pa{psrchi[0]};
+			V *RSBD8_RESTRICT pb{psrchi[-1]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -55771,14 +55558,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[likely]]
 #endif
 			{// fill the array, four at a time
-			V *pa{psrchi[0]};
-			V *pb{psrchi[-1]};
-			V *pc{psrchi[-2]};
-			V *pd{psrchi[-3]};
+			V *RSBD8_RESTRICT pa{psrchi[0]};
+			V *RSBD8_RESTRICT pb{psrchi[-1]};
+			V *RSBD8_RESTRICT pc{psrchi[-2]};
+			V *RSBD8_RESTRICT pd{psrchi[-3]};
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pna, *pnb, *pnc, *pnd;
+			V *RSBD8_RESTRICT pna, *RSBD8_RESTRICT pnb, *RSBD8_RESTRICT pnc, *RSBD8_RESTRICT pnd;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
 				pna = psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
@@ -55829,7 +55616,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmain(std::size_t count, V *const psrclo[], V *pdst[], X offsets[], unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglesortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsets, unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -55851,12 +55638,12 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, two at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 2);
 					psrclo += 2;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -55883,8 +55670,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, two at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				psrclo += 2;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -55913,16 +55700,16 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 					[[likely]]
 #endif
 					{// fill the array, four at a time
-					V *pa{psrclo[0]};
-					V *pb{psrclo[1]};
-					V *pc{psrclo[2]};
-					V *pd{psrclo[3]};
+					V *RSBD8_RESTRICT pa{psrclo[0]};
+					V *RSBD8_RESTRICT pb{psrclo[1]};
+					V *RSBD8_RESTRICT pc{psrclo[2]};
+					V *RSBD8_RESTRICT pd{psrclo[3]};
 					// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					V *pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
-					V *pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pna{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnb{psrclo[1u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnc{psrclo[2u + prefetchmaxstride / (2u * sizeof(V *))]};
+					V *RSBD8_RESTRICT pnd{psrclo[3u + prefetchmaxstride / (2u * sizeof(V *))]};
 					prefetchforward(psrclo + 4);
 					psrclo += 4;
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
@@ -55961,10 +55748,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				[[likely]]
 #endif
 				{// fill the array, four at a time
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
-				V *pc{psrclo[2]};
-				V *pd{psrclo[3]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
+				V *RSBD8_RESTRICT pc{psrclo[2]};
+				V *RSBD8_RESTRICT pd{psrclo[3]};
 				psrclo += 4;
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -55993,8 +55780,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				pdst[offsetd] = pd;
 			}while(--j);
 			if(2u & count + 1u){// fill in the final two items for a remainder of 2 or 3
-				V *pa{psrclo[0]};
-				V *pb{psrclo[1]};
+				V *RSBD8_RESTRICT pa{psrclo[0]};
+				V *RSBD8_RESTRICT pb{psrclo[1]};
 				auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 				auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
 				U outa{indirectinput2<indirection1, indirection2, isindexed2, false, T>(ima, varparameters...)};
@@ -56014,7 +55801,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			}
 		}
 		if(!(1u & count)){// fill in the final item for odd counts
-			V *p{psrclo[0]};
+			V *RSBD8_RESTRICT p{psrclo[0]};
 			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 			U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 			std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -56022,7 +55809,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offset] = p;
 		}
 	}else{// !ismultithreadcapable
-		V *const *psrchi{psrclo + count};
+		V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{psrclo + count};
 		if(prefetchmaxstride && prefetchmaxstride / sizeof(V *) <= count)
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 			[[likely]]
@@ -56032,14 +55819,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[likely]]
 #endif
 			{// fill the array, two at a time: one low-to-middle, one high-to-middle
-			V *plo{*psrclo};
-			V *phi{*psrchi};
+			V *RSBD8_RESTRICT plo{*psrclo};
+			V *RSBD8_RESTRICT phi{*psrchi};
 			// also prefetch on the first-level indirection to lessen the impact of a random read
 			// the intermediate prefetch is applied at half the maximum prefetch stride
-			V *pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
+			V *RSBD8_RESTRICT pnlo{psrclo[prefetchmaxstride / (2u * sizeof(V *))]};
 			prefetchforward(psrclo + 1);
 			++psrclo;
-			V *pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+			V *RSBD8_RESTRICT pnhi{psrchi[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 			prefetchbackward(psrchi - 1);
 			--psrchi;
 			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
@@ -56065,8 +55852,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			[[likely]]
 #endif
 			{// fill the array, two at a time: one low-to-middle, one high-to-middle
-			V *plo{*psrclo++};
-			V *phi{*psrchi--};
+			V *RSBD8_RESTRICT plo{*psrclo++};
+			V *RSBD8_RESTRICT phi{*psrchi--};
 			auto imlo{indirectinput1<indirection1, isindexed2, false, T, V>(plo, varparameters...)};
 			auto imhi{indirectinput1<indirection1, isindexed2, false, T, V>(phi, varparameters...)};
 			U outlo{indirectinput2<indirection1, indirection2, isindexed2, false, T>(imlo, varparameters...)};
@@ -56084,7 +55871,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			pdst[offsethi] = phi;
 		}while(psrclo < psrchi);
 		if(psrclo == psrchi){// fill in the final item for odd counts
-			V *p{*psrclo};
+			V *RSBD8_RESTRICT p{*psrclo};
 			auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 			U out{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
 			std::size_t cur{filtertop<isabsvalue, issignmode, isfltpmode, T, U>(out)};
@@ -56100,7 +55887,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const input[], V *output[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -56113,32 +55900,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, output, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -56151,7 +55929,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -56212,7 +55990,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const input[], V *output[], vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -56242,11 +56020,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -56264,8 +56042,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -56309,19 +56087,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[j]};
-							V *pb{pinput[j - 1]};
+							V *RSBD8_RESTRICT pa{pinput[j]};
+							V *RSBD8_RESTRICT pb{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							poutput[j] = pa;
@@ -56348,8 +56126,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i]};
-					V *pb{input[i - 1]};
+					V *RSBD8_RESTRICT pa{input[i]};
+					V *RSBD8_RESTRICT pb{input[i - 1]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					output[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56364,7 +56142,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -56384,23 +56162,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT poutput{output + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[j + 7]};
-							V *pb{pinput[j + 6]};
-							V *pc{pinput[j + 5]};
-							V *pd{pinput[j + 4]};
+							V *RSBD8_RESTRICT pa{pinput[j + 7]};
+							V *RSBD8_RESTRICT pb{pinput[j + 6]};
+							V *RSBD8_RESTRICT pc{pinput[j + 5]};
+							V *RSBD8_RESTRICT pd{pinput[j + 4]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{pinput[j + 7 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnb{pinput[j + 6 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnc{pinput[j + 5 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnd{pinput[j + 4 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pna{pinput[j + 7 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnb{pinput[j + 6 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnc{pinput[j + 5 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnd{pinput[j + 4 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							poutput[j + 7] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56425,14 +56203,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[curc];
 								++offsets[curd];
 							}
-							V *pe{pinput[j + 3]};
-							V *pf{pinput[j + 2]};
-							V *pg{pinput[j + 1]};
-							V *ph{pinput[j]};
-							V *pne{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnf{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *png{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnh{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pe{pinput[j + 3]};
+							V *RSBD8_RESTRICT pf{pinput[j + 2]};
+							V *RSBD8_RESTRICT pg{pinput[j + 1]};
+							V *RSBD8_RESTRICT ph{pinput[j]};
+							V *RSBD8_RESTRICT pne{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnf{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT png{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnh{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 1);
 							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							poutput[j + 3] = pe;
@@ -56478,10 +56256,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
-					V *pc{input[i + 5]};
-					V *pd{input[i + 4]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
+					V *RSBD8_RESTRICT pc{input[i + 5]};
+					V *RSBD8_RESTRICT pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					output[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56502,10 +56280,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[curc];
 						++offsets[curd];
 					}
-					V *pe{input[i + 3]};
-					V *pf{input[i + 2]};
-					V *pg{input[i + 1]};
-					V *ph{input[i]};
+					V *RSBD8_RESTRICT pe{input[i + 3]};
+					V *RSBD8_RESTRICT pf{input[i + 2]};
+					V *RSBD8_RESTRICT pg{input[i + 1]};
+					V *RSBD8_RESTRICT ph{input[i]};
 					auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 					output[i + 3] = pe;
 					auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
@@ -56537,10 +56315,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 8;
 				}
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
-					V *pc{input[i + 5]};
-					V *pd{input[i + 4]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
+					V *RSBD8_RESTRICT pc{input[i + 5]};
+					V *RSBD8_RESTRICT pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					output[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56563,8 +56341,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curd];
 				}
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					output[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56578,7 +56356,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curb];
 				}
 				if(1 & i){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					output[0] = p;
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -56588,38 +56366,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -56633,7 +56399,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -56691,7 +56457,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *input[], V *buffer[], std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *pslicehandle, std::atomic_uintptr_t &atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -56704,32 +56470,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 	[[maybe_unused]]
 #endif
-	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-		std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+	std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, buffer, varparameters...)};
-	unsigned j{allowedthreads >> 1};// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
-	while(--j)
+	// combine the data from several threads
+	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+	if(unsigned num{(allowedthreads >> 1) - 1u})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 		[[likely]]
 #endif
-		{// combine the data from several threads
-		auto const &slicedata{pslicehandle->get()};
-		++pslicehandle;
-		//std::transform(std::execution::par_unseq, offsetscompanion.begin(), offsetscompanion.end(), slicedata.begin(), offsetscompanion.begin(), std::plus<X>{});
-		X *piter{offsetscompanion.data()};
-		for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
-#endif
-			*piter++ += element;// this will usually inline and auto-vectorise
-	}
+		accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsetscompanion, pslicehandle);
 
-	X *offsets;
+	X *RSBD8_RESTRICT offsets;
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -56742,7 +56499,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -56803,7 +56560,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -56833,11 +56590,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::vector<std::future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
+		std::conditional_t<ismultithreadcapable, std::vector<std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X>>>, std::nullptr_t> initasynchandlesvector;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
-		std::conditional_t<ismultithreadcapable, std::future<void>, std::nullptr_t> asynchandle;
+		std::conditional_t<ismultithreadcapable, std::shared_future<void>, std::nullptr_t> asynchandle;
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 		[[maybe_unused]]
 #endif
@@ -56855,8 +56612,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			[[maybe_unused]]
 #endif
 			std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
-					std::atomic_uintptr_t &,// nothrow capable indirection1, let the compiler just discard this reference
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
 
@@ -56900,19 +56657,19 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[j]};
-							V *pb{pinput[j - 1]};
+							V *RSBD8_RESTRICT pa{pinput[j]};
+							V *RSBD8_RESTRICT pb{pinput[j - 1]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnhi{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnlo{pinput[j - 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 2);
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							pbuffer[j] = pa;
@@ -56939,8 +56696,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i]};
-					V *pb{input[i - 1]};
+					V *RSBD8_RESTRICT pa{input[i]};
+					V *RSBD8_RESTRICT pb{input[i - 1]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					buffer[i] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -56955,7 +56712,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 2;
 				}while(0 < i);
 				if(!(1 & i)){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					buffer[0] = p;
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -56975,23 +56732,23 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						[[likely]]
 #endif
 						{
-						V *const *pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
-						V **pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
+						V *const RSBD8_RESTRICT *RSBD8_RESTRICT pinput{input + prefetchmaxstride / (2u * sizeof(V *))};
+						V *RSBD8_RESTRICT *RSBD8_RESTRICT pbuffer{buffer + prefetchmaxstride / (2u * sizeof(V *))};
 						do
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
 							[[likely]]
 #endif
 							{
-							V *pa{pinput[j + 7]};
-							V *pb{pinput[j + 6]};
-							V *pc{pinput[j + 5]};
-							V *pd{pinput[j + 4]};
+							V *RSBD8_RESTRICT pa{pinput[j + 7]};
+							V *RSBD8_RESTRICT pb{pinput[j + 6]};
+							V *RSBD8_RESTRICT pc{pinput[j + 5]};
+							V *RSBD8_RESTRICT pd{pinput[j + 4]};
 							// also prefetch on the first-level indirection to lessen the impact of a random read
 							// the intermediate prefetch is applied at half the maximum prefetch stride
-							V *pna{pinput[j + 7 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnb{pinput[j + 6 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnc{pinput[j + 5 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnd{pinput[j + 4 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pna{pinput[j + 7 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnb{pinput[j + 6 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnc{pinput[j + 5 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnd{pinput[j + 4 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 							pbuffer[j + 7] = pa;
 							auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -57016,14 +56773,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 								++offsets[curc];
 								++offsets[curd];
 							}
-							V *pe{pinput[j + 3]};
-							V *pf{pinput[j + 2]};
-							V *pg{pinput[j + 1]};
-							V *ph{pinput[j]};
-							V *pne{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnf{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *png{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
-							V *pnh{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pe{pinput[j + 3]};
+							V *RSBD8_RESTRICT pf{pinput[j + 2]};
+							V *RSBD8_RESTRICT pg{pinput[j + 1]};
+							V *RSBD8_RESTRICT ph{pinput[j]};
+							V *RSBD8_RESTRICT pne{pinput[j + 3 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnf{pinput[j + 2 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT png{pinput[j + 1 - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
+							V *RSBD8_RESTRICT pnh{pinput[j - static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))]};
 							prefetchbackward(pinput + j - 1);
 							auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 							pbuffer[j + 3] = pe;
@@ -57069,10 +56826,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					[[likely]]
 #endif
 					{
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
-					V *pc{input[i + 5]};
-					V *pd{input[i + 4]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
+					V *RSBD8_RESTRICT pc{input[i + 5]};
+					V *RSBD8_RESTRICT pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					buffer[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -57093,10 +56850,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						++offsets[curc];
 						++offsets[curd];
 					}
-					V *pe{input[i + 3]};
-					V *pf{input[i + 2]};
-					V *pg{input[i + 1]};
-					V *ph{input[i]};
+					V *RSBD8_RESTRICT pe{input[i + 3]};
+					V *RSBD8_RESTRICT pf{input[i + 2]};
+					V *RSBD8_RESTRICT pg{input[i + 1]};
+					V *RSBD8_RESTRICT ph{input[i]};
 					auto ime{indirectinput1<indirection1, isindexed2, false, T, V>(pe, varparameters...)};
 					buffer[i + 3] = pe;
 					auto imf{indirectinput1<indirection1, isindexed2, false, T, V>(pf, varparameters...)};
@@ -57128,10 +56885,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					i -= 8;
 				}
 				if(4 & i){// fill in the final four items for a remainder of 4 to 7
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
-					V *pc{input[i + 5]};
-					V *pd{input[i + 4]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
+					V *RSBD8_RESTRICT pc{input[i + 5]};
+					V *RSBD8_RESTRICT pd{input[i + 4]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					buffer[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -57154,8 +56911,8 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curd];
 				}
 				if(2 & i){// fill in the final two items for a remainder of 2 or 3
-					V *pa{input[i + 7]};
-					V *pb{input[i + 6]};
+					V *RSBD8_RESTRICT pa{input[i + 7]};
+					V *RSBD8_RESTRICT pb{input[i + 6]};
 					auto ima{indirectinput1<indirection1, isindexed2, false, T, V>(pa, varparameters...)};
 					buffer[i + 7] = pa;
 					auto imb{indirectinput1<indirection1, isindexed2, false, T, V>(pb, varparameters...)};
@@ -57169,7 +56926,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[curb];
 				}
 				if(1 & i){// fill in the final item for odd counts
-					V *p{input[0]};
+					V *RSBD8_RESTRICT p{input[0]};
 					auto im{indirectinput1<indirection1, isindexed2, false, T, V>(p, varparameters...)};
 					buffer[0] = p;
 					U cur{indirectinput2<indirection1, indirection2, isindexed2, false, T>(im, varparameters...)};
@@ -57179,38 +56936,26 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					++offsets[cur];
 				}
 			}
-			if constexpr(ismultithreadcapable) if(unsigned j{((allowedthreads - 1u) >> usemultithread) - assignedslice})
+			// combine the data from several threads
+			// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+			if constexpr(ismultithreadcapable) if(unsigned num{((allowedthreads - 1u) >> usemultithread) - assignedslice})
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-			[[likely]]
+				[[likely]]
 #endif
-				{// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
+				{
 				auto pslicehandle{initasynchandlesvector.data()};
-				do
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-					[[likely]]
-#endif
-					{// combine the data from several threads
-					auto const &slicedata{pslicehandle->get()};
-					++pslicehandle;
-					//std::transform(std::execution::par_unseq, offsets.begin(), offsets.end(), slicedata.begin(), offsets.begin(), std::plus<X>{});
-					X *piter{offsets.data()};
-					for(X element : slicedata)
-#if defined(__has_cpp_attribute) && __has_cpp_attribute(likely)
-						[[likely]]
-#endif
-						*piter++ += element;// this will usually inline and auto-vectorise
-				}while(--j);
+				accumulateoffsetsarrays<isabsvalue, issignmode, isfltpmode, T, X>(num, offsets, pslicehandle);
 			}
 
 			// barrier and pointer exchange with the companion thread
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			std::conditional_t<ismultithreadcapable, X *, std::nullptr_t> offsetscompanion;
+			std::conditional_t<ismultithreadcapable, X *RSBD8_RESTRICT, std::nullptr_t> offsetscompanion;
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -57224,7 +56969,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -57288,7 +57033,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocsingle(std::size_t count, T const input[], T output[])noexcept{
+	void> radixsortcopynoallocsingle(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -57376,7 +57121,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	(std::is_unsigned_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoallocsingle(std::size_t count, T input[], T buffer[])noexcept{
+	void> radixsortnoallocsingle(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -57472,7 +57217,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(T) &&
 	!(isabsvalue && issignmode) &&// both regular absolute modes
 	!(!isabsvalue && issignmode && isfltpmode),// regular floating-point mode
-	void> radixsortnoallocsingle(std::size_t count, T input[])noexcept{
+	void> radixsortnoallocsingle(std::size_t count, T *RSBD8_RESTRICT input)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 
@@ -57556,7 +57301,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsingle(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocsingle(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -57643,7 +57388,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsingle(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocsingle(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -57736,7 +57481,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoallocmulti(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -57828,7 +57573,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void> radixsortnoallocmulti(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -57919,7 +57664,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoallocmulti(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -58010,7 +57755,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmulti(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoallocmulti(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -60221,7 +59966,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> mergehalvesmtc(std::size_t count, T const input[], T output[])noexcept{
+	void> mergehalvesmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -60234,9 +59979,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// process the high half here (rounded up)
 	std::size_t halfcount{(count >> 1) - 1u};// rounded down and one less, as the odd count and final items are handled outside of the loop
-	W *pout{reinterpret_cast<W *>(output) + (count - 1u)};
-	W const *pdatahi{reinterpret_cast<W const *>(input) + (!isrevorder? count - 1u : halfcount)};
-	W const *pdatalo{reinterpret_cast<W const *>(input) + (isrevorder? count - 1u : halfcount)};
+	W *RSBD8_RESTRICT pout{reinterpret_cast<W *>(output) + (count - 1u)};
+	W const *RSBD8_RESTRICT pdatahi{reinterpret_cast<W const *>(input) + (!isrevorder? count - 1u : halfcount)};
+	W const *RSBD8_RESTRICT pdatalo{reinterpret_cast<W const *>(input) + (isrevorder? count - 1u : halfcount)};
 	U curhi{*pdatahi}, curlo{*pdatalo};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comphi, complo]{convertinput<isabsvalue, issignmode, isfltpmode, W>(curhi, curlo)};
@@ -60608,7 +60353,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> mergehalvesmain(std::size_t count, T const input[], T output[])noexcept{
+	void> mergehalvesmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -60621,9 +60366,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// process the low half here (rounded down)
 	std::size_t halfcount{count >> 1};
-	W *pout{reinterpret_cast<W *>(output)};
-	W const *pdatalo{reinterpret_cast<W const *>(input) + isrevorder * halfcount};
-	W const *pdatahi{reinterpret_cast<W const *>(input) + !isrevorder * halfcount};
+	W *RSBD8_RESTRICT pout{reinterpret_cast<W *>(output)};
+	W const *RSBD8_RESTRICT pdatalo{reinterpret_cast<W const *>(input) + isrevorder * halfcount};
+	W const *RSBD8_RESTRICT pdatahi{reinterpret_cast<W const *>(input) + !isrevorder * halfcount};
 	U curlo{*pdatalo}, curhi{*pdatahi};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
@@ -60840,7 +60585,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -60852,7 +60597,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 		unsigned reportedcores,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -60910,7 +60655,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
@@ -60956,7 +60701,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// merging phase
-		std::future<void> asyncreturnhandle;
+		std::shared_future<void> asyncreturnhandle;
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that output and buffer were swapped in the initial phase
@@ -61012,7 +60757,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
@@ -61024,7 +60769,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 8 <= (RSBD8_THREAD_MAXIMUM)
 		unsigned reportedcores,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -61079,7 +60824,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
@@ -61125,7 +60870,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 
 		// merging phase
-		std::future<void> asyncreturnhandle;
+		std::shared_future<void> asyncreturnhandle;
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that input and buffer were swapped in the initial phase
@@ -61185,7 +60930,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> mergethirdsmtc(std::size_t count, T const input[], T output[])noexcept{
+	void> mergethirdsmtc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -61201,14 +60946,14 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::size_t thirdcountmid{(count + 1u) / 3u};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
-	W *pout{reinterpret_cast<W *>(output) + count - 1};
-	W const *pdata2{reinterpret_cast<W const *>(input) + (!isrevorder? count - 1u : thirdcount)};
-	W const *pdata1{reinterpret_cast<W const *>(input) + (thirdcount + thirdcountmid)};
-	W const *pdata0{reinterpret_cast<W const *>(input) + (isrevorder? count - 1u : thirdcount)};
+	W *RSBD8_RESTRICT pout{reinterpret_cast<W *>(output) + count - 1};
+	W const *RSBD8_RESTRICT pdata2{reinterpret_cast<W const *>(input) + (!isrevorder? count - 1u : thirdcount)};
+	W const *RSBD8_RESTRICT pdata1{reinterpret_cast<W const *>(input) + (thirdcount + thirdcountmid)};
+	W const *RSBD8_RESTRICT pdata0{reinterpret_cast<W const *>(input) + (isrevorder? count - 1u : thirdcount)};
 	U cur2{*pdata2}, cur1{*pdata1}, cur0{*pdata0};
-	W const *pdata2stop{!isrevorder? pdata1 : reinterpret_cast<W const *>(input) - 1};
-	W const *pdata1stop{!isrevorder? pdata0 : pdata2};
-	W const *pdata0stop{isrevorder? pdata1 : reinterpret_cast<W const *>(input) - 1};
+	W const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 : reinterpret_cast<W const *>(input) - 1};
+	W const *RSBD8_RESTRICT pdata1stop{!isrevorder? pdata0 : pdata2};
+	W const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 : reinterpret_cast<W const *>(input) - 1};
 	if constexpr(isabsvalue || isfltpmode){// filtered input, convert everything for unsigned comparisons
 		auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2, cur1, cur0)};
 #if defined(_DEBUG) || defined(DEBUG)
@@ -61855,7 +61600,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> mergethirdsmain(std::size_t count, T const input[], T output[])noexcept{
+	void> mergethirdsmain(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using U = std::conditional_t<std::is_signed_v<W> && sizeof(W) < sizeof(std::intptr_t), std::intptr_t,// sign-extend signed types for masking operations
 		std::conditional_t<std::is_unsigned_v<W> && sizeof(W) < sizeof(unsigned), unsigned, W>>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -61869,10 +61614,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// process the low half here (rounded down)
 	std::size_t thirdcount{count / 3u};
 	std::size_t const thirdcountmid{(count + 1u) / 3u};
-	W *pout{reinterpret_cast<W *>(output)};
-	W const *pdata0{reinterpret_cast<W const *>(input) + isrevorder * (thirdcount + thirdcountmid)};
-	W const *pdata1{reinterpret_cast<W const *>(input) + thirdcount};
-	W const *pdata2{reinterpret_cast<W const *>(input) + !isrevorder * (thirdcount + thirdcountmid)};
+	W *RSBD8_RESTRICT pout{reinterpret_cast<W *>(output)};
+	W const *RSBD8_RESTRICT pdata0{reinterpret_cast<W const *>(input) + isrevorder * (thirdcount + thirdcountmid)};
+	W const *RSBD8_RESTRICT pdata1{reinterpret_cast<W const *>(input) + thirdcount};
+	W const *RSBD8_RESTRICT pdata2{reinterpret_cast<W const *>(input) + !isrevorder * (thirdcount + thirdcountmid)};
 	U cur0{*pdata0}, cur1{*pdata1}, cur2{*pdata2};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
@@ -62300,7 +62045,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortcopynoallocmulti6thread
 #endif
-	(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -62347,7 +62092,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -62409,7 +62154,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that output and buffer were swapped in the initial phase
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergethirdsmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
@@ -62457,7 +62202,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortnoallocmulti6thread
 #endif
-	(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -62501,7 +62246,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -62568,7 +62313,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				input = buffer;
 				buffer = tmp;
 			}
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergethirdsmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
@@ -62621,7 +62366,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -62633,7 +62378,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 		unsigned reportedcores,
 #endif
-		std::size_t count, T const input[], T output[], T buffer[])noexcept{
+		std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -62699,7 +62444,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
@@ -62745,7 +62490,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			}
 
 			// merging phase
-			std::future<void> asyncreturnhandle;
+			std::shared_future<void> asyncreturnhandle;
 			if(finalcount != count){// conditionally enable multithreading here
 				// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 				// note that output and buffer were swapped in the initial phase
@@ -62821,7 +62566,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 	void
 #else
-	std::future<void>
+	std::shared_future<void>
 #endif
 	>
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
@@ -62833,7 +62578,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 16 <= (RSBD8_THREAD_MAXIMUM)
 		unsigned reportedcores,
 #endif
-		std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+		std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -62896,7 +62641,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 					if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
@@ -62942,7 +62687,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 
 				// merging phase
-				std::future<void> asyncreturnhandle;
+				std::shared_future<void> asyncreturnhandle;
 				if(finalcount != count){// conditionally enable multithreading here
 					// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 					// note that input and buffer were swapped in the initial phase
@@ -63021,7 +62766,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoallocmulti(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoallocmulti(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -63091,7 +62836,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < reportedcores && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -63136,7 +62881,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(finalcount != count){// conditionally enable multithreading here
 					// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 					// note that output and buffer were swapped in the initial phase
-					std::future<void> asynchandle;
+					std::shared_future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
 						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, output, buffer);
@@ -63218,7 +62963,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoallocmulti(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void> radixsortnoallocmulti(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -63285,7 +63030,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < reportedcores && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -63335,7 +63080,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						input = buffer;
 						buffer = tmp;
 					}
-					std::future<void> asynchandle;
+					std::shared_future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
 						asynchandle = std::async(std::launch::async, mergehalvesmtc<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>, count, input, buffer);
@@ -63421,7 +63166,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergehalvesmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> mergehalvesmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -63433,9 +63178,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// process the high half here (rounded up)
 	std::size_t halfcount{count >> 1};
-	std::intptr_t *pout{reinterpret_cast<std::intptr_t *>(output) + (count - 1u)};
-	std::intptr_t const *pdatahi{reinterpret_cast<std::intptr_t const *>(input) + (!isrevorder? count - 1u : halfcount)};
-	std::intptr_t const *pdatalo{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1u : halfcount)};
+	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *>(output) + (count - 1u)};
+	std::intptr_t const *RSBD8_RESTRICT pdatahi{reinterpret_cast<std::intptr_t const *>(input) + (!isrevorder? count - 1u : halfcount)};
+	std::intptr_t const *RSBD8_RESTRICT pdatalo{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1u : halfcount)};
 	std::intptr_t phi{*pdatahi}, plo{*pdatalo};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
 	auto imhiinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
@@ -63467,10 +63212,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdatalo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatalo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
@@ -63490,10 +63235,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdatahi)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatahi)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
@@ -63539,10 +63284,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(platestlo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platestlo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platestlo) - 1);
 			std::intptr_t latestlo{*reinterpret_cast<std::intptr_t const *>(platestlo)};
@@ -63686,7 +63431,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergehalvesmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> mergehalvesmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -63698,9 +63443,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 
 	// process the low half here (rounded down)
 	std::size_t halfcount{count >> 1};
-	std::intptr_t *pout{reinterpret_cast<std::intptr_t *>(output)};
-	std::intptr_t const *pdatalo{reinterpret_cast<std::intptr_t const *>(input) + !isrevorder * halfcount};
-	std::intptr_t const *pdatahi{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * halfcount};
+	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *>(output)};
+	std::intptr_t const *RSBD8_RESTRICT pdatalo{reinterpret_cast<std::intptr_t const *>(input) + !isrevorder * halfcount};
+	std::intptr_t const *RSBD8_RESTRICT pdatahi{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * halfcount};
 	std::intptr_t plo{*pdatalo}, phi{*pdatahi};
 	--halfcount;// rounded down and one less, as the final item is handled outside of the loop
 	auto imloinit{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
@@ -63732,10 +63477,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdatahi)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatahi)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
@@ -63755,10 +63500,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdatalo)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatalo)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
@@ -63804,10 +63549,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(platesthi)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platesthi)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *>(platesthi) + 1);
 			std::intptr_t latesthi{*reinterpret_cast<std::intptr_t const *>(platesthi)};
@@ -63872,7 +63617,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -63931,7 +63676,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
@@ -63980,7 +63725,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that output and buffer were swapped in the initial phase
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
@@ -64036,7 +63781,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -64092,7 +63837,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 8 > (RSBD8_THREAD_MAXIMUM)
 			if(3u < reportedcores && limit4way <= count){// 4-way limit
 #endif
@@ -64141,12 +63886,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that input and buffer were swapped in the initial phase
-			V **tmp{input};
+			V *RSBD8_RESTRICT *tmp{input};
 			if(movetobuffer){
 				input = buffer;
 				buffer = tmp;
 			}
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
@@ -64194,7 +63939,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergethirdsmtc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> mergethirdsmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -64209,10 +63954,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::size_t thirdcountmid{(count + 1u) / 3u};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
-	std::intptr_t *pout{reinterpret_cast<std::intptr_t *>(output) + count - 1};
-	std::intptr_t const *pdata2{reinterpret_cast<std::intptr_t const *>(input) + (!isrevorder? count - 1u : thirdcount)};
-	std::intptr_t const *pdata1{reinterpret_cast<std::intptr_t const *>(input) + (thirdcount + thirdcountmid)};
-	std::intptr_t const *pdata0{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1u : thirdcount)};
+	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *>(output) + count - 1};
+	std::intptr_t const *RSBD8_RESTRICT pdata2{reinterpret_cast<std::intptr_t const *>(input) + (!isrevorder? count - 1u : thirdcount)};
+	std::intptr_t const *RSBD8_RESTRICT pdata1{reinterpret_cast<std::intptr_t const *>(input) + (thirdcount + thirdcountmid)};
+	std::intptr_t const *RSBD8_RESTRICT pdata0{reinterpret_cast<std::intptr_t const *>(input) + (isrevorder? count - 1u : thirdcount)};
 	std::intptr_t p2{*pdata2}, p1{*pdata1}, p0{*pdata0};
 	auto im2init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 	auto im1init{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
@@ -64220,9 +63965,9 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	auto cur2init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2init, varparameters...)};
 	auto cur1init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1init, varparameters...)};
 	auto cur0init{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0init, varparameters...)};
-	std::intptr_t const *pdata2stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
-	std::intptr_t const *pdata1stop{!isrevorder? pdata0 : pdata2};
-	std::intptr_t const *pdata0stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
+	std::intptr_t const *RSBD8_RESTRICT pdata2stop{!isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
+	std::intptr_t const *RSBD8_RESTRICT pdata1stop{!isrevorder? pdata0 : pdata2};
+	std::intptr_t const *RSBD8_RESTRICT pdata0stop{isrevorder? pdata1 : reinterpret_cast<std::intptr_t const *>(input) - 1};
 	auto[comp2, comp1, comp0]{convertinput<isabsvalue, issignmode, isfltpmode, W>(cur2init, cur1init, cur0init)};
 #if defined(_DEBUG) || defined(DEBUG)
 	decltype(comp2) previouscomp;// used for debug assertion of the sorted order
@@ -64248,10 +63993,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64271,10 +64016,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -64295,10 +64040,10 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -64332,10 +64077,10 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64361,10 +64106,10 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -64393,10 +64138,10 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -64479,10 +64224,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64502,10 +64247,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -64551,10 +64296,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(platest1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platest1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platest1) - 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
@@ -64695,7 +64440,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergethirdsmain(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> mergethirdsmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -64708,10 +64453,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	// process the low half here (rounded down)
 	std::size_t thirdcount{count / 3u};
 	std::size_t const thirdcountmid{(count + 1u) / 3u};
-	std::intptr_t *pout{reinterpret_cast<std::intptr_t *>(output)};
-	std::intptr_t const *pdata0{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * (thirdcount + thirdcountmid)};
-	std::intptr_t const *pdata1{reinterpret_cast<std::intptr_t const *>(input) + thirdcount};
-	std::intptr_t const *pdata2{reinterpret_cast<std::intptr_t const *>(input) + !isrevorder * (thirdcount + thirdcountmid)};
+	std::intptr_t *RSBD8_RESTRICT pout{reinterpret_cast<std::intptr_t *>(output)};
+	std::intptr_t const *RSBD8_RESTRICT pdata0{reinterpret_cast<std::intptr_t const *>(input) + isrevorder * (thirdcount + thirdcountmid)};
+	std::intptr_t const *RSBD8_RESTRICT pdata1{reinterpret_cast<std::intptr_t const *>(input) + thirdcount};
+	std::intptr_t const *RSBD8_RESTRICT pdata2{reinterpret_cast<std::intptr_t const *>(input) + !isrevorder * (thirdcount + thirdcountmid)};
 	std::intptr_t p0{*pdata0}, p1{*pdata1}, p2{*pdata2};
 	std::size_t finalcount{(count >> 1) - thirdcount};// half of count (rounded down) minus thirdcount, used for finalisation
 	--thirdcount;// rounded down and one less, as the final item is handled outside of the loop
@@ -64749,10 +64494,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64772,10 +64517,10 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -64796,10 +64541,10 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -64833,10 +64578,10 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64861,10 +64606,10 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -64891,10 +64636,10 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -64933,10 +64678,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -64956,10 +64701,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 				[[maybe_unused]]
 #endif
-				V *pn;
+				V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -65005,10 +64750,10 @@ lastloop:
 #if defined(__has_cpp_attribute) && __has_cpp_attribute(maybe_unused)
 			[[maybe_unused]]
 #endif
-			V *pn;
+			V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const *>(platest1)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platest1)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *>(platest1) + 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
@@ -65066,7 +64811,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortcopynoallocmulti6thread
 #endif
-	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -65114,7 +64859,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -65176,7 +64921,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that output and buffer were swapped in the initial phase
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergethirdsmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
@@ -65222,7 +64967,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortnoallocmulti6thread
 #endif
-	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -65267,7 +65012,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		}
 		std::size_t finalcount{count};// depending on multithreading, this will be either count or one third of count (rounded down)
 		{
-			std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+			std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 			static std::size_t constexpr limit6way{
 #if !defined(RSBD8_THREAD_MINIMUM) || 6 > (RSBD8_THREAD_MINIMUM)
 				base6waythreshold<isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, T>()
@@ -65329,12 +65074,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		if(finalcount != count){// conditionally enable multithreading here
 			// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 			// note that input and buffer were swapped in the initial phase
-			V **tmp{input};
+			V *RSBD8_RESTRICT *tmp{input};
 			if(movetobuffer){
 				input = buffer;
 				buffer = tmp;
 			}
-			std::future<void> asynchandle;
+			std::shared_future<void> asynchandle;
 			try{
 				// process the upper half separately if possible
 				asynchandle = std::async(std::launch::async, mergethirdsmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
@@ -65392,7 +65137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -65459,7 +65204,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
@@ -65508,7 +65253,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(finalcount != count){// conditionally enable multithreading here
 				// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 				// note that output and buffer were swapped in the initial phase
-				std::future<void> asynchandle;
+				std::shared_future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
 					asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
@@ -65584,7 +65329,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -65648,7 +65393,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #endif
 			std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 			{
-				std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+				std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 #if defined(RSBD8_THREAD_MAXIMUM) && 16 > (RSBD8_THREAD_MAXIMUM)
 				if(7u < reportedcores && limit8way <= count){// 8-way limit
 #endif
@@ -65697,12 +65442,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if(finalcount != count){// conditionally enable multithreading here
 				// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 				// note that input and buffer were swapped in the initial phase
-				V **tmp{input};
+				V *RSBD8_RESTRICT *tmp{input};
 				if(movetobuffer){
 					input = buffer;
 					buffer = tmp;
 				}
-				std::future<void> asynchandle;
+				std::shared_future<void> asynchandle;
 				try{
 					// process the upper half separately if possible
 					asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
@@ -65774,7 +65519,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortcopynoallocmulti16thread
 #endif
-	(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -65845,7 +65590,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < reportedcores && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -65890,7 +65635,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(finalcount != count){// conditionally enable multithreading here
 					// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 					// note that output and buffer were swapped in the initial phase
-					std::future<void> asynchandle;
+					std::shared_future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
 						asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, output, buffer, varparameters...);
@@ -65976,7 +65721,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortnoallocmulti16thread
 #endif
-	(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -66044,7 +65789,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				}
 				std::size_t finalcount{count};// depending on multithreading, this will be either count or one half of count (rounded down)
 				{
-					std::future<std::future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
+					std::shared_future<std::shared_future<void>> asynchandle;// this is to avoid having the child std::async task wait on the grandchild std::async task and instead do both here
 					if(15u < reportedcores && limit16way <= count){// 16-way limit
 						std::size_t const halfcounttop{(count + 1u) >> 1};// rounded up
 						std::size_t const halfcount{count >> 1};// rounded down
@@ -66089,12 +65834,12 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				if(finalcount != count){// conditionally enable multithreading here
 					// this cannot be synchronised by a simple spinlock, as the processing above will most likely involve waiting on two other threads to finish
 					// note that input and buffer were swapped in the initial phase
-					V **tmp{input};
+					V *RSBD8_RESTRICT *tmp{input};
 					if(movetobuffer){
 						input = buffer;
 						buffer = tmp;
 					}
-					std::future<void> asynchandle;
+					std::shared_future<void> asynchandle;
 					try{
 						// process the upper half separately if possible
 						asynchandle = std::async(std::launch::async, mergehalvesmtc<indirection1, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, vararguments...>, count, input, buffer, varparameters...);
@@ -66380,11 +66125,11 @@ RSBD8_FUNC_INLINE T *
 	DWORD alloctype{MEM_RESERVE | MEM_COMMIT};
 	DWORD largealloctype{MEM_LARGE_PAGES | MEM_RESERVE | MEM_COMMIT};
 	if(largepagesize) allocsize = largeallocsize, alloctype = largealloctype;
-	T *buffer{reinterpret_cast<T *>(VirtualAlloc(nullptr, allocsize, alloctype, PAGE_READWRITE))};
+	T *RSBD8_RESTRICT buffer{reinterpret_cast<T *>(VirtualAlloc(nullptr, allocsize, alloctype, PAGE_READWRITE))};
 	return{buffer};
 #elif defined(_POSIX_C_SOURCE)
 	std::size_t allocsize{count * sizeof(T)};
-	void *pempty{};
+	void *RSBD8_RESTRICT pempty{};
 #ifdef MAP_HUGETLB
 	if(MAP_HUGETLB & mmapflags){// use the 6 bits associated with the huge TLB functionality
 		std::size_t pagesize{static_cast<std::size_t>(1u) << (static_cast<unsigned>(mmapflags) >> MAP_HUGE_SHIFT & ((1u << 6) - 1u))};
@@ -66394,16 +66139,16 @@ RSBD8_FUNC_INLINE T *
 #endif
 	}
 #endif
-	T *buffer{reinterpret_cast<T *>(mmap(pempty, allocsize, PROT_READ | PROT_WRITE, mmapflags, -1, 0))};
+	T *RSBD8_RESTRICT buffer{reinterpret_cast<T *>(mmap(pempty, allocsize, PROT_READ | PROT_WRITE, mmapflags, -1, 0))};
 	return{buffer, allocsize};
 #else
-	T *buffer{new(std::nothrow) T[count]};
+	T *RSBD8_RESTRICT buffer{new(std::nothrow) T[count]};
 	return{buffer};
 #endif
 }
 
 template<typename T>
-RSBD8_FUNC_INLINE void deallocatearray(T *buffer
+RSBD8_FUNC_INLINE void deallocatearray(T *RSBD8_RESTRICT buffer
 #if !defined(_WIN32) && defined(_POSIX_C_SOURCE)// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 	, std::size_t allocsize
 #endif
@@ -66430,7 +66175,7 @@ RSBD8_FUNC_INLINE void deallocatearray(T *buffer
 // this class is a simple RAII wrapper for the buffer memory allocated with allocatearray()
 template<typename T>
 struct buffermemorywrapper{
-	T *ptr;
+	T *RSBD8_RESTRICT ptr;
 #if defined(_POSIX_C_SOURCE)
 	std::size_t size;
 #endif
@@ -66443,7 +66188,7 @@ struct buffermemorywrapper{
 	// disable copy and move mechanisms
 	buffermemorywrapper(buffermemorywrapper const &) = delete;
 	buffermemorywrapper &operator=(buffermemorywrapper const &) = delete;
-	RSBD8_FUNC_INLINE buffermemorywrapper(T *ptrmem
+	RSBD8_FUNC_INLINE buffermemorywrapper(T *RSBD8_RESTRICT ptrmem
 #if defined(_POSIX_C_SOURCE)
 		, sizemem
 #endif
@@ -66464,7 +66209,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -66490,7 +66235,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer = false)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer = false)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66512,7 +66257,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[])noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output)noexcept{
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -66534,7 +66279,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T const input[], T output[], T buffer[])noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -66554,7 +66299,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T input[], T buffer[])noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66579,7 +66324,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T input[])noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT input)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 
@@ -66603,7 +66348,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T input[], T buffer[], bool movetobuffer)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT input, T *RSBD8_RESTRICT buffer, bool movetobuffer)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66631,7 +66376,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T input[], bool movetobuffer)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT input, bool movetobuffer)noexcept{
 	// do not pass a nullptr here
 	assert(input);
 
@@ -66659,7 +66404,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T),
-	bool> radixsort(std::size_t count, T input[]
+	bool> radixsort(std::size_t count, T *RSBD8_RESTRICT input
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -66723,7 +66468,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	bool> radixsortcopy(std::size_t count, T const input[], T output[]
+	bool> radixsortcopy(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -66781,7 +66526,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	bool> radixsortcopy(std::size_t count, T const input[], T output[]
+	bool> radixsortcopy(std::size_t count, T const *RSBD8_RESTRICT input, T *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -66812,7 +66557,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T *const RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT output, T *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -66831,7 +66576,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortcopynoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), reinterpret_cast<V **>(buffer), varparameters...);
+	helper::radixsortcopynoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(output), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
 }
 
 // wrapper for the multi-part radixsortnoalloc() function with simple second-level indirection
@@ -66842,7 +66587,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66858,7 +66603,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortnoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), movetobuffer, varparameters...);
+	helper::radixsortnoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), movetobuffer, varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection
@@ -66868,7 +66613,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T *const RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept{
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -66884,7 +66629,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), varparameters...);
+	helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(output), varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection with a dummy buffer argument
@@ -66894,7 +66639,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortcopynoalloc(std::size_t count, T *const input[], T *output[], T *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, T *const RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT output, T *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -66914,7 +66659,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66930,7 +66675,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
+	helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
 }
 
 // wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with simple second-level indirection
@@ -66941,7 +66686,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	void> radixsortnoalloc(std::size_t count, T *input[], T *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, T *RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer, vararguments... varparameters)noexcept{
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -66957,8 +66702,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
-	else helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
+	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
+	else helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
 }
 
 // wrapper to implement the radixsort() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -66972,7 +66717,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T),
-	bool> radixsort(std::size_t count, T *input[]
+	bool> radixsort(std::size_t count, T *RSBD8_RESTRICT *RSBD8_RESTRICT input
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67029,7 +66774,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	128u >= CHAR_BIT * sizeof(T) &&
 	8u < CHAR_BIT * sizeof(T),
-	bool> radixsortcopy(std::size_t count, T *const input[], T *output[]
+	bool> radixsortcopy(std::size_t count, T *const RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67087,7 +66832,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_enum_v<T> ||
 	std::is_class_v<T> || std::is_union_v<T>) &&
 	8u >= CHAR_BIT * sizeof(T),
-	bool> radixsortcopy(std::size_t count, T *const input[], T *output[]
+	bool> radixsortcopy(std::size_t count, T *const RSBD8_RESTRICT *RSBD8_RESTRICT input, T *RSBD8_RESTRICT *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67116,7 +66861,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != output);
@@ -67141,7 +66886,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -67159,15 +66904,15 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 
 // wrapper for the single-part radixsortcopynoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
-	!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
+RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer argument here, and do not allow active compile-time template evaluation with it
+	!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
-		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
+		typename std::enable_if<!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != output);
@@ -67188,7 +66933,7 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -67211,7 +66956,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -67233,7 +66978,7 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -67262,13 +67007,13 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	bool> radixsort(std::size_t count, V *input[]
+	bool> radixsort(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 
@@ -67317,13 +67062,13 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	bool> radixsortcopy(std::size_t count, V *const input[], V output[]
+	bool> radixsortcopy(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -67373,13 +67118,13 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	bool> radixsortcopy(std::size_t count, V *const input[], V *output[]
+	bool> radixsortcopy(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 	assert(!(largepagesize - 1u & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
@@ -67401,7 +67146,7 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 RSBD8_FUNC_INLINE std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	assert(input != output);
 	assert(input != buffer);
@@ -67421,7 +67166,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortcopynoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const *>(input), reinterpret_cast<U **>(output), reinterpret_cast<U **>(buffer), varparameters...);
+	helper::radixsortcopynoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(output), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
 }
 
 // wrapper for the multi-part radixsortnoalloc() function with type and offset pointer indirection
@@ -67429,7 +67174,7 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 RSBD8_FUNC_INLINE std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer = false, vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -67446,19 +67191,19 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortnoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), movetobuffer, varparameters...);
+	helper::radixsortnoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), movetobuffer, varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[] argument here, and do not allow active compile-time template evaluation with it
-	!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
+RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer argument here, and do not allow active compile-time template evaluation with it
+	!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
-		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
+		typename std::enable_if<!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	assert(input != output);
 	// do not pass a nullptr here
@@ -67475,14 +67220,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *buffer[
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const *>(input), reinterpret_cast<U **>(output), varparameters...);
+	helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(output), varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	void> radixsortcopynoalloc(std::size_t count, V *const input[], V *output[], V *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -67504,7 +67249,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -67521,7 +67266,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
+	helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
 }
 
 // wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with with type and offset pointer indirection
@@ -67529,7 +67274,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	void> radixsortnoalloc(std::size_t count, V *input[], V *buffer[], bool movetobuffer, vararguments... varparameters)noexcept{
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer, vararguments... varparameters)noexcept{
 	static_assert(!std::is_pointer_v<std::remove_pointer_t<T>>, "third level indirection is not supported");
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -67547,9 +67292,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	if(!movetobuffer){
-		helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
+		helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
 	}else{
-		helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
+		helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
 	}
 }
 
@@ -67561,7 +67306,7 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	bool> radixsort(std::size_t count, V *input[]
+	bool> radixsort(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67615,7 +67360,7 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 RSBD8_FUNC_INLINE std::enable_if_t<
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	bool> radixsortcopy(std::size_t count, V *const input[], V output[]
+	bool> radixsortcopy(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67670,7 +67415,7 @@ template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction
 #endif
 RSBD8_FUNC_INLINE std::enable_if_t<
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<T>),
-	bool> radixsortcopy(std::size_t count, V *const input[], V *output[]
+	bool> radixsortcopy(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 		, std::size_t largepagesize = 0u
 #elif defined(_POSIX_C_SOURCE)
@@ -67696,7 +67441,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // Library finalisation
 //
 // It's a good practice to not propagate private macro definitions when compiling the next files.
-// There are no more than these two items from #define statements in this library.
+// There are no more than these three items from #define statements in this library.
 #undef RSBD8_FUNC_INLINE
 #undef RSBD8_FUNC_NORMAL
+#undef RSBD8_RESTRICT
 }// namespace rsbd8
