@@ -54,6 +54,7 @@
 // - Utilities for providing portable rotate left or right by a compile-time constant amount functionality
 // - Utilities to implement input array data slices based on the array length divided by the thread count
 // - Utilities to implement the 8 combinations of absolute value, signed type and floating-point type sorting modes
+// - Utilities to produce the accumulated index counts from multple arrays
 // - Utilities to implement the index counts to offsets transforms
 // - Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading
 // - Function implementation templates for 80-bit-based long double types without indirection
@@ -11291,7 +11292,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	}
 }
 
-// Utilities to produce the sums along entire offset arrays
+// Utilities to produce the accumulated index counts from multple arrays
 
 template<bool isabsvalue, bool issignmode, bool isfltpmode, typename T, typename X>
 RSBD8_FUNC_NORMAL std::enable_if_t<
