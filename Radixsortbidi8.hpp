@@ -57808,7 +57808,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatalo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdatalo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
@@ -57828,7 +57828,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatahi)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdatahi)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
@@ -57874,7 +57874,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platestlo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(platestlo)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platestlo) - 1);
 			std::intptr_t latestlo{*reinterpret_cast<std::intptr_t const *>(platestlo)};
@@ -58060,7 +58060,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatahi)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdatahi)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto imhi{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(phi), varparameters...)};
 				auto curhi{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imhi, varparameters...)};
@@ -58080,7 +58080,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdatalo)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdatalo)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto imlo{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(plo), varparameters...)};
 				auto curlo{indirectinput2<indirection1, indirection2, isindexed2, false, W>(imlo, varparameters...)};
@@ -58126,7 +58126,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platesthi)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(platesthi)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *>(platesthi) + 1);
 			std::intptr_t latesthi{*reinterpret_cast<std::intptr_t const *>(platesthi)};
@@ -58555,7 +58555,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -58575,7 +58575,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -58596,7 +58596,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -58626,7 +58626,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -58652,7 +58652,7 @@ handle0:// architecture: jump label reuse (from the else branch, including possi
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -58681,7 +58681,7 @@ handle0final:// architecture: jump label reuse (from the else branch, including 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(pdata0)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -58760,7 +58760,7 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdata1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -58780,7 +58780,7 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+					pn = reinterpret_cast<V *const *>(pdata2)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 				}
 				auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 				auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -58826,7 +58826,7 @@ lastloop:
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platest1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
+				pn = reinterpret_cast<V *const *>(platest1)[-static_cast<std::ptrdiff_t>(prefetchmaxstride / (2u * sizeof(V *)))];
 			}
 			prefetchbackward(reinterpret_cast<std::intptr_t const *>(platest1) - 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
@@ -59017,7 +59017,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 			auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -59037,7 +59037,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 			auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -59058,7 +59058,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -59088,7 +59088,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -59113,7 +59113,7 @@ handle2:// architecture: jump label reuse (from the else branch, including possi
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -59140,7 +59140,7 @@ handle2final:// architecture: jump label reuse (from the else branch, including 
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(pdata2)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			auto im2{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p2), varparameters...)};
 			auto cur2{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im2, varparameters...)};
@@ -59175,7 +59175,7 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdata1)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im1{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p1), varparameters...)};
 				auto cur1{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im1, varparameters...)};
@@ -59195,7 +59195,7 @@ lastloop:
 				RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 				if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 					// the intermediate prefetch is applied at half the maximum prefetch stride
-					pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
+					pn = reinterpret_cast<V *const *>(pdata0)[prefetchmaxstride / (2u * sizeof(V *))];
 				}
 				auto im0{indirectinput1<indirection1, isindexed2, false, W, V>(reinterpret_cast<V *>(p0), varparameters...)};
 				auto cur0{indirectinput2<indirection1, indirection2, isindexed2, false, W>(im0, varparameters...)};
@@ -59241,7 +59241,7 @@ lastloop:
 			RSBD8_MAYBE_UNUSED V *RSBD8_RESTRICT pn;
 			if constexpr(prefetchmaxstride){// also prefetch on the first-level indirection to lessen the impact of a random read
 				// the intermediate prefetch is applied at half the maximum prefetch stride
-				pn = reinterpret_cast<V *const RSBD8_RESTRICT *>(platest1)[prefetchmaxstride / (2u * sizeof(V *))];
+				pn = reinterpret_cast<V *const *>(platest1)[prefetchmaxstride / (2u * sizeof(V *))];
 			}
 			prefetchforward(reinterpret_cast<std::intptr_t const *>(platest1) + 1);
 			std::intptr_t latest1{*reinterpret_cast<std::intptr_t const *>(platest1)};
@@ -60886,7 +60886,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<T>(count
+			{allocatearray<T>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -60934,7 +60934,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<T>(count
+			{allocatearray<T>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -61012,7 +61012,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortcopynoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(output), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
+	helper::radixsortcopynoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // wrapper for the multi-part radixsortnoalloc() function with simple second-level indirection
@@ -61039,7 +61039,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortnoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), movetobuffer, varparameters...);
+	helper::radixsortnoallocmulti<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), movetobuffer, varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection
@@ -61065,7 +61065,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(output), varparameters...);
+	helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *const *>(input), reinterpret_cast<V **>(output), varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with simple second-level indirection with a dummy buffer argument
@@ -61111,7 +61111,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
+	helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with simple second-level indirection
@@ -61138,8 +61138,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<T>, const helper::memberobjectgenerator<U, 0>,
 		std::conditional_t<std::is_volatile_v<T>, volatile helper::memberobjectgenerator<U, 0>,
 		helper::memberobjectgenerator<U, 0>>>>;
-	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
-	else helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V *RSBD8_RESTRICT *>(input), reinterpret_cast<V *RSBD8_RESTRICT *>(buffer), varparameters...);
+	if(!movetobuffer) helper::radixsortnoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
+	else helper::radixsortcopynoallocsingle<&V::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2>(count, reinterpret_cast<V **>(input), reinterpret_cast<V **>(buffer), varparameters...);
 }
 
 // wrapper to implement the radixsort() function with simple second-level indirection, which only allocates some memory prior to sorting arrays
@@ -61167,7 +61167,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<T *>(count
+			{allocatearray<T *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -61215,7 +61215,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<T *>(count
+			{allocatearray<T *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -61432,11 +61432,11 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
-				, largepagesize
+			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
-				, mmapflags
+			, mmapflags
 #endif
 			)};
 		if(buffer)RSBD8_LIKELY{
@@ -61478,7 +61478,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -61552,7 +61552,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortcopynoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(output), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
+	helper::radixsortcopynoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const *>(input), reinterpret_cast<U **>(output), reinterpret_cast<U **>(buffer), varparameters...);
 }
 
 // wrapper for the multi-part radixsortnoalloc() function with type and offset pointer indirection
@@ -61577,7 +61577,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortnoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), movetobuffer, varparameters...);
+	helper::radixsortnoallocmulti<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), movetobuffer, varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection
@@ -61606,7 +61606,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_R
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(output), varparameters...);
+	helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *const *>(input), reinterpret_cast<U **>(output), varparameters...);
 }
 
 // wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection with a dummy buffer argument
@@ -61652,7 +61652,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		std::conditional_t<std::is_const_v<V>, const helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
-	helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
+	helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
 }
 
 // wrapper for the single-part radixsortnoalloc() and radixsortcopynoalloc() functions with with type and offset pointer indirection
@@ -61678,9 +61678,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		std::conditional_t<std::is_volatile_v<V>, volatile helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>,
 		helper::memberobjectgenerator<std::conditional_t<std::is_pointer_v<T>, W const *, W>, indirection1>>>>;
 	if(!movetobuffer){
-		helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
+		helper::radixsortnoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
 	}else{
-		helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U *RSBD8_RESTRICT *>(input), reinterpret_cast<U *RSBD8_RESTRICT *>(buffer), varparameters...);
+		helper::radixsortcopynoallocsingle<&U::object, isdescsort, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, U>(count, reinterpret_cast<U **>(input), reinterpret_cast<U **>(buffer), varparameters...);
 	}
 }
 
@@ -61706,7 +61706,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
@@ -61751,7 +61751,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #else
 			buffer
 #endif
-				{allocatearray<V *>(count
+			{allocatearray<V *>(count
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 			, largepagesize
 #elif defined(_POSIX_C_SOURCE)
