@@ -2442,8 +2442,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
 	// do not pass a nullptr here
 	assert(p);
@@ -2456,10 +2456,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, isdiscarded, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2471,8 +2471,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2484,9 +2484,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *RSBD8_RESTRICT p, isdiscarded, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2590,8 +2590,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
 	// do not pass a nullptr here
 	assert(p);
@@ -2604,10 +2604,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	isindexed2 &&
 	!isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>> *> splitget(V *RSBD8_RESTRICT p, W index2, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	static_cast<void>(index2);
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2619,8 +2619,8 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
-	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
+	!std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::invoke_result_t<decltype(indirection1), V *, vararguments...>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2632,9 +2632,9 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_function_pointer_v<decltype(indirection1)> &&
 	!isindexed2 &&
 	!isextraparam &&
-	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>,
-	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>){
-	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *RSBD8_RESTRICT, vararguments...>>;
+	std::is_lvalue_reference_v<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>,
+	std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>> splitget(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(indirection1), V *, vararguments...>){
+	using T = std::remove_reference_t<std::invoke_result_t<decltype(indirection1), V *, vararguments...>>;
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2666,8 +2666,8 @@ RSBD8_FUNC_INLINE void splitparameter()noexcept{
 
 // utility template to either retrieve the first-level source or output another pointer for second-level indirection
 template<auto indirection1, bool isindexed2, bool isextraparam, typename T, typename V, typename... vararguments>
-RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
-	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>;// splitget will convert references to pointers
+RSBD8_FUNC_INLINE auto indirectinput1(V *RSBD8_RESTRICT p, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>){
+	using U = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;// splitget will convert references to pointers
 	// do not pass a nullptr here
 	assert(p);
 
@@ -2751,7 +2751,7 @@ struct memberpointerdeducebody;
 // partial specialisation, by std::is_member_function_pointer_v
 template<auto indirection1, bool isindexed2, bool isextraparam, typename V, typename... vararguments>
 struct memberpointerdeducebody<indirection1, isindexed2, isextraparam, V, std::enable_if_t<std::is_member_function_pointer_v<decltype(indirection1)>>, vararguments...>{
-	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>;
+	using type = std::invoke_result_t<decltype(splitget<indirection1, isindexed2, isextraparam, V, vararguments...>), V *, vararguments...>;
 };
 
 // partial specialisation, by std::is_member_object_pointer_v
@@ -15665,7 +15665,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
@@ -16142,7 +16142,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -16165,7 +16165,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -16219,7 +16219,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -16327,7 +16327,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -16422,7 +16422,7 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrchi;
 					psrchi += count;
-					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(!old) do RSBD8_LIKELY{
 							spinpause();
 						}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -16519,7 +16519,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U =
 #if 0xFFFFFFFFFFFFFFFFu <= UINTPTR_MAX
@@ -16541,7 +16541,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -16667,7 +16667,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -16909,7 +16909,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -17152,7 +17152,7 @@ handlebelowtop:
 					pdst = pdstnext;
 					// unused: pdstnext = psrclo;
 					if constexpr(ismultithreadcapable){
-						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+						if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 							if(!old) do RSBD8_LIKELY{
 								spinpause();
 							}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -17396,7 +17396,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -17409,11 +17409,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	// combine the data from several threads
 	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -17423,7 +17423,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -17432,7 +17432,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -17503,7 +17503,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -17546,7 +17546,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -17560,7 +17560,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(assignedslice -= 2u)RSBD8_LIKELY{
 						initasynchandlesvector.reserve(assignedslice);
 						do RSBD8_LIKELY{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -18117,7 +18117,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -18127,7 +18127,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -18193,7 +18193,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	80u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -18203,7 +18203,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
@@ -18215,7 +18215,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -18224,7 +18224,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -18295,7 +18295,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = decltype(T::signexponent);
 	using U =
@@ -18335,7 +18335,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -19002,7 +19002,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -19012,7 +19012,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -20909,7 +20909,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>>,
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -21266,7 +21266,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -21288,7 +21288,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -21354,7 +21354,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -21431,7 +21431,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -21499,7 +21499,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -21521,7 +21521,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -21683,7 +21683,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -21855,7 +21855,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -22019,7 +22019,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -22032,11 +22032,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	// combine the data from several threads
 	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -22046,7 +22046,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -22055,7 +22055,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -22125,7 +22125,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -22167,7 +22167,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -22181,7 +22181,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(assignedslice -= 2u)RSBD8_LIKELY{
 						initasynchandlesvector.reserve(assignedslice);
 						do RSBD8_LIKELY{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -22681,7 +22681,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -22691,7 +22691,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -22756,7 +22756,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u == typebitsize<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>>,
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -22766,7 +22766,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
@@ -22778,7 +22778,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -22787,7 +22787,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -22857,7 +22857,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(std::uintmax_t)){
@@ -22896,7 +22896,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -23411,7 +23411,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -23421,7 +23421,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -25737,7 +25737,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	std::size_t LO{}, HI{1u};// little-endian case
@@ -26311,7 +26311,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -26333,7 +26333,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -26426,7 +26426,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
-		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(!old) do RSBD8_LIKELY{
 				spinpause();
 			}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -26528,7 +26528,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -26623,7 +26623,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -26645,7 +26645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -26849,7 +26849,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		shifter += index * typeradix<T>;
 		poffset += static_cast<std::size_t>(index) << typeradix<T>;
 		if constexpr(ismultithreadcapable){
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -27063,7 +27063,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			shifter += index * typeradix<T>;
 			poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -27269,7 +27269,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -27280,11 +27280,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	// combine the data from several threads
 	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -27294,7 +27294,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -27303,7 +27303,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -27373,7 +27373,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -27413,7 +27413,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -27427,7 +27427,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(assignedslice -= 2u)RSBD8_LIKELY{
 						initasynchandlesvector.reserve(assignedslice);
 						do RSBD8_LIKELY{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -28031,7 +28031,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -28041,7 +28041,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -28106,7 +28106,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64u == CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -28116,7 +28116,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
@@ -28128,7 +28128,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -28137,7 +28137,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -28207,7 +28207,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	std::size_t LO{}, HI{1u};// little-endian case
 	if constexpr(1u < sizeof(double)){
@@ -28246,7 +28246,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -28971,7 +28971,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -28981,7 +28981,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -36903,7 +36903,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocmultiinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, std::conditional_t<isinputconst, V *const RSBD8_RESTRICT, V *RSBD8_RESTRICT> *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// if isrevorder and isinputconst are set, the first parameter is used for V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, and all the other ones are for the getter function
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, isrevorder && isinputconst, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
@@ -39869,7 +39869,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsetscompanion, unsigned runsteps, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -39883,7 +39883,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)) + count};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -39981,7 +39981,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				shifter += index * typeradix<T>;
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
-			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(!old) do RSBD8_LIKELY{
 					spinpause();
 				}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -40077,7 +40077,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultisortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdstnext, X *RSBD8_RESTRICT offsets, unsigned runsteps, unsigned usemultithread, std::conditional_t<ismultithreadcapable, std::atomic_uintptr_t &, std::nullptr_t> atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -40091,7 +40091,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V *RSBD8_RESTRICT *>(input)};// the original array input here will never be written to
+	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -40300,7 +40300,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 				poffset += static_cast<std::size_t>(index) << typeradix<T>;
 			}
 			if constexpr(ismultithreadcapable){
-				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
 					}while(atomiclightbarrier.load(std::memory_order_relaxed));
@@ -40507,7 +40507,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocmultimtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -40520,11 +40520,11 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion;
-	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
+	if constexpr(isrevorder) offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>(1u, allowedthreads, count, input, output, buffer, varparameters...);
 	else offsetscompanion = radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>(1u, allowedthreads, count, input, output, varparameters...);
 	// combine the data from several threads
 	// for processing, the halves of the thread count are rounded up in the main thread (lower half), and rounded down in the companion thread (upper half)
@@ -40534,7 +40534,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -40543,7 +40543,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -40614,7 +40614,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -40648,7 +40648,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -40662,7 +40662,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 					if(assignedslice -= 2u)RSBD8_LIKELY{
 						initasynchandlesvector.reserve(assignedslice);
 						do RSBD8_LIKELY{
-							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V *RSBD8_RESTRICT *, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
+							if constexpr(isrevorder) initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, V **, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, buffer, varparameters...));
 							else initasynchandlesvector.emplace_back(std::async(std::launch::async, radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, true, V, X, vararguments...>, assignedslice + 1u, allowedthreads, count, input, output, varparameters...));
 						}while(--assignedslice);// slice 0 is handled by the current thread, and slice 1 by the companion thread
 					}
@@ -44057,7 +44057,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -44067,7 +44067,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -44133,7 +44133,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	64 - (0xFFFFFFFFFFFFFFFFu > UINTPTR_MAX) >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmultimtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -44143,7 +44143,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocmultiinitmt<indirection1, isrevorder, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, false, V, X, vararguments...>(1u, allowedthreads, count, input, buffer, varparameters...)};
@@ -44155,7 +44155,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -44164,7 +44164,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -44235,7 +44235,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -44266,7 +44266,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -48396,7 +48396,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -48406,7 +48406,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -50318,7 +50318,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> radixsortnoallocsingleinitmt(unsigned assignedslice, unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT pout, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -50464,7 +50464,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocsinglesortmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsetscompanion, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(std::max(static_cast<std::size_t>(1u) << 8, prefetchmaxstride / sizeof(V *)) - 1u <= count);// small arrays are only allowed in single-threaded mode
@@ -50566,7 +50566,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglesortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsets, unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocsinglesortmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo, V *RSBD8_RESTRICT *RSBD8_RESTRICT pdst, X *RSBD8_RESTRICT offsets, unsigned usemultithread, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 	assert(count && count != SIZE_MAX);
@@ -50809,7 +50809,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != output);
@@ -50819,7 +50819,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, output, varparameters...)};
@@ -50831,7 +50831,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -50840,7 +50840,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -50893,7 +50893,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)	noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -50920,7 +50920,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -51224,7 +51224,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -51234,7 +51234,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -51284,7 +51284,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_unsigned_v<X> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocsinglemtc(unsigned allowedthreads, std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, std::shared_future<offsetstype<isabsvalue, issignmode, isfltpmode, true, tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>, X>> *RSBD8_RESTRICT pslicehandle, std::atomic_uintptr_t &RSBD8_RESTRICT atomiclightbarrier, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(1u < allowedthreads);
 	assert(input != buffer);
@@ -51294,7 +51294,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	assert(2u == allowedthreads || pslicehandle);
 
 	// generate the histograms for each part, all in one go
-	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+	RSBD8_MAYBE_UNUSED std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 		std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 		atomicvarwrapper> atomicguard{atomiclightbarrier};// may throw, so set up the guard
 	offsetstype<isabsvalue, issignmode, isfltpmode, true, T, X> offsetscompanion{radixsortnoallocsingleinitmt<indirection1, isabsvalue, issignmode, isfltpmode, indirection2, isindexed2, V, X>(1u, allowedthreads, count, input, buffer, varparameters...)};
@@ -51306,7 +51306,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	{// barrier and pointer exchange with the main thread
 		std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()))};
 		// detect exceptions
-		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 			if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 		}
 		if(!other){
@@ -51315,7 +51315,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 				other = atomiclightbarrier.load(std::memory_order_relaxed);
 			}while(reinterpret_cast<std::uintptr_t>(offsetscompanion.data()) == other);
 			// detect exceptions
-			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+			if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 				if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the main thread produced an exception
 			}
 			// reset the barrier after use, only one thread will do this
@@ -51368,7 +51368,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if !defined(RSBD8_THREAD_MAXIMUM) || 1 < (RSBD8_THREAD_MAXIMUM)
 		unsigned allowedthreads,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using U = std::conditional_t<sizeof(T) < sizeof(unsigned), unsigned, T>;// assume zero-extension to be basically free for U on basically all modern machines
 #if defined(RSBD8_THREAD_MAXIMUM) && 1 >= (RSBD8_THREAD_MAXIMUM)
@@ -51395,7 +51395,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 		RSBD8_MAYBE_UNUSED unsigned assignedslice;
 		{// scope atomicguard, so it's always destroyed before asynchandle
 			RSBD8_MAYBE_UNUSED std::conditional_t<ismultithreadcapable,
-				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>,
+				std::conditional_t<std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>,
 					std::atomic_uintptr_t &RSBD8_RESTRICT,// nothrow capable indirection1, let the compiler just discard this reference
 					atomicvarwrapper>,// may throw, so set up the guard
 				std::nullptr_t> atomicguard{atomiclightbarrier};
@@ -51699,7 +51699,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 			if constexpr(ismultithreadcapable){
 				std::uintptr_t other{atomiclightbarrier.exchange(reinterpret_cast<std::uintptr_t>(offsets.data()) & -static_cast<std::intptr_t>(usemultithread))};
 				// detect exceptions
-				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+				if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 					if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 				}
 				// simply do not spin if usemultithread is zero
@@ -51709,7 +51709,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 						other = atomiclightbarrier.load(std::memory_order_relaxed);
 					}while(reinterpret_cast<std::uintptr_t>(offsets.data()) == other);
 					// detect exceptions
-					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+					if constexpr(!std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 						if(reinterpret_cast<std::uintptr_t>(&atomiclightbarrier) == other) return;// the companion thread produced an exception
 					}
 					// reset the barrier after use, only one thread will do this
@@ -52021,7 +52021,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocsingle(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocsingle(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -52104,7 +52104,7 @@ template<auto indirection1, bool isdescsort, bool isrevorder, bool isabsvalue, b
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocsingle(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocsingle(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -52368,7 +52368,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoallocmulti(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoallocmulti(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -52455,7 +52455,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoallocmulti(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoallocmulti(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != buffer);
 	// do not pass a nullptr here
 	assert(input);
@@ -57766,7 +57766,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergehalvesmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> mergehalvesmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -58018,7 +58018,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergehalvesmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> mergehalvesmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -58191,7 +58191,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -58351,7 +58351,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -58505,7 +58505,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergethirdsmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> mergethirdsmtc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -58967,7 +58967,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> mergethirdsmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> mergethirdsmain(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	using W = typename std::conditional_t<std::is_class_v<T> || std::is_union_v<T> || isabsvalue || !issignmode || isfltpmode, std::enable_if<true, T>, std::make_signed<T>>::type;// for simple signed comparisons, use signed W
 	using M = std::conditional_t<std::is_integral_v<W>, W, std::intptr_t>;// used for masking operations
@@ -59299,7 +59299,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortcopynoallocmulti6thread
 #endif
-	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -59451,7 +59451,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortnoallocmulti6thread
 #endif
-	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -59617,7 +59617,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -59805,7 +59805,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #if true// placeholder, for the above reason again
 		unsigned reportedcores,
 #endif
-		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -59991,7 +59991,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortcopynoallocmulti16thread
 #endif
-	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != output);
 	assert(input != buffer);
@@ -60189,7 +60189,7 @@ RSBD8_FUNC_NORMAL std::enable_if_t<
 #else
 	radixsortnoallocmulti16thread
 #endif
-	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = tounifunsigned<std::remove_pointer_t<std::decay_t<memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>, isabsvalue, issignmode, isfltpmode>;
 	assert(input != buffer);
 	// do not pass a nullptr here
@@ -61272,7 +61272,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != output);
@@ -61297,7 +61297,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	128u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>) &&
 	8u < CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer = false, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -61316,14 +61316,14 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // wrapper for the single-part radixsortcopynoalloc() function with indirection
 template<auto indirection1, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer argument here, and do not allow active compile-time template evaluation with it
-	!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
+	!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
-		typename std::enable_if<!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
+		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != output);
@@ -61344,7 +61344,7 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != output);
 	assert(input != buffer);
 	assert(output != buffer);
@@ -61367,7 +61367,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the bool movet
 		typename std::enable_if<!std::is_same_v<bool, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
-	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -61389,7 +61389,7 @@ template<auto indirection1, sortingdirection direction = sortingdirection::ascfw
 RSBD8_FUNC_INLINE std::enable_if_t<
 	std::is_member_pointer_v<decltype(indirection1)> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>),
-	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+	void> radixsortnoalloc(std::size_t count, V *RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer, bool movetobuffer, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	using T = std::remove_pointer_t<std::decay_t<helper::memberpointerdeduce<indirection1, isindexed2, false, V, vararguments...>>>;
 	static_assert(!std::is_pointer_v<T>, "third level indirection is not supported");
 	assert(input != buffer);
@@ -61421,7 +61421,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	// do not pass a nullptr here
 	assert(input);
 
@@ -61465,7 +61465,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 	assert(input != output);
 	// do not pass a nullptr here
 	assert(input);
@@ -61510,7 +61510,7 @@ RSBD8_NODISCARD RSBD8_FUNC_INLINE std::enable_if_t<
 #elif defined(_POSIX_C_SOURCE)
 		, int mmapflags = MAP_ANONYMOUS | MAP_PRIVATE
 #endif
-		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *RSBD8_RESTRICT, vararguments...>){
+		, vararguments... varparameters)noexcept(std::is_nothrow_invocable_v<decltype(helper::splitget<indirection1, isindexed2, false, V, vararguments...>), V *, vararguments...>){
 #ifdef _WIN32// _WIN32 will remain defined for Windows versions past the legacy 32-bit original
 	assert(!(largepagesize - 1u & largepagesize));// a maximum of one bit should be set in the value of largepagesize
 	static_cast<void>(largepagesize);
@@ -61583,10 +61583,10 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 // wrapper for the single-part radixsortcopynoalloc() function with type and offset pointer indirection
 template<typename T, std::ptrdiff_t indirection1 = 0, sortingdirection direction = sortingdirection::ascfwdorder, sortingmode mode = sortingmode::native, std::ptrdiff_t indirection2 = 0, bool isindexed2 = false, typename V, typename... vararguments>
 RSBD8_FUNC_INLINE std::enable_if_t<// disable the option for with the V *RSBD8_RESTRICT *RSBD8_RESTRICT buffer argument here, and do not allow active compile-time template evaluation with it
-	!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
+	!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
 		std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>> &&
 	8u >= CHAR_BIT * sizeof(std::remove_pointer_t<std::decay_t<
-		typename std::enable_if<!std::is_same_v<V *RSBD8_RESTRICT *, std::conditional_t<0u < sizeof...(vararguments),
+		typename std::enable_if<!std::is_same_v<V **, std::conditional_t<0u < sizeof...(vararguments),
 			std::invoke_result_t<decltype(helper::splitparameter<false, vararguments...>), vararguments...>, void>>,
 			helper::memberpointerdeducebody<indirection1, isindexed2, false, V, vararguments...>>::type>>),
 	void> radixsortcopynoalloc(std::size_t count, V *const RSBD8_RESTRICT *RSBD8_RESTRICT input, V *RSBD8_RESTRICT *RSBD8_RESTRICT output, vararguments... varparameters)noexcept{
