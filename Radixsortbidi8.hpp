@@ -272,7 +272,18 @@ enum struct sortingdirection : unsigned char{// 2 bits as bitfields
 }// namespace rsbd8
 
 // ## Miscellaneous notes
-// Sorting unsigned values is the fastest, very closely followed up by signed values, followed up by floating-point values in this library.
+// ### Architectural matters
+// Incompatibility: on the x64/x86-64/AMD64/EM64T platform minimal Prefetchw feature support by the CPU is unconditionally required for this library. This is stated in the comments as:
+// prefetchw can be assumed to be supported on x64 (even though not guaranteed because of rare Intel Pentium D 800 series processors from 2005), so this is only enabled for x64 and not for 32-bit x86
+// Currently in 2026, a few, very niche operating systems for the x64 platform will run without support for this feature, but these simply do not align with the usage case of this library.
+// These operating systems are for legacy support with specifically this hardware, and are unlikely to run any new software. Reminder, this is a C++17 and onwards feature set library to begin with.
+// This library is on top of that focussed on high-performance computing, somewhat larger memory footprints, and multithreading targets often beyond the scope of these dual-core machines.
+// Incompatibility: on the x86-32 platform SSE feature support by the CPU is unconditionally required for this library. SSE is available since the 1999 Intel Pentium III and 2001 AMD Athlon XP era.
+// For a similar reason as on x64, prefetcht0 is expected to be available to do basic prefetching for reading data from and possibly writing data to a soon to be used cache line.
+// ### Design matters
+// Sorting unfiltered integer values is the fastest, followed up by floating-point values in this library.
+// Filtering costs vary per item, see "Utilities to establish the tresholds for 2-, 4-, 6-, 8- and 16-way multithreading" for some insights into that.
+// For 64-bit and larger systems complete 128-bit integer and floating-point support is available in this library, whether or not such types exist in the environment.
 // Unsigned 128-bit and larger integers can be sorted by sequential sorting from the bottom to the top parts as unsigned (64-bit) elements when using indirection.
 // Signed 128-bit and larger integers are sorted the same, with only the topmost (64-bit) element sorted as signed because of the sign bit. This does not work when filtered by the absolute modes.
 // Regular absolute 128-bit and larger floating-point values are sorted the same, with only the topmost (64-bit) element sorted as absolute floating-point because of the sign bit. This does not work when filtered by the default or tiered absolute modes.
@@ -664,7 +675,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
-// a very reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
+// prefetchw can be assumed to be supported on x64 (even though not guaranteed because of rare Intel Pentium D 800 series processors from 2005), so this is only enabled for x64 and not for 32-bit x86
 #ifdef _M_X64
 RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
 RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
@@ -743,7 +754,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	void> prefetchcurrent(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data), _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchbackward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) - prefetchmaxstride, _MM_HINT_T0);}
 RSBD8_FUNC_INLINE void prefetchforward(void const *RSBD8_RESTRICT data)noexcept{_mm_prefetch(reinterpret_cast<char const *>(data) + prefetchmaxstride, _MM_HINT_T0);}
-// a very reasonable assumption is that prefetchw is supported on x64 (even though not guaranteed on some rare, ancient Intel Pentium D x64 processors), so this is only enabled for x64 and not for 32-bit x86
+// prefetchw can be assumed to be supported on x64 (even though not guaranteed because of rare Intel Pentium D 800 series processors from 2005), so this is only enabled for x64 and not for 32-bit x86
 #ifdef __x86_64__
 RSBD8_FUNC_INLINE void prefetchwritebackward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) - prefetchmaxstride);}
 RSBD8_FUNC_INLINE void prefetchwriteforward(void const *RSBD8_RESTRICT data)noexcept{_m_prefetchw(reinterpret_cast<std::byte const *>(data) + prefetchmaxstride);}
