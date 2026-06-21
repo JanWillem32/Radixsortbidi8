@@ -13605,7 +13605,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -13645,7 +13645,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -13727,7 +13727,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -13800,7 +13800,7 @@ handlebelowtop:
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
-					// unused: pdstnext = psrchi;
+					// unused: pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 					psrchi += count;
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
@@ -13888,7 +13888,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -13970,7 +13970,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -14117,7 +14117,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -14283,7 +14283,7 @@ handlebelowtop:
 				// swap the pointers for the next round, data is moved on each iteration
 				psrclo = pdst;
 				pdst = pdstnext;
-				// unused: pdstnext = psrclo;
+				// unused: pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 				if constexpr(ismultithreadcapable) if(old < usemultithread) do RSBD8_LIKELY{
 					spinpause();
 				}while(1u == atomiclightbarrier.load(std::memory_order_relaxed));// prevent the ABA problem here, as the companion thread will never set it to one
@@ -16126,7 +16126,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -16174,7 +16174,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -16278,7 +16278,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -16373,7 +16373,7 @@ handlebelowtop:
 					// swap the pointers for the next round, data is moved on each iteration
 					psrchi = pdst;
 					pdst = pdstnext;
-					// unused: pdstnext = psrchi;
+					// unused: pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 					psrchi += count;
 					if(!old) do RSBD8_LIKELY{
 						spinpause();
@@ -16490,7 +16490,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -16610,7 +16610,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -16848,7 +16848,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -17091,7 +17091,7 @@ handlebelowtop:
 					// swap the pointers for the next round, data is moved on each iteration
 					psrclo = pdst;
 					pdst = pdstnext;
-					// unused: pdstnext = psrclo;
+					// unused: pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 					if constexpr(ismultithreadcapable){
 						if(!old) do RSBD8_LIKELY{
 							spinpause();
@@ -19361,7 +19361,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -19399,7 +19399,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -19446,7 +19446,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -19510,7 +19510,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -19588,7 +19588,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -19672,7 +19672,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -21173,7 +21173,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -21233,7 +21233,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -21306,7 +21306,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -21398,7 +21398,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -21554,7 +21554,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -21722,7 +21722,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -23901,7 +23901,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -23952,7 +23952,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -24010,7 +24010,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -24087,7 +24087,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -24178,7 +24178,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -24275,7 +24275,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -26147,7 +26147,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -26234,7 +26234,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		psrchi = pdst;
 		std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 		pdst = pdstnext;
-		pdstnext = psrchi;
+		pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 		psrchi += count;
 		// skip a step if possible
 		runsteps >>= index;
@@ -26332,7 +26332,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			runsteps >>= index;
@@ -26451,7 +26451,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -26649,7 +26649,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 		RSBD8_MAYBE_UNUSED std::uintptr_t old;
 		if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 		pdst = pdstnext;
-		pdstnext = psrclo;
+		pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 		// skip a step if possible
 		runsteps >>= index;
 		shifter += index * typeradix<T>;
@@ -26859,7 +26859,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			runsteps >>= index;
 			shifter += index * typeradix<T>;
@@ -31561,7 +31561,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<T *>(input)) + count};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -31615,7 +31615,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<T *>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			if constexpr(16u < typebitsize<T>){
@@ -31690,7 +31690,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	T *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<T *>(input)};// the original array input here will never be written to
+	T const *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -31784,7 +31784,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<T *>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			if constexpr(16u < typebitsize<T>){
 				runsteps >>= index;
@@ -39629,7 +39629,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : const_cast<V **>(input)) + count};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrchi{(isrevorder? pdstnext : input) + count};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsetscompanion + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -39719,7 +39719,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			psrchi = pdst;
 			std::uintptr_t old{atomiclightbarrier.fetch_add(~std::uintptr_t{})};
 			pdst = pdstnext;
-			pdstnext = psrchi;
+			pdstnext = const_cast<V **>(psrchi);// the original array input here will never be written to
 			psrchi += count;
 			// skip a step if possible
 			if constexpr(16u < typebitsize<T>){
@@ -39833,7 +39833,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 	assert(runsteps);
 
 	unsigned shifter{bitscanforwardportable(runsteps)};// at least 1 bit is set inside runsteps as by previous check
-	V *RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : const_cast<V **>(input)};// the original array input here will never be written to
+	V *const RSBD8_RESTRICT *RSBD8_RESTRICT psrclo{isrevorder? pdstnext : input};// the original array input here will never be written to
 	// skip a step if possible
 	runsteps >>= shifter;
 	X *RSBD8_RESTRICT poffset{offsets + (static_cast<std::size_t>(shifter) << typeradix<T>)};
@@ -40034,7 +40034,7 @@ RSBD8_FUNC_INLINE std::enable_if_t<
 			RSBD8_MAYBE_UNUSED std::uintptr_t old;
 			if constexpr(ismultithreadcapable) old = atomiclightbarrier.fetch_add(usemultithread);
 			pdst = pdstnext;
-			pdstnext = psrclo;
+			pdstnext = const_cast<V **>(psrclo);// the original array input here will never be written to
 			// skip a step if possible
 			if constexpr(16u < typebitsize<T>){
 				runsteps >>= index;
